@@ -1,0 +1,58 @@
+# CC-001 — Freeform Input Integration
+
+## Goal
+
+Integrate freeform questions into the existing identity engine while preserving canonical structure:
+
+- freeform inputs → signals → tensions → reflection
+- no breaking of existing deterministic signal system
+- no overbuilding
+
+---
+
+## Read First (Required)
+
+- docs/canon/question-bank-v1.md
+- docs/canon/freeform-signal-extraction.md
+- docs/canon/freeform-extraction-prompt.md
+- docs/canon/signal-and-tension-model.md
+- docs/canon/inner-constitution.md
+
+---
+
+## Scope
+
+Add support for:
+
+- Q-I1 (belief under disagreement)
+- Q-I2 (epistemic flexibility)
+- Q-I3 (belief under cost)
+
+---
+
+## Requirements
+
+### 1. Question Flow
+
+- Add freeform questions to the existing flow
+- Render a textarea input instead of buttons
+- Preserve:
+  - question_id
+  - card_id
+  - question_text
+  - response (string)
+
+---
+
+### 2. Freeform Storage
+
+Ensure answers are stored in the same structure as other inputs:
+
+```ts
+{
+  question_id: string,
+  card_id: string,
+  question_text: string,
+  response: string,
+  type: "freeform"
+}

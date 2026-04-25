@@ -1,0 +1,161 @@
+import type { Question } from "../lib/types";
+
+export const questions: Question[] = [
+  {
+    question_id: "Q-C1",
+    card_id: "conviction",
+    type: "forced",
+    text: "Would you rather be misunderstood but correct, or liked but slightly dishonest?",
+    options: [
+      { label: "Misunderstood but correct", signal: "truth_priority_high" },
+      { label: "Liked but slightly dishonest", signal: "belonging_priority_high" },
+    ],
+  },
+  {
+    question_id: "Q-C3",
+    card_id: "conviction",
+    type: "forced",
+    text: "Which feels more important to preserve?",
+    options: [
+      { label: "Freedom to act", signal: "freedom_priority" },
+      { label: "Stability and order", signal: "order_priority" },
+    ],
+  },
+  {
+    question_id: "Q-P1",
+    card_id: "pressure",
+    type: "forced",
+    text: "If expressing a belief would cost you close relationships, you would:",
+    options: [
+      { label: "Stay silent", signal: "adapts_under_social_pressure" },
+      { label: "Soften it", signal: "adapts_under_social_pressure" },
+      { label: "Express it carefully", signal: "moderate_social_expression" },
+      { label: "Say it directly", signal: "high_conviction_expression" },
+    ],
+  },
+  {
+    question_id: "Q-P2",
+    card_id: "pressure",
+    type: "forced",
+    text: "If a belief put your job at risk, you would:",
+    options: [
+      { label: "Change your position", signal: "adapts_under_economic_pressure" },
+      { label: "Keep it private", signal: "hides_belief" },
+      { label: "Hold it quietly", signal: "holds_internal_conviction" },
+      { label: "Accept the risk", signal: "high_conviction_under_risk" },
+    ],
+  },
+  {
+    question_id: "Q-F1",
+    card_id: "formation",
+    type: "forced",
+    text: "As a child, authority figures were mostly:",
+    options: [
+      { label: "Trustworthy and protective", signal: "authority_trust_high" },
+      { label: "Necessary but flawed", signal: "authority_skepticism_moderate" },
+      { label: "Arbitrary or unfair", signal: "authority_distrust" },
+    ],
+  },
+  {
+    question_id: "Q-F2",
+    card_id: "formation",
+    type: "forced",
+    text: "Your childhood environment felt:",
+    options: [
+      { label: "Stable and predictable", signal: "stability_baseline_high" },
+      { label: "Mixed", signal: "moderate_stability" },
+      { label: "Uncertain or chaotic", signal: "chaos_exposure" },
+    ],
+  },
+  {
+    question_id: "Q-X1",
+    card_id: "context",
+    type: "forced",
+    text: "Your current life feels:",
+    options: [
+      { label: "Stable and manageable", signal: "stability_present" },
+      { label: "Busy but controlled", signal: "moderate_load" },
+      { label: "Overwhelming or stretched", signal: "high_pressure_context" },
+    ],
+  },
+  {
+    question_id: "Q-X2",
+    card_id: "context",
+    type: "forced",
+    text: "Right now, people depend on you:",
+    options: [
+      { label: "Very little", signal: "low_responsibility" },
+      { label: "Some", signal: "moderate_responsibility" },
+      { label: "A lot", signal: "high_responsibility" },
+    ],
+  },
+  {
+    question_id: "Q-A1",
+    card_id: "agency",
+    type: "forced",
+    text: "How do you spend most of your time?",
+    options: [
+      { label: "Building or creating", signal: "proactive_creator" },
+      { label: "Maintaining responsibilities", signal: "responsibility_maintainer" },
+      { label: "Reacting to demands", signal: "reactive_operator" },
+    ],
+  },
+  {
+    question_id: "Q-A2",
+    card_id: "agency",
+    type: "forced",
+    text: "If your obligations were lighter, where would your energy naturally go?",
+    options: [
+      { label: "Building or creating something new", signal: "proactive_creator" },
+      { label: "Deepening relationships and care", signal: "relational_investment" },
+      { label: "Restoring order and stability", signal: "stability_restoration" },
+      { label: "Exploring, learning, or wandering", signal: "exploration_drive" },
+    ],
+  },
+  {
+    question_id: "Q-S1",
+    card_id: "sacred",
+    type: "ranking",
+    text: "Order these by what you'd protect first when something has to give.",
+    helper: "Four of your own. Rank by which holds first when two of them pull apart.",
+    items: [
+      { id: "freedom",   label: "Freedom",   gloss: "the ability to act without needing permission.",        signal: "freedom_priority"   },
+      { id: "truth",     label: "Truth",     gloss: "what's actually so, even when it costs.",                signal: "truth_priority"     },
+      { id: "stability", label: "Stability", gloss: "steady ground, for you and the people who rely on you.", signal: "stability_priority" },
+      { id: "loyalty",   label: "Loyalty",   gloss: "staying with your people through what comes.",           signal: "loyalty_priority"   },
+    ],
+  },
+  {
+    question_id: "Q-S2",
+    card_id: "sacred",
+    type: "ranking",
+    text: "Order these by which has the strongest claim on you.",
+    items: [
+      { id: "family",    label: "Family",    gloss: "the people who are yours, and to whom you are theirs.",      signal: "family_priority"    },
+      { id: "knowledge", label: "Knowledge", gloss: "what's actually known, and the discipline of seeking more.", signal: "knowledge_priority" },
+      { id: "justice",   label: "Justice",   gloss: "fair weight, even when it costs you to give it.",            signal: "justice_priority"   },
+      { id: "faith",     label: "Faith",     gloss: "trust in what's larger than you, however you frame it.",     signal: "faith_priority"     },
+    ],
+  },
+  {
+    question_id: "Q-I1",
+    card_id: "conviction",
+    type: "freeform",
+    text: "What is something you believe that most people around you disagree with?",
+    options: [],
+  },
+  {
+    question_id: "Q-I2",
+    card_id: "conviction",
+    type: "freeform",
+    text: "What would change your mind about that belief?",
+    options: [],
+  },
+  {
+    question_id: "Q-I3",
+    card_id: "pressure",
+    type: "freeform",
+    text: "Have you ever paid a cost — social, professional, or personal — for holding a belief? What happened?",
+    options: [],
+  },
+];

@@ -1,0 +1,57 @@
+# Freeform Signal Extraction Prompt (Canonical)
+
+## Purpose
+
+Define the exact prompt used to convert freeform responses into structured signals.
+
+This prompt must:
+- preserve nuance
+- avoid hallucination
+- map to known signals where possible
+- remain consistent with the canonical system
+
+---
+
+## Prompt
+
+You are interpreting a user's freeform response within a structured identity system.
+
+Your job is to extract signals from the response.
+
+Constraints:
+- Do not guess intent beyond what is supported by the text
+- Do not invent personality traits
+- Do not label the user
+- Do not produce conclusions
+- Only extract signals that are reasonably supported by the response
+
+---
+
+## Input
+
+You will receive:
+
+1. The question:
+[QUESTION_TEXT]
+
+2. The user's response:
+[USER_RESPONSE]
+
+3. The allowed signal library (optional but preferred):
+[SIGNAL_LIBRARY]
+
+---
+
+## Output Format
+
+Return a JSON array of signals:
+
+```json
+[
+  {
+    "signal_id": "string",
+    "description": "short, neutral description",
+    "confidence": "low | medium | high",
+    "source_input_id": "question_id"
+  }
+]

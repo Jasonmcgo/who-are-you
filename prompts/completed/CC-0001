@@ -1,0 +1,134 @@
+You are working in the who-are-you Next.js repo.
+
+Goal:
+Build a small vertical slice of the Who Are You? identity engine using the canon files in docs/canon.
+
+Read these first:
+- docs/canon/foundational-system.md
+- docs/canon/card-schema.md
+- docs/canon/signal-and-tension-model.md
+- docs/canon/question-bank-v1.md
+- docs/canon/tension-library-v1.md
+- docs/canon/inner-constitution.md
+
+Important constraints:
+- Do not redesign the product.
+- Do not add auth.
+- Do not add a database.
+- Do not introduce external APIs.
+- Do not build a large architecture.
+- Do not delete existing canon docs.
+- Keep this as a local MVP.
+- Preserve raw answers.
+- Derive signals from explicit answers only.
+- Derive tensions from signals only.
+- Present tensions as possibilities, not facts.
+
+Build the following:
+
+1. Question Flow
+- Use the questions from docs/canon/question-bank-v1.md as the source concept.
+- Implement a small v1 question set in code.
+- Include at least:
+  - conviction questions
+  - pressure questions
+  - formation questions
+  - context questions
+  - agency question
+  - sacred values question
+- Keep the UI simple and readable.
+
+2. Data Model
+Create TypeScript types for:
+- CardId
+- Question
+- Answer
+- Signal
+- Tension
+- InnerConstitution
+
+Each answer should preserve:
+- question_id
+- card_id
+- question_text
+- response
+
+Each signal should preserve:
+- signal_id
+- description
+- from_card
+- source_question_ids
+- strength
+
+Each tension should preserve:
+- tension_id
+- type
+- description
+- signals_involved
+- confidence
+- status
+- user_prompt
+
+3. Signal Derivation
+Create a small deterministic signal engine.
+
+Examples:
+- “Misunderstood but correct” → truth_priority_high
+- “Stay silent” or “Soften it” under social pressure → adapts_under_social_pressure
+- “Accept the risk” under job risk → high_conviction_under_risk
+- “Trustworthy and protective” authority answer → authority_trust_high
+- “Arbitrary or unfair” authority answer → authority_distrust
+- “Overwhelming or stretched” current life answer → high_pressure_context
+- “Building or creating” time-use answer → proactive_creator
+- “Family” sacred value answer → family_priority
+
+4. Tension Detection
+Implement at least these tensions:
+- T-001 Truth vs Belonging
+- T-002 Conviction vs Economic Security
+- T-005 Stability vs Freedom
+- T-006 Creator vs Maintainer
+- T-011 Chaos Formation vs Control Need
+
+Use the canon language from tension-library-v1.md where possible.
+
+5. Result Page
+After the questions are complete, render a “Mini Inner Constitution” page with:
+- Core Orientation
+- Signals detected
+- Possible Tensions
+- Sacred Values
+- Bridge Signals placeholder
+
+Tone:
+- philosophical
+- precise
+- non-judgmental
+- avoid pop psychology
+- avoid political labels
+- avoid saying “you are”
+- use “appears to,” “may suggest,” and “tends to”
+
+6. User Confirmation
+For each tension, show:
+- user_prompt
+- buttons: Yes / Partially / No / Explain
+
+For now, store the selected confirmation state only in React state.
+
+7. Files
+Keep the implementation simple. Prefer:
+- data/questions.ts
+- app/page.tsx
+- lib/types.ts
+- lib/identityEngine.ts
+
+8. Report Back
+After implementation, provide:
+- files changed
+- what was added
+- what was intentionally not added
+- how to run it
+- any risks or next-step recommendations
+
+Do not overbuild. This is a proof of the canonical system, not the full product.
