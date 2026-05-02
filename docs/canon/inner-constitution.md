@@ -54,12 +54,13 @@ The Inner Constitution renders top to bottom in the following order:
 2. **The Eight Cards (SWOT)** — Lens, Compass, Conviction, Gravity, Trust, Weather, Fire, Path. Each with four cells: Gift, Blind Spot, Growth Edge, Risk Under Pressure.
 3. **Top Gifts** — three Gifts synthesized across cards.
 4. **Top Risks** — three Risks Under Pressure synthesized across cards.
-5. **Growth Path** — a directional paragraph about meaningful work, love, and giving.
-6. **Relationship Translation** — how others may experience this Shape.
-7. **Conflict Translation** — how to engage with people whose Shape differs.
-8. **Mirror-Types Seed** — a paragraph naming how the user's commitments may appear differently in others.
-9. **Confirmed Tensions** — tensions the user has affirmed, written with weight.
-10. **Open Tensions** — tensions surfaced but not yet confirmed.
+5. **Watch For** — four to six "When X becomes Y" triggers that name where each gift starts to drift into its shadow.
+6. **Growth Path** — a directional paragraph about meaningful work, love, and giving.
+7. **Relationship Translation** — how others may experience this Shape.
+8. **Conflict Translation** — how to engage with people whose Shape differs.
+9. **Mirror-Types Seed** — a paragraph naming how the user's commitments may appear differently in others.
+10. **Confirmed Tensions** — tensions the user has affirmed, written with weight.
+11. **Open Tensions** — tensions surfaced but not yet confirmed.
 
 ---
 
@@ -203,7 +204,26 @@ Three Risks Under Pressure synthesized across cards — the most pressing ways t
 
 ---
 
-## 5. Growth Path (directional)
+## 5. Watch For (triggers)
+
+A bulleted list of four to six "When X becomes Y" triggers. Each line names a specific moment where one of this Shape's gifts begins to drift into its shadow — the threshold worth noticing rather than a verdict that has already arrived. Triggers are drawn from each card's gift category (one per category, in canonical card order, deduplicated) and may be augmented by load-conditional or fire-pattern triggers when present.
+
+**Format example:**
+
+> **Watch for**
+> *triggers — when a gift starts to drift into its shadow*
+>
+> - When 'I see the pattern' becomes 'I no longer need to test the pattern.'
+> - When clarity stops asking whether the moment is asking for it.
+> - When detecting bad faith becomes assuming bad faith.
+> - When standing alone starts to feel like the only way to stand.
+> - When willingness to bear cost stops checking whether the cost is needed.
+
+The Watch For section sits between Top Risks (which name patterns) and Growth Path (which names direction). Where Top Risks describe the shape of the failure mode, Watch For names the threshold where it begins. Triggers are written without moralizing — no "you should", no "always" — and never as diagnosis.
+
+---
+
+## 6. Growth Path (directional)
 
 A single paragraph (4-8 sentences) describing what kind of work, love, and giving will likely feel meaningful for this Shape. Drawn from Compass + Lens + Gravity + existing Path signals. **No new measurement; pure interpretation.**
 
@@ -217,7 +237,7 @@ The directional paragraph is honest about what's interpretive: it does not claim
 
 ---
 
-## 6. Relationship Translation
+## 7. Relationship Translation
 
 A short section (2-4 sentences) describing how others, especially those with different Lens dominance or Compass priorities, may experience this user's Shape.
 
@@ -229,7 +249,7 @@ A short section (2-4 sentences) describing how others, especially those with dif
 
 ---
 
-## 7. Conflict Translation
+## 8. Conflict Translation
 
 A practical section (2-4 sentences) suggesting how to engage with people whose Shape differs, particularly across Lens or Compass differences.
 
@@ -241,7 +261,7 @@ A practical section (2-4 sentences) suggesting how to engage with people whose S
 
 ---
 
-## 8. Mirror-Types Seed
+## 9. Mirror-Types Seed
 
 A paragraph (3-5 sentences) naming how the user's protected commitments may show up differently in others. Drawn from the user's top Compass value × dominant Lens function. Plants the seed for the reconciliation use case.
 
@@ -255,7 +275,7 @@ This section replaces the old "Bridge Signals (Human Constants)" section. The re
 
 ---
 
-## 9. Confirmed Tensions
+## 10. Confirmed Tensions
 
 Tensions the user has explicitly affirmed (yes, partly, or with annotation) get rendered with full weight here. Each tension uses the canonical user prompt from `tension-library-v1.md` plus a sentence describing the user's specific signal pattern that triggered it.
 
@@ -269,7 +289,7 @@ Tensions the user has explicitly affirmed (yes, partly, or with annotation) get 
 
 ---
 
-## 10. Open Tensions
+## 11. Open Tensions
 
 Tensions the engine surfaced but the user did not confirm. Rendered with explicit uncertainty — not asserted as fact, but offered as possibilities for the user to consider.
 

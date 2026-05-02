@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" fill="none" stroke="#1a1713" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+  
+  <path d="M160 296 L 160 220" stroke-width="3"></path>
+  
+  <path d="M160 220 C 150 200, 130 188, 112 178"></path>
+  <path d="M160 220 C 170 200, 190 188, 208 178"></path>
+  
+  <path d="M112 178 C 96 168, 84 152, 76 132" stroke-width="2"></path>
+  <path d="M112 178 C 104 162, 92 154, 78 152" stroke-width="2"></path>
+  
+  <path d="M208 178 C 224 168, 236 152, 244 132" stroke-width="2"></path>
+  <path d="M208 178 C 216 162, 228 154, 242 152" stroke-width="2"></path>
+  
+  <g stroke-width="1.6">
+    
+    <path d="M76 132 C 70 120, 60 110, 52 102"></path>
+    <path d="M76 132 C 80 118, 76 106, 70 96"></path>
+    <path d="M76 132 C 88 124, 92 114, 92 102"></path>
+    
+    <path d="M78 152 C 64 154, 54 148, 46 140"></path>
+    <path d="M78 152 C 70 158, 60 162, 50 162"></path>
+    
+    <path d="M244 132 C 250 120, 260 110, 268 102"></path>
+    <path d="M244 132 C 240 118, 244 106, 250 96"></path>
+    <path d="M244 132 C 232 124, 228 114, 228 102"></path>
+    
+    <path d="M242 152 C 256 154, 266 148, 274 140"></path>
+    <path d="M242 152 C 250 158, 260 162, 270 162"></path>
+  </g>
+  
+  <g stroke-width="1.2" opacity="0.55">
+    <path d="M52 102 L 44 92"></path>
+    <path d="M52 102 L 50 88"></path>
+    <path d="M70 96 L 64 84"></path>
+    <path d="M92 102 L 96 88"></path>
+    <path d="M268 102 L 276 92"></path>
+    <path d="M268 102 L 270 88"></path>
+    <path d="M250 96 L 256 84"></path>
+    <path d="M228 102 L 224 88"></path>
+    <path d="M46 140 L 36 138"></path>
+    <path d="M50 162 L 38 168"></path>
+    <path d="M274 140 L 284 138"></path>
+    <path d="M270 162 L 282 168"></path>
+  </g>
+  
+  <g>
+    <circle cx="160" cy="220" r="6" fill="#8a4a1f" stroke="#8a4a1f"></circle>
+    <circle cx="148" cy="212" r="3" fill="#8a4a1f" stroke="#8a4a1f"></circle>
+    <circle cx="172" cy="212" r="3" fill="#8a4a1f" stroke="#8a4a1f"></circle>
+    <circle cx="160" cy="234" r="3" fill="#8a4a1f" stroke="#8a4a1f"></circle>
+  </g>
+  
+  <line x1="148" y1="296" x2="172" y2="296" stroke-width="2"></line>
+</svg>

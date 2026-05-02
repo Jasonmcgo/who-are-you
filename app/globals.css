@@ -1,6 +1,149 @@
+@import "tailwindcss";
+
+:root {
+  --paper: #f6f2ea;
+  --paper-warm: #efe9dd;
+  --paper-deep: #e6dece;
+  --ink: #1a1713;
+  --ink-soft: #433d33;
+  --ink-mute: #807566;
+  --ink-faint: #b8ad9c;
+  --rule: rgba(26, 23, 19, 0.14);
+  --rule-soft: rgba(26, 23, 19, 0.08);
+  --umber: #8a4a1f;
+  --umber-soft: #a8653a;
+  --umber-wash: rgba(138, 74, 31, 0.08);
+}
+
+@theme {
+  --color-paper: #f6f2ea;
+  --color-paper-warm: #efe9dd;
+  --color-paper-deep: #e6dece;
+  --color-ink: #1a1713;
+  --color-ink-soft: #433d33;
+  --color-ink-mute: #807566;
+  --color-ink-faint: #b8ad9c;
+  --color-rule: rgba(26, 23, 19, 0.14);
+  --color-rule-soft: rgba(26, 23, 19, 0.08);
+  --color-umber: #8a4a1f;
+  --color-umber-soft: #a8653a;
+  --color-umber-wash: rgba(138, 74, 31, 0.08);
+
+  --font-serif:
+    var(--font-source-serif), "Source Serif 4", "Source Serif Pro",
+    "Iowan Old Style", "Palatino", Georgia, serif;
+  --font-mono:
+    var(--font-jetbrains-mono), "JetBrains Mono", "IBM Plex Mono",
+    ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-sans:
+    var(--font-inter-tight), "Inter Tight", system-ui, -apple-system,
+    "Segoe UI", sans-serif;
+}
+
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: white;
-  color: #171717;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-serif);
+  font-feature-settings: "ss01", "onum";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+*:focus,
+*:focus-visible {
+  outline: none;
+}
+
+[data-focus-ring]:focus-visible {
+  outline: 2px solid var(--umber);
+  outline-offset: 2px;
+}
+
+/* CC-020 — Print CSS. Pure additive override block; affects only @media print
+   so the on-screen render is identical to before this CC. The strategy:
+     - Hide every element marked data-print-hide (any value).
+     - Hide the belief anchor when the toggle was unchecked
+       (data-print-hide="belief-anchor" applied conditionally).
+     - Restyle to white paper, black ink, slightly smaller serif body for
+       paper readability.
+     - Set sensible page margins.
+     - Page-break before each major H2 so sections start fresh; avoid splits
+       inside short list blocks.
+   The Map's eight cards are conditionally rendered in the DOM based on the
+   accordion's React state. CSS alone cannot summon a removed node, so
+   MapSection registers a beforeprint listener that expands all cards before
+   the print preview paints (and restores after). The data-print-expand
+   attribute on the Map's section element is a marker for that contract —
+   it documents the bridge for future maintainers. */
+@media print {
+  @page {
+    margin: 1in;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body {
+    font-size: 12pt;
+    line-height: 1.5;
+  }
+
+  /* Hide every block marked as print-hide (Save, Share, footer,
+     interactive button rows, etc.). */
+  [data-print-hide] {
+    display: none !important;
+  }
+
+  /* Strip floating / sticky / fixed page chrome — alerts, toasts,
+     anything pinned to the viewport that doesn't belong on paper. */
+  [role="alert"],
+  .sticky,
+  .fixed {
+    display: none !important;
+  }
+
+  /* Section page-break behavior. h2 starts a fresh page when there's room;
+     short list blocks shouldn't split awkwardly. */
+  h1 {
+    page-break-after: avoid;
+    break-after: avoid-page;
+  }
+  h2 {
+    page-break-before: always;
+    break-before: page;
+    page-break-after: avoid;
+    break-after: avoid-page;
+  }
+  h3 {
+    page-break-after: avoid;
+    break-after: avoid-page;
+  }
+  ol,
+  ul,
+  blockquote,
+  article,
+  section {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Buttons that survived the print-hide pass (none should remain in
+     practice, but a safety net) — render as text, not chrome. */
+  button {
+    background: transparent !important;
+    border: none !important;
+    color: #000000 !important;
+    padding: 0 !important;
+  }
 }

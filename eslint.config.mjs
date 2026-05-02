@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Design-lab reference files — not production code, not for lint.
+    "docs/**",
   ]),
 ]);
 

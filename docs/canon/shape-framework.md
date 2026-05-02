@@ -64,6 +64,25 @@ The product-friendly names are not decorative. They are the language the Inner C
 
 A person's Shape is the way their eyes, heart, voice, spine, ears, nervous system, immune response, and gait work together. It is not one thing. It is the interaction.
 
+### Body-map metaphor vocabulary (CC-038-body-map, added 2026-04-29)
+
+A third user-facing vocabulary lives alongside the canonical card names and the body-analogy names above: the **body-map metaphor** vocabulary used in CC-038-body-map's aux-pair register routes (e.g., *Path → Speak* for the architect, *Heart → Fire* for the witness). The metaphor names are tuned for the cognitive-movement reading — verbs (Listen, Speak) and contextual noun-phrases (Heart, Gravity) compose better in `metaphor[from] → metaphor[to]` arrows than the body-part names would.
+
+The translation between user-facing body-map metaphors and `ShapeCardId` codenames is canonical:
+
+| User-facing body-map metaphor | `ShapeCardId` codename | Body-analogy (above) |
+|---|---|---|
+| Heart | compass | Heart |
+| Listen | trust | Ears |
+| Speak | conviction | Voice |
+| Gravity | gravity | Spine |
+| Lens | lens | Eyes |
+| Weather | weather | Nervous system |
+| Fire | fire | Immune response |
+| Path | path | Gait |
+
+**Engine fields use the codename column; user-facing prose chooses between the metaphor column (for body-map cognitive-movement readings) and the body-analogy column (for the per-card body-part metaphor in Strength / Growth Edge / Practice / Pattern Note prose).** The full body-map framework, the 16 aux-pair routes, the Agency = Conviction resolution, and the Si-Fe asymmetry note all live in `docs/canon/function-pair-registers.md`.
+
 ---
 
 ## Card-by-Card
@@ -74,7 +93,7 @@ A person's Shape is the way their eyes, heart, voice, spine, ears, nervous syste
 
 **What it draws from:** Jungian cognitive functions (Ni, Ne, Si, Se, Ti, Te, Fi, Fe), function-stack theory, MBTI as a derived surface label.
 
-**Existing canon home:** Temperament Card (Q-T1 through Q-T8 ranked, voice-styled). See `temperament-framework.md`.
+**Existing canon home:** Temperament Card (Q-T1 through Q-T8 ranked, voice-styled). See `temperament-framework.md`. Per the ranking item-count rule (`card-schema.md` § Question Types — *Ranking primitive: item-count rule*), Q-T1–Q-T8 are the canonical four-default-at-scale example: eight 4-item rankings rather than one piled-up ranking.
 
 **Why it exists separately from Compass:** Two people can both rank Truth as their first sacred value but mean entirely different things — one through logical precision (Ti), one through personal authenticity (Fi), one through pattern recognition (Ni), one through verified precedent (Si). Without Lens, "Truth" is too flat. Lens is what keeps the same value from collapsing into one shape.
 
@@ -86,9 +105,20 @@ A person's Shape is the way their eyes, heart, voice, spine, ears, nervous syste
 
 **What it draws from:** Schwartz Theory of Basic Values, Haidt's Moral Foundations Theory, Tetlock's research on sacred values and taboo tradeoffs.
 
-**Existing canon home:** Sacred Values Card (Q-S1 + Q-S2 ranked).
+**Existing canon home:** Sacred Values Card (Q-S1 + Q-S2 ranked) + the Allocation Layer (Q-S3-close / Q-S3-wider / Q-S3-cross from CC-016) + the Concrete Stakes ranking (Q-Stakes1 from CC-024). Per the ranking item-count rule (`card-schema.md` § Question Types — *Ranking primitive: item-count rule*), Q-S3 is the canonical multi-stage example: two 3-item parents resolved by a derived 4-item cross-rank.
 
 **Operating definition of sacred:** A value becomes sacred when compromising it feels like betraying yourself. Compass identifies the values a person will not casually trade away.
+
+**Canonical sacred values pool (12 items)** (CC-028 expansion, 2026-04-27):
+
+- Q-S1 (embodied / qualities-of-self): Freedom, Truth, Stability, Loyalty, **Peace**, **Honor**.
+- Q-S2 (external pulls / orientations toward others): Family, Knowledge, Justice, Faith, **Compassion**, **Mercy**.
+
+Pre-CC-028 the pool was 8 items (4 per question). Real-user testing across four sessions (Madison, Jason, Michele, LaCinda) confirmed top-3-universal compression: every user's top three came from the same handful (Family / Freedom / Loyalty plus one discriminator), because the 4-item ranking gradient was too thin to differentiate. The 12-item pool restores meaningful gradient between users at the Compass card. The 4 new values follow the verb-noun composition rule — each composes with its question's verb register and carries distinct semantic territory not covered by existing items. Contribution verbs (Teaching, Leading, Supporting) were considered and rejected — they belong on Path/Gravity, not Compass, per `feedback_sacred_vs_contribution_register.md`.
+
+**Two registers** (CC-024 amendment, 2026-04-26): Compass measures both abstract and concrete protection. Q-S1/Q-S2 capture the user's **abstract sacred values** — what the heart loves in principle (the 12 items above). Q-Stakes1 captures the user's **concrete stakes** — what the heart fears losing in particular (Money, Job, Close relationships, Reputation, Health). The architectural truth: *what the heart loves abstractly + what the heart fears losing concretely.* Both registers cohabit in the heart-as-compass body part; together they give Compass a more complete measurement surface than the abstract-values-only read it carried pre-CC-024.
+
+The two registers feed downstream cards differently: abstract sacred values feed `value_domain` on BeliefUnderTension (which sacred value the named belief touches); concrete stakes feed Q-I3 (which concrete losses the user would bear for that belief). Architecturally symmetric to how CC-016's Allocation Layer added a third Compass register (where discretionary money and energy actually flow), giving the Compass card a *named* register, an *allocated* register, and now a *feared* register.
 
 ### 3. Conviction (Belief)
 
@@ -108,7 +138,7 @@ A person's Shape is the way their eyes, heart, voice, spine, ears, nervous syste
 
 **What it draws from:** Rotter's locus of control, attribution theory.
 
-**Existing canon home:** Q-C4 ranked (Individual / System / Nature / Supernatural / Authority). Locked in `open-design-calls.md` § 3, awaiting CC-008.
+**Existing canon home:** Q-C4 ranked (Individual / System / Nature / Supernatural / Authority). Locked in `open-design-calls.md` § 3, awaiting CC-008. Per the ranking item-count rule (`card-schema.md` § Question Types — *Ranking primitive: item-count rule*), Q-C4 is the canonical 5-item exception: the five attribution categories don't split cleanly into two parents, so Q-C4 sits at the principle's ceiling deliberately.
 
 **Why it matters:** Two people who share the same Compass value (e.g., compassion) can disagree completely on what to do with it because their Gravity differs. One says "help them take responsibility," the other says "change the system that trapped them." Same value, different responsibility map.
 
@@ -118,19 +148,30 @@ A person's Shape is the way their eyes, heart, voice, spine, ears, nervous syste
 
 **What it draws from:** Institutional trust research, attachment theory, social-trust literature.
 
-**Existing canon home:** Q-X3 ranked institutional trust (Government / Press / Companies / Education / Non-Profits & Religious). Plus Q-X4 personal-trust ranking (locked for v1; question text below).
+**Existing canon home:** Multi-stage Q-X3 (CC-031) — Q-X3-public (Government-Elected / Government-Services / Education / Non-Profits / Religious) + Q-X3-information-and-commercial (Journalism / News organizations / Social Media / Small Business / Large Companies) + Q-X3-cross (4-item derived). Plus multi-stage Q-X4 (CC-032) — Q-X4-relational (Spouse-or-partner / Family / Close-friend) + Q-X4-chosen (Mentor / Outside-expert / Own-counsel) + Q-X4-cross (4-item derived).  
+Per the ranking item-count rule (`card-schema.md` § Question Types — *Ranking primitive: item-count rule*), Q-X3 sits at the 5+5 parent ceiling deliberately because the four splits (Government / Press / Companies / NP&Religious) all matter; Q-X4 sits at the 3+3 default because the relational/chosen split is clean and three items per parent already capture the resolution the domain needs.
 
-**Q-X4 (locked for v1, awaiting canon entry in CC-007 or equivalent):**
+The full v2.5 architecture: Q-I2's derivation cascades from `[Q-X3-cross, Q-X4-cross]` (CC-032), so the user's revision-source space in the Keystone Reflection now potentially includes Social Media, Outside-expert, Government-Services, News-organizations — dimensions the legacy flat Q-X3 + Q-X4 averaged into bucket labels.
 
-> *"When you need to hear the truth and not just kindness, whom do you trust most? Rank in order."*
+**Q-X4 v2.5 multi-stage form (CC-032):**
+
+Two parent rankings + one cross-rank. Six personal-trust signals total — five preserved from the legacy form + one new (Outside-expert).
+
+> **Q-X4-relational** — *"When you need to hear the truth and not just kindness, whom of these — the people entangled in your life — do you trust most? Rank in order."*
 >
 > 1. **A spouse or partner** — someone whose life is fully entangled with yours.
-> 2. **A close friend** — someone who has earned your trust outside obligation.
-> 3. **Family** — parents, siblings, or chosen kin who knew you before this version of you.
-> 4. **A mentor or advisor** — someone whose judgment you've sought across years.
-> 5. **Your own counsel** — your own judgment, when no other source feels right.
+> 2. **Family** — parents, siblings, or chosen kin who knew you before this version of you.
+> 3. **A close friend** — someone who has earned your trust outside obligation.
+>
+> **Q-X4-chosen** — *"And when you need truth from someone you've selected for their judgment — not someone bound to you by relationship — whom do you trust most? Rank in order."*
+>
+> 1. **A mentor or advisor** — someone whose judgment you've sought across years.
+> 2. **An outside expert** *(NEW in CC-032)* — a therapist, doctor, lawyer, coach, financial advisor, or clergy member — the trusted professional.
+> 3. **Your own counsel** — your own judgment, when no other source feels right.
+>
+> **Q-X4-cross** *(derived, 4 items)* — *"When relational trust and chosen trust compete for the same hard-truth question, who actually wins?"*
 
-Five items, ranking-type, each emits a `personal_trust_*` signal. Users may have empty slots (no spouse, no mentor, no living family); the engine handles missing items gracefully and treats absence as itself a signal.
+Each item emits a `*_trust_priority` signal. Users may have empty slots (no spouse, no mentor, no living family); the engine handles missing items gracefully and treats absence as itself a signal. The per-item "doesn't apply" affordance is now unblocked by the multi-stage form (parent level is a natural home) but still deferred per § Deferred — separate small CC.
 
 **Why it exists separately from Gravity:** Gravity is where you place blame. Trust is whose word you take about reality. Both are causal-interpretive, but distinct: a user can attribute responsibility to systems while still trusting their close friend to read situations accurately. Or attribute responsibility to individuals while distrusting all institutional voices.
 
@@ -334,3 +375,115 @@ Shape does not replace any existing canon doc. It sits above them as the umbrell
 - `validation-roadmap-v1.md` — per-card psychometric instruments for any future formal validation pass.
 
 If any conflict surfaces between this file and another canon file, **the more specific file wins for its scope**. This file is interpretive umbrella; the others are operational truth.
+
+---
+
+## CC-025 — Per-card 4-section structure (added 2026-04-26)
+
+Each ShapeCard now renders four sections in the Map: **Strength / Growth Edge / Practice / Pattern Note**. The change is structural at the framework level — every card gets the same shape, with content keyed to that card's body-part metaphor.
+
+- **Strength** — the gift the card surfaces.
+- **Growth Edge** — the same machinery viewed in failure mode (was *Trap* in earlier CCs).
+- **Practice** — a card-register-specific instruction the card naturally invites (was *Next move*). Conviction's Posture occupies this slot; Path's Practice lives inside its narrative paragraph.
+- **Pattern Note** — an aphoristic closing line keyed to the card's architectural truth. Aphorism variant render (italic, separator above), visually distinct from the body cells.
+
+Locked Practice + Pattern Note text per card lives in `result-writing-canon.md § CC-025` — the framework names the structure; the editorial canon owns the text.
+
+Why at framework level: identical body text across two cards becomes structurally impossible when each card has its own Pattern Note keyed to body-part metaphor. The per-card duplication problem (real-user output where Lens / Conviction / Trust converged on the same Trap text) is solved by architecture rather than by gift-category variant counts.
+
+---
+
+## CC-026 — Drive on Path · Gait (added 2026-04-26)
+
+CC-026 introduces **Drive** as the model's first explicit broad why-axis. Most of the model's measurements expose *what* (what you protect, what you do, what you fear, what you trust); Drive exposes *why* — what motivates the exertion of energy.
+
+Drive lives on **Path · Gait**. Path keeps its existing narrative shape (directional paragraph + Work / Love / Give / Practice / Pattern Note); the new Distribution subsection mounts above Work and renders a three-slice pie chart (`cost` / `coverage` / `compliance` buckets) with optional rank badges from Q-3C1's claimed-drive ranking. The chart visualizes the matrix between *claimed* and *revealed* drive — Q-3C1 captures what the user names as their motivator; a 15-input distribution computed at engine-derivation time reveals what the user's answers expose as their motivator.
+
+The Drive read is body-part-keyed to **Gait** because gait is the visible expression of an unseen motivator (the why under the walk). Other body-map cards keep their existing measurement registers; Drive does not extend to them in v1. Cross-card drive-pattern surfaces (Lens × Drive, Conviction × Drive, etc.) are deferred to CC-026b after v1 smoke confirms the read is meaningful.
+
+Full architectural framework, the 15-input map, the case classifier, the locked prose templates, the `T-D1` tension, and the vocabulary discipline (framework terms engineer-facing only; user-facing prose uses human-language phrases) live in the dedicated canon file `drive-framework.md`. This framework doc names the structure at the umbrella level; the dedicated doc owns the operational truth.
+
+Distinct from existing measurements (binding rule):
+
+- Drive is **not** energy. Energy is the resource (already measured by Q-E1-* / Q-A2 — where discretionary energy actually flows). Drive is what motivates the exertion.
+- Drive signals are **not** sacred-value priority signals. Drive lives on a different axis; conflating with sacred-value math (`SACRED_PRIORITY_SIGNAL_IDS` / `SACRED_IDS`) would corrupt compass-ranking computations.
+
+---
+
+## CC-037 — Disposition Map (added 2026-04-29)
+
+CC-037 introduces a **Big-5 OCEAN distribution** as a derived non-card page section between Mirror and Map. The section is labeled **"Disposition Map"** and renders a five-bar SVG chart (Openness / Conscientiousness / Extraversion / Agreeableness / Emotional Reactivity (estimated)) plus a one-paragraph prose interpretation, sourced from a tagging table over signals already collected by the instrument.
+
+**Not a ShapeCard.** ShapeCards have a 4-section architecture (Strength / Growth Edge / Practice / Pattern Note) and a body-part metaphor; OCEAN is a cross-cutting derivation that doesn't fit either schema. The Disposition Map sits at the **page level**, parallel to MirrorSection and MapSection — it is a rendering surface, not a measurement surface in the body-map taxonomy.
+
+Architectural rationale for the placement:
+
+- **Adjacency to Mirror is natural.** Jung-Big5 correlations are well-documented in the personality-psychology literature; the Mirror's Lens-stack reading and the Disposition Map's OCEAN distribution are different vocabularies for overlapping structure. Sitting them adjacent lets the reader move between the two registers without losing context.
+- **Body-part metaphor doesn't apply.** OCEAN is a cross-cutting psychometric register, not a Card 1–8 body-part read. Trying to assign it a body-part would force a metaphor where none belongs.
+- **No new ShapeCardId.** `disposition` is NOT added to `ShapeCardId`, `CARD_PREFERENCES`, `SHAPE_CARD_PRACTICE_TEXT`, or `SHAPE_CARD_PATTERN_NOTE`. The eight Shape cards remain canonical at eight.
+
+**Distinct from existing measurements (binding rule):**
+
+- OCEAN is **derivation only**. The user is never asked to rank themselves on Big-5; the distribution emerges from how they answered the existing questions across Lens / Compass / Allocation / Drive / Trust / Conviction / Pressure / Formation / Context / Belief blocks.
+- The **N axis is shipped as estimated**, not as a direct measurement. The instrument proxies Neuroticism through formation-history (`chaos_exposure`), current-context load (`high_pressure_context`), pressure-adaptation behavior (`adapts_under_*`), and agency reactivity (`reactive_operator`). These are state-and-history signals, not trait-level reactivity. The "(estimated)" parenthetical and the per-bar subscript make the proxy nature explicit at every render surface.
+- OCEAN signals are **not** sacred-value priority signals, **not** drive signals, **not** trust signals. The framework is its own register; conflating with any of the above would corrupt their respective computations. The shared dependency is `weightFor` from `lib/drive.ts` (the rank-aware weighting ladder) — that's a tuning convenience, not a semantic merger.
+
+Full architectural framework, the tagging table, the multi-tag math, the Neuroticism-floor architecture, the four distribution-shape cases, and the locked prose templates live in the dedicated canon file `ocean-framework.md`. This framework doc names the structure at the umbrella level; the dedicated doc owns the operational truth.
+
+---
+
+## CC-042 — Work Map (added 2026-04-29)
+
+CC-042 introduces a **Work Map** as a derived non-card page section between the Disposition Map and Map. The section is labeled **"Work Map"** and renders 1–2 work registers the user is structurally aligned to — categories of vocation/hobby/skill that will come easy and feel meaningful given the user's cognitive register, motivational distribution, trait disposition, and value orientation. Each register carries 2–3 example anchors (specific vocations / hobbies / skills) to ground the abstract category. Sourced from a composite predicate over signals already collected by the instrument.
+
+**Not a ShapeCard.** ShapeCards have a 4-section architecture (Strength / Growth Edge / Practice / Pattern Note) and a body-part metaphor; the Work Map is a cross-cutting derivation that doesn't fit either schema. The Work Map sits at the **page level**, parallel to MirrorSection, the Disposition Map, and MapSection — it is a rendering surface, not a measurement surface in the body-map taxonomy.
+
+Architectural rationale for the placement:
+
+- **Adjacency to Disposition Map is natural.** Both are derivation-only page sections that compose existing signals; the Work Map reads the OCEAN distribution as one of its inputs. Sitting them adjacent keeps the derivation register coherent across the report.
+- **Body-part metaphor doesn't apply.** Work Map names categories of vocation, not a Card 1–8 body-part read. Trying to assign it a body-part would force a metaphor where none belongs.
+- **No new ShapeCardId.** `work_map` is NOT added to `ShapeCardId`, `CARD_PREFERENCES`, `SHAPE_CARD_PRACTICE_TEXT`, or `SHAPE_CARD_PATTERN_NOTE`. The eight Shape cards remain canonical at eight.
+
+**Distinct from existing measurements (binding rule):**
+
+- The Work Map is **derivation only**. The user is never asked vocation-specific questions; the matched registers emerge from how they answered the existing questions across Lens / Drive / OCEAN / Q-E1 / Compass / Q-Ambition1 / Path agency aspiration.
+- The Work Map composes existing outputs (Drive, OCEAN, Lens aux-pair register) as inputs. It does **not** introduce new signals; the framework reads what's already in `signals[]` and the engine outputs.
+- Work Map is the first of three sibling outputs (Work / Love / Giving). CC-043 (Love Map) and CC-044 (Giving Map) follow the same architectural pattern with sibling-specific predicate inputs and register taxonomies. The pattern (8 registers, composite predicate, top-1-vs-top-2 thresholds, page section between adjacent registers) is the canonical scaffold; per-domain register identities and predicate inputs are sibling-specific.
+
+Full architectural framework, the 8 register taxonomy, the composite predicate inputs, the threshold ladder, and the locked prose templates live in the dedicated canon file `work-map.md`. This framework doc names the structure at the umbrella level; the dedicated doc owns the operational truth.
+
+---
+
+## CC-044 — Love Map (added 2026-04-29)
+
+CC-044 introduces a **Love Map** as the third derived non-card page section. The section is labeled **"Love Map"** and renders 1–2 matched love registers (1 of 7 character-types) plus top 1–3 flavors (1 of 7 functional modes) plus a Resource Balance diagnostic that surfaces only when self-vs-other investment is distorted. Sourced from a composite predicate over signals already collected by the instrument.
+
+**Page sequence post-CC-044:** *Mirror → Disposition Map → Work Map → Love Map → Map → Compass → ...*
+
+**Not a ShapeCard.** Same architectural rationale as Disposition Map and Work Map: ShapeCards have a 4-section architecture (Strength / Growth Edge / Practice / Pattern Note) and a body-part metaphor; the Love Map is a cross-cutting derivation that doesn't fit either schema. The Love Map sits at the **page level**, parallel to MirrorSection, the Disposition Map, the Work Map, and MapSection.
+
+Architectural rationale for the placement:
+
+- **Adjacency to Work Map is natural.** Both are sibling derivations on the Work / Love / Giving triadic decomposition Jason articulated. Where Work Map expresses the cost-axis of Drive, Love Map expresses the *intimate* sub-register of the coverage-axis. Sitting them adjacent keeps the purpose-output register coherent.
+- **Body-part metaphor doesn't apply.** Love Map names categories of love-shape, not a Card 1–8 body-part read.
+- **No new ShapeCardId.** `love_map` is NOT added to `ShapeCardId`, `CARD_PREFERENCES`, `SHAPE_CARD_PRACTICE_TEXT`, or `SHAPE_CARD_PATTERN_NOTE`. The eight Shape cards remain canonical at eight.
+
+**Six-layer architecture distinguishes Love Map from Work Map:**
+
+1. **Pauline framing** (1 Corinthians 13) — universal/normative ethical floor. Plain-language paraphrase only in user-facing prose; framework name does NOT surface.
+2. **Register (7)** — character-type / cognitive-relational shape; composes with aux-pair register.
+3. **Flavor (7)** — functional mode; what love DOES for the person.
+4. **Virtue baseline** — Pauline negatives applied per register as distortion-diagnostic vocabulary.
+5. **Bond type (Greek 4)** — Eros / Philia / Storge / Agape; deferred to CC-045+ for surfacing.
+6. **Resource Balance** — self-vs-other investment ratio; surfaces independently when distorted.
+
+**Distinct from existing measurements (binding rule):**
+
+- The Love Map is **derivation only**. The user is never asked love-specific questions; the matched registers emerge from how they answered the existing questions across Lens / Drive / OCEAN / Compass / Q-X4 / Q-S3 / Q-E1 / Q-Stakes1 / Q-Ambition1 / Path agency aspiration.
+- The Love Map composes existing outputs (Drive, OCEAN, Lens aux-pair register) as inputs. It does **not** introduce new signals.
+- Love Map is the second of three sibling outputs (Work / Love / Giving). CC-045 (Giving Map) follows the same architectural pattern with sibling-specific predicate inputs and register taxonomy.
+- **The Pauline framework name itself never surfaces in user-facing prose** per CC-048 Rule 1 (frameworks behind the scenes). The Pauline qualities — patient, kind, persists, refuses to keep records, rejoices with truth — surface in plain-language paraphrase via the locked framing paragraph above the register render.
+
+**Resource Balance is a separate diagnostic axis** — it surfaces independently of register matching. A user with no strong register match but `inward_heavy` / `outward_depleted` / `thin_overall` Resource Balance still sees the locked prose paragraph for that case. A user with strong register match AND `healthy` balance sees register prose without a balance line.
+
+Full architectural framework, the six-layer architecture, the 7 register taxonomy, the 7 flavor taxonomy, predicate intents, Resource Balance compute and locked prose, Pauline reconciliation, Greek-4 bond-type deferral, and Philautia handling live in the dedicated canon file `love-map.md`.

@@ -54,11 +54,11 @@ The "however you frame it" / "however you'd name it" hedge on Faith is deliberat
 
 ---
 
-## Q-X3 — Institutional Trust (proposed)
+## Q-X3 — Institutional Trust (legacy 5-item form; DEPRECATED in CC-031)
+
+The legacy Q-X3 below was the locked 2026-04-25 5-item form. CC-031 replaces it with the multi-stage form (Q-X3-public + Q-X3-information-and-commercial + Q-X3-cross). The legacy glosses below are preserved for historical reference and for rendering pre-CC-031 saved sessions.
 
 Question: *Rank these institutions from most to least trustworthy.*
-
-These need to be informational rather than poetic — the categories are abstract and the user benefits from a small scope clarification rather than a stake.
 
 - **Government** — federal, state, and local public bodies.
 - **Press** — newsrooms, journalists, and information outlets.
@@ -66,17 +66,65 @@ These need to be informational rather than poetic — the categories are abstrac
 - **Education** — schools, colleges, and the credentialing they grant.
 - **Non-Profits & Religious** — charities, NGOs, churches, and other voluntary missions.
 
-**Alternates worth comparing:**
+---
 
-- *Government* alt: "the public institutions that set and enforce rules."
-- *Press* alt: "the journalism and information sources that shape what people know."
-- *Companies* alt: "the businesses and workplaces that pay you and shape your work life."
-- *Education* alt: "schools, universities, and the credentialing bodies that pass on knowledge."
-- *Non-Profits & Religious* alt: "voluntary mission-driven institutions, secular and faith-based."
+## Q-X3-public — Institutional Trust (CC-031, public-mission parent)
 
-**Locked 2026-04-25:** *Employers* renamed to *Companies* (plain English match for the rest of the row, avoids condescending "the people who pay you"). *Non-Profits & Religious organizations* shortened to *Non-Profits & Religious* (mobile-fit). Faith gloss in Q-S2 retained as-is — atheist or humanist users can rank Faith last; the rank itself is informative.
+Question: *How much do you trust each of these public-mission institutions to tell the truth and act in good faith? Rank in order.*
 
-Tradeoff: the longer alternates are more informative but slow the rank task down. The short versions read faster on mobile. My read: ship the short versions, expand only if user testing shows confusion.
+Helper: *Five public and civic institutions. Most trusted at the top, least trusted at the bottom.*
+
+- **Government — Elected** — elected representatives, legislatures, and the political apparatus.
+- **Government — Services** — the on-the-ground services of government — public schools, DMV, water, sanitation, local police.
+- **Education** — schools, colleges, and the credentialing they grant. *(preserved verbatim from the legacy Q-X3)*
+- **Non-Profits** — charities, NGOs, and voluntary missions outside religious frame.
+- **Religious** — churches, faith communities, and explicitly religious missions.
+
+The two Government splits and the Non-Profits / Religious split capture distinctions the legacy "Government" and "Non-Profits & Religious" items averaged. A user can hold high services-trust + low elected-trust, or high non-profits-trust + low religious-trust (or vice versa); the legacy form smeared both gaps.
+
+---
+
+## Q-X3-information-and-commercial — Institutional Trust (CC-031, info-and-commercial parent)
+
+Question: *How much do you trust each of these information and commercial institutions to tell the truth and act in good faith? Rank in order.*
+
+Helper: *Five information-distribution and commercial institutions. Most trusted at the top, least trusted at the bottom.*
+
+- **Journalism** — individual journalists and the discipline of journalistic craft.
+- **News organizations** — newsrooms, outlets, and the institutions that distribute and shape journalism.
+- **Social Media** — platforms that mediate information through algorithm and influence — Twitter/X, TikTok, YouTube, Instagram, Facebook, Substack, Reddit.
+- **Small / Private Business** — small, private, closely-held businesses — the local shop, the family firm, the contractor you've used for years.
+- **Large / Public Companies** — large, public, publicly-traded companies — the multinationals, the platforms, the brands at scale.
+
+Splits the legacy "Press" into craft-level (Journalism) vs. institutional-level (News organizations); splits the legacy "Companies" into small/private vs. large/public; **adds Social Media** as the institutional category the legacy form omitted entirely. Social Media is named without an evaluative gloss — the platform list is illustrative, not exhaustive.
+
+---
+
+## Q-X4-relational — Personal Trust (CC-032, relational parent; preserved labels)
+
+Question: *When you need to hear the truth and not just kindness, whom of these — the people entangled in your life — do you trust most? Rank in order.*
+
+Helper: *Three relational trust sources. Most trusted at the top, least trusted at the bottom.*
+
+- **A spouse or partner** — someone whose life is fully entangled with yours. *(preserved)*
+- **Family** — parents, siblings, or chosen kin who knew you before this version of you. *(preserved)*
+- **A close friend** — someone who has earned your trust outside obligation. *(preserved)*
+
+All three glosses preserved verbatim from the legacy Q-X4. The relational parent groups the entanglement-based trust sources — relationships that exist regardless of whether the user has actively selected them.
+
+---
+
+## Q-X4-chosen — Personal Trust (CC-032, chosen parent; new Outside-expert)
+
+Question: *And when you need truth from someone you've selected for their judgment — not someone bound to you by relationship — whom do you trust most? Rank in order.*
+
+Helper: *Three chosen trust sources. Most trusted at the top, least trusted at the bottom.*
+
+- **A mentor or advisor** — someone whose judgment you've sought across years. *(preserved)*
+- **An outside expert** — a therapist, doctor, lawyer, coach, financial advisor, or clergy member — the trusted professional. *(NEW in CC-032)*
+- **Your own counsel** — your own judgment, when no other source feels right. *(preserved)*
+
+The Outside-expert gloss enumerates the trusted-professional category inclusively (therapist, doctor, lawyer, coach, financial advisor, clergy) without implying credentialed authority above other categories. The label "outside expert" is canonical per the v2.5 memo — don't substitute "professional" / "expert" / "advisor."
 
 ---
 

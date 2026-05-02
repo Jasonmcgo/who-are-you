@@ -247,3 +247,13 @@ Named here so future contributors know what is intentionally outside scope.
 **Big Five / OCEAN as validation.** OCEAN's factor structure is the most peer-reviewed in psychology. If the product ever needs to demonstrate psychometric soundness — e.g., to clinical users, researchers, or regulators — a validation study comparing Temperament signals against Big Five scores is the canonical reference class. Held in reserve. Not implemented as a measurement layer here.
 
 **Predictive Index / Accumax native-vs-adapted modeling.** Their instrument framework is licensed and not directly reusable, but the concept (native self versus adapted behavior under current demands) is reproducible here via Temperament signals compared to Agency and Context signals through tensions. That reproduction is captured in the Tension Hooks section, not by importing PI or Accumax instruments.
+
+---
+
+## CC-038 — Function-pair register layer (added 2026-04-29)
+
+CC-038 adds a routing layer that reads the user's dominant + auxiliary as a structural discrimination axis in the gift-category derivation pipeline. The 16 canonical Jung function-stack pairs (NeTi, NeFi, NiTe, NiFe, SeTi, SeFi, SiTe, SiFe, TeNi, TeSi, TiNe, TiSe, FeNi, FeSi, FiNe, FiSe — exactly the same 16 stacks tabulated in § 5 above) each map to a register *analog* (e.g., *"the framework-prober"*, *"the meaning-catalyst"*) and a gift-category route.
+
+The layer is a routing primitive, not a typology. The 4-letter MBTI code per § 5 remains the canonical surface label when dominant + auxiliary identification is clean (per § 5's lookup table); the register analog is a parallel descriptor, body-of-work language used by the prose layer rather than typological code. Engine never surfaces "you are an ENTP" / "you are an ESFJ" — only the analog and the categories that compose with it.
+
+Architectural detail, the full 16-pair table, the routing-priority placement (between CC-036 secondary routes and CC-034 fallbacks), the non-canonical-stack fall-through behavior, and the cross-reference futures (aux-pair × OCEAN, aux-pair × Drive, aux-pair × Path) live in `docs/canon/function-pair-registers.md`. This temperament canon names the layer at the umbrella level; the dedicated doc owns the operational truth.

@@ -1,17 +1,36 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { RankingItem } from "../../lib/types";
+import type { AspirationalOverlay, RankingItem } from "../../lib/types";
 
 type Props = {
   items: RankingItem[];
   initialOrder?: string[];
   onChange: (order: string[]) => void;
+  // CC-016 — when present, render the per-item three-state aspirational
+  // overlay (wish less / right / wish more). Only used on the four
+  // allocation parent rankings (Q-S3-close, Q-S3-wider, Q-E1-outward,
+  // Q-E1-inward).
+  overlay?: Record<string, AspirationalOverlay>;
+  onOverlayChange?: (overlay: Record<string, AspirationalOverlay>) => void;
 };
 
 const DRAG_THRESHOLD = 6;
 
-export default function Ranking({ items, initialOrder, onChange }: Props) {
+export default function Ranking({
+  items,
+  initialOrder,
+  onChange,
+  overlay,
+  onOverlayChange,
+}: Props) {
+  const overlayEnabled = !!onOverlayChange;
+  function setOverlayFor(itemId: string, value: AspirationalOverlay) {
+    if (!onOverlayChange) return;
+    const current = overlay ?? {};
+    onOverlayChange({ ...current, [itemId]: value });
+  }
+
   const [order, setOrder] = useState<string[]>(() =>
     initialOrder && initialOrder.length === items.length
       ? initialOrder
@@ -146,8 +165,15 @@ export default function Ranking({ items, initialOrder, onChange }: Props) {
   return (
     <div className="flex flex-col gap-2">
       <ol
-        className="border border-gray-300 rounded-md overflow-hidden"
-        style={{ listStyle: "none", padding: 0, margin: 0 }}
+        className="overflow-hidden"
+        style={{
+          listStyle: "none",
+          padding: 0,
+          margin: 0,
+          border: "1px solid var(--rule)",
+          borderRadius: 12,
+          background: "var(--paper)",
+        }}
         aria-label="Ranking. Drag to reorder, or focus a grip and press space to pick up an item."
       >
         {order.map((id, idx) => {
@@ -155,46 +181,131 @@ export default function Ranking({ items, initialOrder, onChange }: Props) {
           if (!item) return null;
           const isDragging = dragId === id;
           const isPicked = keyboardPicked === id;
+          const isActive = isDragging || isPicked;
+          const isLast = idx === order.length - 1;
           const liStyle: React.CSSProperties = isDragging
             ? {
                 transform: `translateY(${dragOffset}px)`,
-                boxShadow: "0 12px 40px rgba(26,23,19,.18)",
-                outline: "1px solid #8a4a1f",
-                background: "white",
+                boxShadow:
+                  "0 12px 40px rgba(26,23,19,.18), 0 1px 2px var(--rule)",
+                outline: "1px solid var(--umber)",
+                background: "var(--umber-wash)",
                 position: "relative",
                 zIndex: 10,
                 transition: "none",
               }
+            : isPicked
+            ? {
+                background: "var(--umber-wash)",
+                outline: "1px solid var(--umber)",
+                transition: "transform 150ms ease-out",
+              }
             : {
                 transition: "transform 150ms ease-out",
+                background: "var(--paper)",
               };
+          const overlayValue = overlay?.[id] ?? "right";
           return (
             <li
               key={id}
               ref={(el) => {
                 liRefs.current[id] = el;
               }}
-              className="flex items-stretch border-b border-gray-200 last:border-b-0 bg-white"
-              style={{ ...liStyle, touchAction: "manipulation" }}
+              className="flex flex-col"
+              style={{
+                ...liStyle,
+                touchAction: "manipulation",
+                borderBottom: isLast ? "none" : "1px solid var(--rule-soft)",
+              }}
               aria-roledescription="rankable item"
             >
+            <div className="flex items-stretch">
               <div
-                className="flex items-center justify-center px-3 font-mono text-lg text-gray-700 border-r border-gray-200"
-                style={{ minWidth: 40 }}
+                className="flex items-center justify-center font-mono"
+                style={{
+                  minWidth: 48,
+                  fontSize: 18,
+                  color: "var(--umber)",
+                  borderRight: "1px solid var(--rule)",
+                  fontVariantNumeric: "tabular-nums",
+                }}
               >
-                {idx + 1}
+                <span className="md:hidden">{idx + 1}</span>
+                <span className="hidden md:inline" style={{ fontSize: 22 }}>
+                  {idx + 1}
+                </span>
               </div>
-              <div className="flex-1 px-3 py-3 text-sm leading-snug">
-                <span className="font-medium">{item.label}</span>
-                {item.gloss ? (
-                  <span className="text-gray-600">
-                    {" — "}
-                    {item.gloss}
+              {item.voice && item.quote ? (
+                <div
+                  className="flex-1 flex flex-col"
+                  style={{
+                    padding: "14px 16px",
+                    gap: 6,
+                  }}
+                >
+                  <p
+                    className="font-mono uppercase"
+                    style={{
+                      fontSize: 11,
+                      letterSpacing: "0.08em",
+                      color: "var(--ink-mute)",
+                      margin: 0,
+                    }}
+                  >
+                    {item.voice}
+                  </p>
+                  <p
+                    className="font-serif italic"
+                    style={{
+                      fontSize: 14,
+                      lineHeight: 1.5,
+                      color: "var(--ink)",
+                      margin: 0,
+                      textWrap: "pretty",
+                    }}
+                  >
+                    <span className="md:hidden">{item.quote}</span>
+                    <span
+                      className="hidden md:inline"
+                      style={{ fontSize: 16 }}
+                    >
+                      {item.quote}
+                    </span>
+                  </p>
+                </div>
+              ) : (
+                <div
+                  className="flex-1 font-serif"
+                  style={{
+                    padding: "14px 16px",
+                    fontSize: 14,
+                    lineHeight: 1.4,
+                    color: "var(--ink)",
+                  }}
+                >
+                  <span className="md:hidden">
+                    <span style={{ color: "var(--ink)" }}>{item.label}</span>
+                    {item.gloss ? (
+                      <span style={{ color: "var(--ink-soft)" }}>
+                        {" — "}
+                        {item.gloss}
+                      </span>
+                    ) : null}
                   </span>
-                ) : null}
-              </div>
+                  <span className="hidden md:inline" style={{ fontSize: 16 }}>
+                    <span style={{ color: "var(--ink)" }}>{item.label}</span>
+                    {item.gloss ? (
+                      <span style={{ color: "var(--ink-soft)" }}>
+                        {" — "}
+                        {item.gloss}
+                      </span>
+                    ) : null}
+                  </span>
+                </div>
+              )}
               <button
                 data-grip
+                data-focus-ring
                 aria-label={`Item ${idx + 1} of ${order.length}: ${
                   item.label
                 }. Press space to reorder.`}
@@ -204,16 +315,15 @@ export default function Ranking({ items, initialOrder, onChange }: Props) {
                 onPointerUp={onPointerUp}
                 onPointerCancel={onPointerUp}
                 onKeyDown={(e) => onKeyDown(e, id)}
-                className={
-                  "flex items-center justify-center px-3 select-none text-gray-500 hover:text-gray-900 focus:outline-none " +
-                  (isPicked
-                    ? "ring-2 ring-offset-1 ring-amber-700 "
-                    : "focus-visible:ring-2 focus-visible:ring-amber-700 ") +
-                  "cursor-grab active:cursor-grabbing"
-                }
+                className="flex items-center justify-center select-none"
                 style={{
                   minWidth: 44,
                   minHeight: 44,
+                  background: "transparent",
+                  border: "none",
+                  color: isActive ? "var(--umber)" : "var(--ink-mute)",
+                  fontSize: 20,
+                  cursor: isDragging ? "grabbing" : "grab",
                   touchAction: dragId === id ? "none" : "manipulation",
                   WebkitTapHighlightColor: "transparent",
                 }}
@@ -221,6 +331,60 @@ export default function Ranking({ items, initialOrder, onChange }: Props) {
               >
                 <span aria-hidden="true">≡</span>
               </button>
+            </div>
+            {overlayEnabled ? (
+              <div
+                className="flex flex-row items-center"
+                role="radiogroup"
+                aria-label={`Aspirational overlay for ${item.label}`}
+                style={{
+                  gap: 6,
+                  paddingLeft: 56,
+                  paddingRight: 16,
+                  paddingBottom: 12,
+                  paddingTop: 2,
+                }}
+              >
+                {(["wish_less", "right", "wish_more"] as const).map(
+                  (opt) => {
+                    const selected = overlayValue === opt;
+                    const labelText =
+                      opt === "wish_less"
+                        ? "wish less"
+                        : opt === "right"
+                        ? "right"
+                        : "wish more";
+                    return (
+                      <button
+                        key={opt}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        onClick={() => setOverlayFor(id, opt)}
+                        data-focus-ring
+                        className="font-mono uppercase"
+                        style={{
+                          fontSize: 11,
+                          letterSpacing: "0.08em",
+                          padding: "4px 10px",
+                          background: selected ? "var(--umber)" : "transparent",
+                          color: selected ? "var(--paper)" : "var(--ink-mute)",
+                          border: selected
+                            ? "1px solid var(--umber)"
+                            : "1px solid var(--rule)",
+                          borderRadius: 4,
+                          cursor: "pointer",
+                          transition:
+                            "background 120ms ease-out, color 120ms ease-out",
+                        }}
+                      >
+                        {labelText}
+                      </button>
+                    );
+                  }
+                )}
+              </div>
+            ) : null}
             </li>
           );
         })}

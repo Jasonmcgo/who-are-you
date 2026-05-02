@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Who Are You? · Design Exploration</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,300..700;1,8..60,300..700&family=JetBrains+Mono:wght@400;500;600&family=Inter+Tight:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+<style>
+  html, body { height: 100%; width: 100%; }
+</style>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="components.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "accent": "#1e4a7a",
+  "serifScale": 1,
+  "showSignals": true,
+  "itemCount": 5,
+  "paper": "#f3f4f6",
+  "showBodyMap": true
+}/*EDITMODE-END*/;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tensions shown live on the Sacred Values / Temperament screens
+// ─────────────────────────────────────────────────────────────────────────────
+
+const SacredTension = {
+  kicker: "A pattern may be present · T-012",
+  prompt: (order, items) => {
+    const top = items.find(i => i.id === order[0])?.id || "your top";
+    const second = items.find(i => i.id === order[1])?.id || "your second";
+    return (
+      <>
+        You placed <em>{top}</em> above <em>{second}</em>. When these two pull apart
+        — and they will — the first seems to win. Does that feel accurate?
+      </>
+    );
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Designer's cover — quick orientation on the left of the canvas
+// ─────────────────────────────────────────────────────────────────────────────
+
+function Cover({ compact }) {
+  return (
+    <div className="ab" style={{ padding: 0 }}>
+      <div style={{
+        padding: compact ? "36px 28px" : "56px 48px",
+        display: "flex", flexDirection: "column", gap: 16, height: "100%",
+      }}>
+        <div className="meta" style={{ color: "var(--umber)" }}>Design lab · round 01</div>
+        <h1 style={{
+          fontSize: compact ? 28 : 40, lineHeight: 1.1, margin: "8px 0 4px",
+          fontWeight: 400, letterSpacing: "-0.02em",
+          fontFamily: "var(--serif)",
+        }}>
+          Who Are You?
+          <br />
+          <em style={{ color: "var(--umber)" }}>A body-map, ranked into shape.</em>
+        </h1>
+        <p style={{
+          fontFamily: "var(--serif)", fontSize: compact ? 14 : 16.5, lineHeight: 1.55,
+          color: "var(--ink-soft)", margin: "12px 0 0", maxWidth: 440,
+        }}>
+          Eight cards — Lens, Compass, Conviction, Gravity, Trust, Weather, Fire, Path —
+          mapped to eyes, heart, voice, spine, ears, nervous system, immune response, and
+          gait. One ranking primitive threads through. Drag is real; grab any row.
+        </p>
+
+        <div style={{ marginTop: 24 }}>
+          <div className="meta">What's on this canvas</div>
+          <ol style={{
+            fontFamily: "var(--serif)", fontSize: 14.5, lineHeight: 1.55,
+            color: "var(--ink)", paddingLeft: 18, margin: "10px 0 0",
+          }}>
+            <li><strong>Compass · Heart.</strong> Q-S1 and Q-S2 — what you'd protect first; what has the strongest claim. Four-item case, desktop and mobile.</li>
+            <li><strong>Gravity · Spine + Trust · Ears.</strong> Q-C4 (where responsibility sits) and Q-X3 (whom you hear institutions through). Same primitive, longer tail.</li>
+            <li><strong>Lens · Eyes — Four Voices.</strong> Q-T1 of 8 — voice statements as drag rows; row height grows to give the prose air.</li>
+            <li><strong>Inner Constitution.</strong> The end artifact, written across the eight registers — typeset, meant to be saved.</li>
+          </ol>
+        </div>
+
+        <div style={{ marginTop: "auto", paddingTop: 20, borderTop: "1px solid var(--rule-soft)" }}>
+          <div className="meta">Notes to Jason</div>
+          <ul style={{
+            fontFamily: "var(--serif)", fontSize: 13.5, lineHeight: 1.5,
+            color: "var(--ink-soft)", paddingLeft: 18, margin: "8px 0 0",
+          }}>
+            <li>Questions + voice statements pulled from canon (Q-S1, Q-S2, Q-X3, Q-C4, Q-T1).</li>
+            <li>The tension-confirmation card appears when a ranking is complete. Copy is tentative.</li>
+            <li>Tweaks panel (bottom-right) swaps accent, serif scale, and signal-badge visibility.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// App
+// ─────────────────────────────────────────────────────────────────────────────
+
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  // Apply tweaks at the document level so they cascade
+  React.useEffect(() => {
+    const r = document.documentElement;
+    // Accent (replaces all browns/umber)
+    r.style.setProperty("--umber", t.accent);
+    r.style.setProperty("--umber-soft", t.accent);
+    r.style.setProperty("--umber-wash", t.accent + "14");
+    // Paper family — neutral off-white; filled surfaces are neutral grays,
+    // not tinted, so nothing reads as a "blue box".
+    if (t.paper) {
+      r.style.setProperty("--paper", t.paper);
+      r.style.setProperty("--paper-warm", "#ececee");
+      r.style.setProperty("--paper-deep", "#e2e2e5");
+    }
+    // Also override the umber-wash so the tension card + over-states are
+    // just a faint neutral tint, not a blue tint.
+    r.style.setProperty("--umber-wash", "rgba(19,24,42,.05)");
+    // Inks — shift from warm browns to cool slate blues
+    r.style.setProperty("--ink", "#13182a");
+    r.style.setProperty("--ink-soft", "#2f3a52");
+    r.style.setProperty("--ink-mute", "#6b7590");
+    r.style.setProperty("--ink-faint", "#aab2c4");
+    r.style.setProperty("--rule", "rgba(19,24,42,.14)");
+    r.style.setProperty("--rule-soft", "rgba(19,24,42,.08)");
+    document.body.style.fontSize = (16 * (t.serifScale || 1)) + "px";
+    if (!t.showSignals) {
+      r.style.setProperty("--signals-display", "none");
+    } else {
+      r.style.setProperty("--signals-display", "flex");
+    }
+    // Body-map label visibility — when off, kickers drop the "· Heart" suffix
+    // and the artboard head hides the body-part chip. Card names still read.
+    r.style.setProperty("--bodymap-display", t.showBodyMap ? "inline" : "none");
+  }, [t.accent, t.serifScale, t.showSignals, t.showBodyMap]);
+
+  // Clip item counts
+  const svCount = Math.max(3, Math.min(4, t.itemCount || 4)); // sacred is 4-item
+  const q_s1 = { ...Q_S1, items: Q_S1.items.slice(0, svCount) };
+  const q_x3 = { ...Q_X3, items: Q_X3.items.slice(0, Math.max(3, Math.min(5, t.itemCount || 5))) };
+
+  // shared progress bits
+  const prog = (done, current, total) => ({ done, current, total });
+
+  return (
+    <>
+      <style>{`
+        .constitution .signals { display: var(--signals-display, flex); }
+        .body-tag, .kicker-body { display: var(--bodymap-display, inline); }
+      `}</style>
+
+      <DesignCanvas title="Who Are You? — ranking primitive, round 01" subtitle="Three working directions. Drag/tap state is real.">
+
+        <DCSection id="cover" title="Orientation" subtitle="Designer's note on what's on this canvas">
+          <DCArtboard id="cover" label="Read me first" width={520} height={720}>
+            <Cover />
+          </DCArtboard>
+        </DCSection>
+
+        {/* ────────────────────────────────────────────────────────────────
+           Open calls — illustrated. Two questions, shown as side-by-side
+           treatments so we can pick by eye instead of in the abstract.
+           ──────────────────────────────────────────────────────────────── */}
+        <DCSection id="opencall-section" title="Open call · Section titles on the canvas" subtitle="Should the canvas itself name the cards in body-map language, or stay neutral and let the metaphor live inside the artboards?">
+          <DCArtboard id="sec-bodymap" label="A · Body-map names" width={420} height={220}>
+            <SectionTitleSwatch
+              kicker="Treatment A · current"
+              title="Compass · Heart — Q-S1 & Q-S2"
+              sub="Sacred values, ranked. Drag-to-reorder · desktop and mobile"
+              note="Pro: the metaphor is felt the moment you scan the canvas. Con: every section header carries the metaphor whether the artboard needs it or not."
+            />
+          </DCArtboard>
+          <DCArtboard id="sec-neutral" label="B · Neutral, descriptive" width={420} height={220}>
+            <SectionTitleSwatch
+              kicker="Treatment B"
+              title="Sacred values · Q-S1 & Q-S2"
+              sub="What you'd protect first when something has to give"
+              note="Pro: the canvas reads as a working file, not a manifesto. Con: the user must enter an artboard before the body-map registers."
+            />
+          </DCArtboard>
+          <DCArtboard id="sec-tag" label="C · Body part as small tag" width={420} height={220}>
+            <SectionTitleSwatch
+              kicker="Treatment C"
+              title="Sacred values · Q-S1 & Q-S2"
+              sub="What you'd protect first when something has to give"
+              tag="HEART"
+              note="Pro: the body-map is present but doesn't dominate the title. Con: a chip per section can feel taxonomic — closer to filing than to feeling."
+            />
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="opencall-chip" title="Open call · Body-part chip in the artboard head" subtitle="The italic '· Heart' next to 'Compass' is the smallest, most-repeated touch of the metaphor. Five ways to handle it — the right one is whichever feels least gimmicky after a hundred screens.">
+          <DCArtboard id="chip-italic" label="A · Italic word (current)" width={420} height={180}>
+            <ChipTreatmentSwatch variant="italic" cardName="Compass" body="Heart" ix="Q-S1 / S2" />
+          </DCArtboard>
+          <DCArtboard id="chip-mono" label="B · Mono small caps" width={420} height={180}>
+            <ChipTreatmentSwatch variant="mono" cardName="Compass" body="HEART" ix="Q-S1 / S2" />
+          </DCArtboard>
+          <DCArtboard id="chip-paren" label="C · Inline parenthetical" width={420} height={180}>
+            <ChipTreatmentSwatch variant="paren" cardName="Compass" body="Heart" ix="Q-S1 / S2" />
+          </DCArtboard>
+          <DCArtboard id="chip-glyph" label="D · Glyph only" width={420} height={180}>
+            <ChipTreatmentSwatch variant="glyph" cardName="Compass" body="♡" ix="Q-S1 / S2" />
+          </DCArtboard>
+          <DCArtboard id="chip-hidden" label="E · Hidden — name only" width={420} height={180}>
+            <ChipTreatmentSwatch variant="hidden" cardName="Compass" ix="Q-S1 / S2" />
+          </DCArtboard>
+        </DCSection>
+
+        {/* B and C variants retired — drag-to-reorder is the primitive. */}
+
+        <DCSection id="sacred" title="Compass · Heart — Q-S1 & Q-S2" subtitle="Sacred values, ranked. Drag-to-reorder · desktop and mobile">
+          <DCArtboard id="sv-d" label="Desktop · 520 × 720" width={520} height={720}>
+            <QuestionPage question={q_s1} variant="A" progress={prog(8, 9, 10)} tension={SacredTension} />
+          </DCArtboard>
+          <DCArtboard id="sv-m" label="Mobile · 390 × 720" width={390} height={720}>
+            <QuestionPage question={q_s1} variant="A" compact progress={prog(8, 9, 10)} />
+          </DCArtboard>
+          <DCArtboard id="s2-d" label="Q-S2 · strongest claim · 520 × 720" width={520} height={720}>
+            <QuestionPage question={Q_S2} variant="A" progress={prog(9, 10, 10)} />
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="five-item" title="Gravity · Spine + Trust · Ears" subtitle="Q-C4 (where responsibility sits) and Q-X3 (whom you hear institutions through). Same primitive, longer tail">
+          <DCArtboard id="c4-d" label="Q-C4 · responsibility · 520 × 720" width={520} height={720}>
+            <QuestionPage question={Q_C4} variant="A" progress={prog(4, 5, 10)} />
+          </DCArtboard>
+          <DCArtboard id="c4-m" label="Q-C4 · mobile · 390 × 720" width={390} height={720}>
+            <QuestionPage question={Q_C4} variant="A" compact progress={prog(4, 5, 10)} />
+          </DCArtboard>
+          <DCArtboard id="x3-d" label="Q-X3 · institutional · 520 × 720" width={520} height={720}>
+            <QuestionPage question={Q_X3} variant="A" progress={prog(2, 3, 10)} />
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="temperament" title="Lens · Eyes — Four Voices · Q-T1 of 8" subtitle="Cognitive frame as the user-facing voices. Same primitive — voice statements as drag rows">
+          <DCArtboard id="t1-d" label="Desktop · 560 × 760" width={560} height={760}>
+            <QuestionPage question={Q_T1} variant="A" progress={prog(0, 1, 8)} />
+          </DCArtboard>
+          <DCArtboard id="t1-m" label="Mobile · 390 × 760" width={390} height={760}>
+            <QuestionPage question={Q_T1} variant="A" compact progress={prog(0, 1, 8)} />
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="constitution" title="Inner Constitution" subtitle="The end artifact — a typeset document, not a results page">
+          <DCArtboard id="con-d" label="Desktop · 620 × 880" width={620} height={880}>
+            <ConstitutionPage />
+          </DCArtboard>
+          <DCArtboard id="con-m" label="Mobile · 390 × 880" width={390} height={880}>
+            <ConstitutionPage compact />
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="notes" title="Open calls" subtitle="Designer's take on the questions in the brief">
+          <DCArtboard id="notes-ab" label="Notes" width={520} height={720}>
+            <div className="ab">
+              <div className="ab-body" style={{ padding: "36px 40px" }}>
+                <div className="prompt-kicker">Open design calls — designer's read</div>
+                <h2 className="prompt" style={{ fontSize: 18, marginBottom: 4 }}>A few positions, to react to.</h2>
+
+                <div style={{ marginTop: 20 }}>
+                  <div className="meta" style={{ color: "var(--umber)" }}>01 · The ranking primitive</div>
+                  <p style={{ fontSize: 14.5, lineHeight: 1.55, color: "var(--ink)", margin: "6px 0 16px" }}>
+                    Drag-to-reorder is the primitive. Index column on the left, grip on the right,
+                    rows reflow live. It carries from 4-item Sacred Values up through the 5-item
+                    Q-X3 and Q-C4 rankings without modification. On touch, the same control with a
+                    larger grip target — no separate tier mode.
+                  </p>
+
+                  <div className="meta" style={{ color: "var(--umber)" }}>02 · 4 vs. 5 items</div>
+                  <p style={{ fontSize: 14.5, lineHeight: 1.55, color: "var(--ink)", margin: "6px 0 16px" }}>
+                    5 holds on desktop. On mobile, a 5-item ranking reaches the bottom of a 390pt
+                    viewport; the tail is the most at risk of arbitrary ranking. For Q-X3 and Q-C4,
+                    consider asking the top-3 explicitly and letting the tail fall into "also present."
+                  </p>
+
+                  <div className="meta" style={{ color: "var(--umber)" }}>03 · Temperament, 8 questions</div>
+                  <p style={{ fontSize: 14.5, lineHeight: 1.55, color: "var(--ink)", margin: "6px 0 16px" }}>
+                    Same primitive, larger row — voice statements run two lines and the row gives them
+                    air. Calling the card <em>Four Voices</em> instead of "Temperament" reads better.
+                    Suggest two ambient breaks at Q-T3 and Q-T6 ("pause. take a breath.").
+                  </p>
+
+                  <div className="meta" style={{ color: "var(--umber)" }}>04 · Red flag</div>
+                  <p style={{ fontSize: 14.5, lineHeight: 1.55, color: "var(--ink)", margin: "6px 0 0" }}>
+                    The tension-confirmation prompt can read as <em>asking for a grade</em> on the user's own
+                    self-report. Watch for "yes / partly / no" becoming judgment. The fourth option —
+                    <em> tell me more</em> — opens signal provenance. Users tolerate a pattern they
+                    can see inside of.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </DCArtboard>
+        </DCSection>
+
+      </DesignCanvas>
+
+      <TweaksPanel title="Tweaks">
+        <TweakSection label="Appearance" />
+        <TweakColor label="Paper" value={t.paper} onChange={(v) => setTweak("paper", v)} />
+        <TweakColor label="Accent" value={t.accent} onChange={(v) => setTweak("accent", v)} />
+        <TweakSlider label="Serif scale" value={t.serifScale} min={0.85} max={1.15} step={0.05}
+                     onChange={(v) => setTweak("serifScale", v)} />
+        <TweakSection label="Ranking" />
+        <TweakSlider label="Item count (X3/C4)" value={t.itemCount} min={3} max={5} step={1}
+                     onChange={(v) => setTweak("itemCount", v)} />
+        <TweakSection label="Constitution" />
+        <TweakToggle label="Show signal provenance" value={t.showSignals}
+                     onChange={(v) => setTweak("showSignals", v)} />
+        <TweakSection label="Body-map metaphor" />
+        <TweakToggle label="Show body-part labels" value={t.showBodyMap}
+                     onChange={(v) => setTweak("showBodyMap", v)} />
+      </TweaksPanel>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

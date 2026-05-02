@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { questions } from "../data/questions";
 import {
   buildInnerConstitution,
@@ -9,446 +9,868 @@ import {
 } from "../lib/identityEngine";
 import type {
   Answer,
+  AspirationalOverlay,
+  CardId,
+  MetaSignal,
+  MultiSelectDerivedAnswer,
+  QuestionOption,
+  RankingDerivedAnswer,
   RankingItem,
-  Signal,
+  SinglePickAnswer,
   TensionStatus,
 } from "../lib/types";
 import Ranking from "./components/Ranking";
+import QuestionShell from "./components/QuestionShell";
+import InnerConstitutionPage from "./components/InnerConstitutionPage";
+import IdentityAndContextPage from "./components/IdentityAndContextPage";
+import { saveSession } from "../lib/saveSession";
+import type { DemographicAnswer } from "../lib/types";
+import SecondPassPage from "./components/SecondPassPage";
+import MultiSelectDerived, { type DerivedItem } from "./components/MultiSelectDerived";
+
+// CC-016 — the four allocation parent rankings that get the per-item
+// three-state aspirational overlay affordance.
+const ALLOCATION_PARENT_RANKINGS = new Set([
+  "Q-S3-close",
+  "Q-S3-wider",
+  "Q-E1-outward",
+  "Q-E1-inward",
+]);
+
+// CC-022a Item 6 — the Q-I1 (first Keystone) index, computed once at module
+// load. The second-pass trigger relocation watches for the boundary where
+// the next question would be Q-I1 — if any prior question was skipped, we
+// detour into second-pass first so Q-I2 / Q-I3 derive from the cleanest
+// possible parent answers.
+const Q_I1_INDEX = questions.findIndex((q) => q.question_id === "Q-I1");
+
+// CC-016 — derive items for a `ranking_derived` question from the top-N of
+// its parent answers. Returns null if any parent doesn't have enough items
+// (cascade-skip should fire in that case). CC-017 — extended for use by
+// `multiselect_derived` questions via `deriveItemsForMultiSelect` below;
+// the same parent-walking and id-namespacing semantics apply.
+function deriveItemsForCrossRank(
+  derivedQuestionId: string,
+  derivedFrom: string[],
+  topN: number,
+  answers: Answer[]
+): {
+  items: RankingItem[];
+  sources: { id: string; signal: string; source_question_id: string }[];
+} | null {
+  const items: RankingItem[] = [];
+  const sources: { id: string; signal: string; source_question_id: string }[] =
+    [];
+  for (const parentId of derivedFrom) {
+    const parentAnswer = answers.find(
+      (a) => a.question_id === parentId && a.type === "ranking"
+    );
+    if (!parentAnswer || parentAnswer.type !== "ranking") return null;
+    if (parentAnswer.order.length < topN) return null;
+    const parentQuestion = questions.find((q) => q.question_id === parentId);
+    if (!parentQuestion || parentQuestion.type !== "ranking") return null;
+    for (let i = 0; i < topN; i++) {
+      const itemId = parentAnswer.order[i];
+      const parentItem = parentQuestion.items.find((it) => it.id === itemId);
+      if (!parentItem) return null;
+      // Namespace the id so collisions across parents don't clobber.
+      const namespacedId = `${parentId}:${parentItem.id}`;
+      items.push({
+        id: namespacedId,
+        label: parentItem.label,
+        gloss: parentItem.gloss,
+        signal: parentItem.signal,
+      });
+      sources.push({
+        id: namespacedId,
+        signal: parentItem.signal,
+        source_question_id: parentId,
+      });
+    }
+  }
+  void derivedQuestionId;
+  return { items, sources };
+}
+
+// CC-017 — derive items for a `multiselect_derived` question from the top-N
+// of each parent ranking answer. Same shape as deriveItemsForCrossRank but
+// returns null only when ALL parents lack data (Q-I2 / Q-I3 can render with
+// just one parent's items per spec); per-parent partial availability is OK.
+// Returns the items list as `DerivedItem[]` (the MultiSelectDerived component's
+// expected shape).
+function deriveItemsForMultiSelect(
+  derivedFrom: string[],
+  topN: number,
+  answers: Answer[]
+): DerivedItem[] | null {
+  const items: DerivedItem[] = [];
+  let anyParentHadData = false;
+  for (const parentId of derivedFrom) {
+    const parentAnswer = answers.find(
+      (a) => a.question_id === parentId && a.type === "ranking"
+    );
+    if (!parentAnswer || parentAnswer.type !== "ranking") continue;
+    if (parentAnswer.order.length === 0) continue;
+    const parentQuestion = questions.find((q) => q.question_id === parentId);
+    if (!parentQuestion || parentQuestion.type !== "ranking") continue;
+    anyParentHadData = true;
+    const take = Math.min(topN, parentAnswer.order.length);
+    for (let i = 0; i < take; i++) {
+      const itemId = parentAnswer.order[i];
+      const parentItem = parentQuestion.items.find((it) => it.id === itemId);
+      if (!parentItem) continue;
+      items.push({
+        id: `${parentId}:${parentItem.id}`,
+        label: parentItem.label,
+        gloss: parentItem.gloss,
+        signal: parentItem.signal,
+        source_question_id: parentId,
+      });
+    }
+  }
+  return anyParentHadData ? items : null;
+}
+
+// CC-017 — find the user's belief anchor: Q-I1 freeform first; on skip,
+// Q-I1b. Returns null if neither was answered.
+function findBeliefAnchor(answers: Answer[]): string | null {
+  const qi1 = answers.find((a) => a.question_id === "Q-I1");
+  if (qi1 && qi1.type === "freeform" && qi1.response.trim().length > 0) {
+    return qi1.response.trim();
+  }
+  const qi1b = answers.find((a) => a.question_id === "Q-I1b");
+  if (qi1b && qi1b.type === "freeform" && qi1b.response.trim().length > 0) {
+    return qi1b.response.trim();
+  }
+  return null;
+}
 
 type Confirmation = {
   status: TensionStatus;
   note?: string;
 };
 
+const CARD_KICKER_NAME: Record<CardId, string> = {
+  conviction: "CONVICTION",
+  pressure: "PRESSURE",
+  formation: "FORMATION",
+  context: "CONTEXT",
+  agency: "AGENCY",
+  sacred: "SACRED VALUES",
+  role: "ROLE",
+  temperament: "FOUR VOICES",
+  contradiction: "CONTRADICTION",
+};
+
 export default function Home() {
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<Answer[]>([]);
-  const [showResult, setShowResult] = useState(false);
   const [confirmations, setConfirmations] = useState<
     Record<string, Confirmation>
   >({});
   const [explainOpen, setExplainOpen] = useState<Record<string, boolean>>({});
+  const [drafts, setDrafts] = useState<Record<string, string | string[]>>({});
+  const [skippedQuestionIds, setSkippedQuestionIds] = useState<string[]>([]);
+  const [metaSignals, setMetaSignals] = useState<MetaSignal[]>([]);
+  // CC-022a — phase machinery rewritten for save-before-portrait flow.
+  //   "first_pass" — test in progress.
+  //   "second_pass" — second-pass page renders. Trigger relocated to
+  //     post-Allocation / pre-Keystone (Item 6) so Q-I2 / Q-I3 can derive
+  //     from second-pass-completed parent answers.
+  //   "identity_context" — demographics page (now reached automatically
+  //     after the test completes, not via an opt-in Save button).
+  //   "result" — the InnerConstitution renders. Reached only after the
+  //     save commits (Item 7); no thank-you detour.
+  const [phase, setPhase] = useState<
+    "first_pass" | "second_pass" | "identity_context" | "result"
+  >("first_pass");
+  // CC-022a Item 6 — when set, second-pass returns the user to the test at
+  // this index instead of advancing to identity_context. Set when the
+  // pre-Keystone boundary triggers the second pass (resume target = Q-I1);
+  // null when the second pass fires at end-of-flow as a defensive backstop.
+  const [secondPassResumeIndex, setSecondPassResumeIndex] = useState<number | null>(
+    null
+  );
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  // CC-022a — captured demographics from the just-completed Identity &
+  // Context fill. Used by the result-phase render to thread name + other
+  // demographic hooks into the prose (CC-022b consumers). Renamed-in-spirit
+  // from the CC-020 `submittedDemographics` "deviation workaround"; with
+  // save-before-portrait this is now the natural data flow.
+  const [submittedDemographics, setSubmittedDemographics] = useState<
+    DemographicAnswer[] | null
+  >(null);
+  // CC-020 — the timestamp the save committed. Used by buildFilename so the
+  // .md filename matches the saved session's date.
+  const [sessionSavedAt, setSessionSavedAt] = useState<Date | null>(null);
+  // CC-016 — per-question allocation overlays. Keyed by question_id.
+  const [overlays, setOverlays] = useState<
+    Record<string, Record<string, AspirationalOverlay>>
+  >({});
+  // CC-017 — per-question multi-select state. Keyed by question_id.
+  // `selectedIds` includes the noneOption.id and otherOption.id sentinels
+  // when those are checked.
+  const [multiSelectState, setMultiSelectState] = useState<
+    Record<string, { selectedIds: string[]; otherText: string }>
+  >({});
 
   const question = questions[current];
 
-  function submitResponse(response: string) {
-    const a = toAnswer(question.question_id, response);
-    if (!a) return;
-    const next = [...answers.filter((x) => x.question_id !== a.question_id), a];
-    setAnswers(next);
-    if (current < questions.length - 1) {
-      setCurrent(current + 1);
+  // CC-016 — for ranking_derived questions, compute items + sources from
+  // parent answers. Returns null if the parents don't have enough data
+  // (cascade-skip will fire).
+  const derivedItems = useMemo(() => {
+    if (question.type !== "ranking_derived") return null;
+    return deriveItemsForCrossRank(
+      question.question_id,
+      question.derived_from,
+      question.derived_top_n ?? 2,
+      answers
+    );
+  }, [question, answers]);
+
+  // CC-017 — for multiselect_derived questions, compute the derived items
+  // from the top-N of each parent ranking. Returns null when ALL parents
+  // lack data (cascade-skip will fire).
+  const multiSelectDerivedItems = useMemo(() => {
+    if (question.type !== "multiselect_derived") return null;
+    return deriveItemsForMultiSelect(
+      question.derived_from,
+      question.derived_top_n_per_source ?? 3,
+      answers
+    );
+  }, [question, answers]);
+
+  // CC-017 — belief anchor (Q-I1 → Q-I1b fallback). Surfaced above Q-I2 / Q-I3.
+  const beliefAnchor = useMemo(() => findBeliefAnchor(answers), [answers]);
+
+  // CC-017 — Q-I1b is conditional. Renders only when its `render_if_skipped`
+  // target (Q-I1) is in skippedQuestionIds. If Q-I1 was answered, advance
+  // past Q-I1b on render (deferred via queueMicrotask to satisfy
+  // react-hooks/set-state-in-effect).
+  useEffect(() => {
+    if (question.type !== "freeform" && question.type !== "forced") return;
+    if (!question.render_if_skipped) return;
+    const conditionTarget = question.render_if_skipped;
+    const wasSkipped = skippedQuestionIds.includes(conditionTarget);
+    const wasAnswered = answers.some(
+      (a) => a.question_id === conditionTarget
+    );
+    if (wasSkipped) return; // condition met — render normally
+    if (!wasAnswered) return; // condition not yet decided — render normally
+    // Condition target was answered (not skipped) — auto-advance past this
+    // conditional question.
+    const idx = current;
+    queueMicrotask(() => {
+      advanceFromIndex(idx);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [question, skippedQuestionIds, answers]);
+
+  // CC-016 — cascade-skip when entering a ranking_derived question whose
+  // parents aren't fully populated. Auto-records a derived_question_skipped
+  // meta-signal and advances past it. Deferred via queueMicrotask so the
+  // state updates happen after the effect returns (satisfies
+  // react-hooks/set-state-in-effect).
+  useEffect(() => {
+    if (question.type !== "ranking_derived") return;
+    if (derivedItems !== null) return;
+    const qid = question.question_id;
+    const cardId = question.card_id;
+    const idx = current;
+    queueMicrotask(() => {
+      const meta: MetaSignal = {
+        type: "derived_question_skipped",
+        question_id: qid,
+        card_id: cardId,
+        recorded_at: Date.now(),
+      };
+      setMetaSignals((prev) =>
+        prev.some((m) => m.question_id === qid) ? prev : [...prev, meta]
+      );
+      advanceFromIndex(idx);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [question, derivedItems]);
+
+  // CC-017 — cascade-skip when entering a multiselect_derived question whose
+  // parents lack data. Same shape as ranking_derived cascade-skip.
+  useEffect(() => {
+    if (question.type !== "multiselect_derived") return;
+    if (multiSelectDerivedItems !== null) return;
+    const qid = question.question_id;
+    const cardId = question.card_id;
+    const idx = current;
+    queueMicrotask(() => {
+      const meta: MetaSignal = {
+        type: "derived_question_skipped",
+        question_id: qid,
+        card_id: cardId,
+        recorded_at: Date.now(),
+      };
+      setMetaSignals((prev) =>
+        prev.some((m) => m.question_id === qid) ? prev : [...prev, meta]
+      );
+      advanceFromIndex(idx);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [question, multiSelectDerivedItems]);
+
+  const seed: string | string[] = useMemo(() => {
+    const prev = answers.find((a) => a.question_id === question.question_id);
+    if (question.type === "ranking") {
+      return prev && prev.type === "ranking"
+        ? prev.order
+        : question.items.map((i) => i.id);
+    }
+    if (question.type === "ranking_derived") {
+      if (prev && prev.type === "ranking_derived") return prev.order;
+      return derivedItems ? derivedItems.items.map((i) => i.id) : [];
+    }
+    return prev && (prev.type === "forced" || prev.type === "freeform")
+      ? prev.response
+      : "";
+  }, [question, answers, derivedItems]);
+
+  const draft = drafts[question.question_id] ?? seed;
+
+  function updateDraft(value: string | string[]) {
+    setDrafts((prev) => ({ ...prev, [question.question_id]: value }));
+  }
+
+  function advance(next: Answer) {
+    const nextAnswers = [
+      ...answers.filter((x) => x.question_id !== next.question_id),
+      next,
+    ];
+    setAnswers(nextAnswers);
+    advanceFromIndex(current);
+  }
+
+  function advanceFromIndex(idx: number) {
+    // CC-022a Item 6 — pre-Keystone second-pass trigger. If the next
+    // question would be Q-I1 and the user has any skipped questions,
+    // detour into second-pass first so Q-I2 / Q-I3's parents are clean
+    // by the time the Keystone block runs. After second-pass we resume
+    // at Q-I1 (see handleSecondPassComplete).
+    const nextIdx = idx + 1;
+    if (
+      nextIdx === Q_I1_INDEX &&
+      Q_I1_INDEX !== -1 &&
+      skippedQuestionIds.length > 0
+    ) {
+      setSecondPassResumeIndex(Q_I1_INDEX);
+      setPhase("second_pass");
+      return;
+    }
+
+    if (idx < questions.length - 1) {
+      setCurrent(nextIdx);
+    } else if (
+      // CC-023 Item 1 — exclude Q-I1 from the end-of-flow backstop. Q-I1
+      // has its own conditional-render path via Q-I1b (CC-017); a Q-I1
+      // skip should never trigger second-pass. Any non-Q-I1 skip recorded
+      // after the boundary (defensive case for cascade-skips we haven't
+      // anticipated) still triggers the backstop.
+      skippedQuestionIds.filter((id) => id !== "Q-I1").length > 0
+    ) {
+      setSecondPassResumeIndex(null);
+      setPhase("second_pass");
     } else {
-      setShowResult(true);
+      // CC-022a Item 7 — test complete, go straight to demographics. The
+      // portrait renders only after the save commits (commitSave →
+      // phase: "result").
+      setPhase("identity_context");
     }
   }
 
-  function handleAnswer(optionLabel: string) {
-    submitResponse(optionLabel);
+  function handleSkip() {
+    const q = question;
+    const meta: MetaSignal = {
+      type: "question_skipped",
+      question_id: q.question_id,
+      card_id: q.card_id,
+      recorded_at: Date.now(),
+    };
+    setMetaSignals((prev) => [...prev, meta]);
+    setSkippedQuestionIds((prev) =>
+      prev.includes(q.question_id) ? prev : [...prev, q.question_id]
+    );
+    setAnswers((prev) =>
+      prev.filter((a) => a.question_id !== q.question_id)
+    );
+    setDrafts((prev) => {
+      const next = { ...prev };
+      delete next[q.question_id];
+      return next;
+    });
+    advanceFromIndex(current);
   }
 
-  function handleFreeformSubmit(text: string) {
-    const trimmed = text.trim();
-    if (trimmed.length === 0) return;
-    submitResponse(trimmed);
-  }
+  function handleSecondPassComplete(picks: SinglePickAnswer[]) {
+    const merged: Answer[] = [
+      ...answers.filter(
+        (a) => !picks.some((p) => p.question_id === a.question_id)
+      ),
+      ...picks,
+    ];
+    setAnswers(merged);
 
-  function submitRanking(order: string[]) {
-    const a = toRankingAnswer(question.question_id, order);
-    if (!a) return;
-    const next = [...answers.filter((x) => x.question_id !== a.question_id), a];
-    setAnswers(next);
-    if (current < questions.length - 1) {
-      setCurrent(current + 1);
+    // CC-023 Item 1 — clear resolved IDs from skippedQuestionIds. Without
+    // this, the post-boundary second-pass leaves the same IDs queued; the
+    // end-of-flow defensive backstop in advanceFromIndex then re-triggers
+    // second-pass with the same questions (the Q-T loop bug Michele hit).
+    //
+    // The SecondPassPage component never emits question_double_skipped
+    // (its mode disables Skip in QuestionShell), so the only IDs that go
+    // through second-pass and need clearing are exactly those in `picks`.
+    // Any IDs that remain in skippedQuestionIds are post-pass skips
+    // (Q-I1 in practice — handled by Q-I1b conditional render).
+    const resolvedIds = new Set(picks.map((p) => p.question_id));
+    setSkippedQuestionIds((prev) =>
+      prev.filter((id) => !resolvedIds.has(id))
+    );
+
+    // CC-022a Item 6 — if second-pass was triggered at the pre-Keystone
+    // boundary, resume the test at Q-I1. Otherwise (end-of-flow defensive
+    // case) the test is complete; go to demographics per Item 7.
+    if (secondPassResumeIndex !== null) {
+      const resume = secondPassResumeIndex;
+      setSecondPassResumeIndex(null);
+      setCurrent(resume);
+      setPhase("first_pass");
     } else {
-      setShowResult(true);
+      setPhase("identity_context");
     }
   }
 
+  function handleContinue() {
+    if (question.type === "ranking" && Array.isArray(draft)) {
+      const a = toRankingAnswer(question.question_id, draft);
+      if (!a) return;
+      // CC-016 — attach overlay if this is an allocation parent ranking.
+      const overlay = overlays[question.question_id];
+      const enriched =
+        ALLOCATION_PARENT_RANKINGS.has(question.question_id) && overlay
+          ? { ...a, overlay }
+          : a;
+      advance(enriched as Answer);
+      return;
+    }
+    if (
+      question.type === "ranking_derived" &&
+      Array.isArray(draft) &&
+      derivedItems
+    ) {
+      const derived: RankingDerivedAnswer = {
+        question_id: question.question_id,
+        card_id: question.card_id,
+        question_text: question.text,
+        type: "ranking_derived",
+        order: draft,
+        derived_item_sources: derivedItems.sources,
+      };
+      advance(derived);
+      return;
+    }
+    if (
+      question.type === "multiselect_derived" &&
+      multiSelectDerivedItems &&
+      question.none_option &&
+      question.other_option
+    ) {
+      const state = multiSelectState[question.question_id] ?? {
+        selectedIds: [],
+        otherText: "",
+      };
+      const noneId = question.none_option.id;
+      const otherId = question.other_option.id;
+      const noneSelected = state.selectedIds.includes(noneId);
+      const selections: MultiSelectDerivedAnswer["selections"] = [];
+      // Derived item selections (skip None / Other sentinels).
+      for (const sid of state.selectedIds) {
+        if (sid === noneId || sid === otherId) continue;
+        const item = multiSelectDerivedItems.find((it) => it.id === sid);
+        if (!item) continue;
+        selections.push({
+          id: item.id,
+          signal: item.signal,
+          source_question_id: item.source_question_id,
+        });
+      }
+      // "Other" selection — emits no signal but stored on the answer.
+      if (state.selectedIds.includes(otherId)) {
+        selections.push({ id: otherId, signal: null });
+      }
+      const otherText = state.otherText.trim();
+      const answer: MultiSelectDerivedAnswer = {
+        question_id: question.question_id,
+        card_id: question.card_id,
+        question_text: question.text,
+        type: "multiselect_derived",
+        selections,
+        none_selected: noneSelected,
+        ...(otherText.length > 0 ? { other_text: otherText } : {}),
+      };
+      advance(answer);
+      return;
+    }
+    if (typeof draft === "string") {
+      const trimmed = draft.trim();
+      if (question.type === "freeform" && trimmed.length === 0) return;
+      if (question.type === "forced" && draft.length === 0) return;
+      const a = toAnswer(question.question_id, trimmed || draft);
+      if (a) advance(a);
+    }
+  }
+
+  const canContinue = (() => {
+    if (question.type === "ranking") return Array.isArray(draft);
+    if (question.type === "ranking_derived") {
+      return Array.isArray(draft) && derivedItems !== null;
+    }
+    if (question.type === "multiselect_derived") {
+      // CC-017 — Continue is enabled when at least one option is selected
+      // (any derived item, OR "None of these", OR "Other" with non-empty text).
+      const state = multiSelectState[question.question_id];
+      if (!state) return false;
+      if (state.selectedIds.length === 0) return false;
+      const noneId = question.none_option?.id;
+      const otherId = question.other_option?.id;
+      // If only "Other" is selected, require non-empty text.
+      const onlyOther =
+        otherId !== undefined &&
+        state.selectedIds.length === 1 &&
+        state.selectedIds[0] === otherId;
+      if (onlyOther && state.otherText.trim().length === 0) return false;
+      void noneId;
+      return true;
+    }
+    if (question.type === "freeform") {
+      return typeof draft === "string" && draft.trim().length > 0;
+    }
+    return typeof draft === "string" && draft.length > 0;
+  })();
+
+  // CC-022a — build the constitution once the test is complete (phase
+  // reaches identity_context or result). It's needed during commitSave
+  // (which fires from identity_context) so the engine runs at the
+  // identity_context boundary, not at result.
   const constitution = useMemo(
-    () => (showResult ? buildInnerConstitution(answers) : null),
-    [showResult, answers]
+    () =>
+      phase === "identity_context" || phase === "result"
+        ? buildInnerConstitution(answers, metaSignals)
+        : null,
+    [phase, answers, metaSignals]
   );
-
-  function setTensionStatus(tension_id: string, status: TensionStatus) {
-    setConfirmations((prev) => ({
-      ...prev,
-      [tension_id]: { status, note: prev[tension_id]?.note },
-    }));
-    if (status !== "unconfirmed") {
-      setExplainOpen((prev) => ({ ...prev, [tension_id]: false }));
-    }
-  }
-
-  function toggleExplain(tension_id: string) {
-    setExplainOpen((prev) => ({
-      ...prev,
-      [tension_id]: !prev[tension_id],
-    }));
-  }
-
-  function setNote(tension_id: string, note: string) {
-    setConfirmations((prev) => ({
-      ...prev,
-      [tension_id]: {
-        status: prev[tension_id]?.status ?? "unconfirmed",
-        note,
-      },
-    }));
-  }
 
   function restart() {
     setCurrent(0);
     setAnswers([]);
-    setShowResult(false);
     setConfirmations({});
     setExplainOpen({});
+    setDrafts({});
+    setSkippedQuestionIds([]);
+    setMetaSignals([]);
+    setPhase("first_pass");
+    setSecondPassResumeIndex(null);
+    setIsSaving(false);
+    setSaveError(null);
+    setSubmittedDemographics(null);
+    setSessionSavedAt(null);
   }
 
-  if (showResult && constitution) {
+  // CC-022a — save flow handlers. The opt-in handleStartSave is gone;
+  // identity_context is reached automatically when the test completes
+  // (advanceFromIndex Item 7). commitSave transitions identity_context →
+  // result on success; the user lands on the portrait with their just-
+  // saved demographics already threaded through.
+  async function commitSave(demographicAnswers: DemographicAnswer[]) {
+    if (!constitution) return;
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      await saveSession({
+        answers,
+        innerConstitution: constitution,
+        skippedQuestionIds,
+        metaSignals,
+        allocationOverlays: constitution.allocation_overlays,
+        beliefUnderTension: constitution.belief_under_tension,
+        demographicAnswers,
+      });
+      setSubmittedDemographics(demographicAnswers);
+      setSessionSavedAt(new Date());
+      setPhase("result");
+    } catch (e) {
+      setSaveError(
+        e instanceof Error
+          ? e.message
+          : "Save failed. Check your DATABASE_URL and try again."
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  function handleSubmitDemographics(answers: DemographicAnswer[]) {
+    void commitSave(answers);
+  }
+
+  function handleSkipDemographics() {
+    // Skip = save with all fields not_answered. Per the amended Rule 5
+    // (research mode), Skip means "skip the demographic disclosure," not
+    // "skip the save."
+    void commitSave([]);
+  }
+
+  // CC-022a Item 7 — Identity & Context phase renders after the test
+  // completes (advanceFromIndex transitions here automatically). The
+  // submit handlers commit the save and transition to result.
+  if (phase === "identity_context" && constitution) {
     return (
-      <main className="min-h-screen p-6 md:p-10">
-        <div className="max-w-2xl mx-auto space-y-10">
-          <header className="space-y-2">
-            <p className="text-xs uppercase tracking-widest text-gray-500">
-              Mini Inner Constitution
-            </p>
-            <h1 className="text-3xl font-semibold">A first reflection</h1>
-            <p className="text-sm text-gray-600 italic">
-              A possibility, not a verdict. Nothing here is a final description.
-            </p>
-          </header>
-
-          <section className="space-y-2">
-            <h2 className="text-lg font-medium">Core Orientation</h2>
-            <p className="leading-relaxed">{constitution.core_orientation}</p>
-          </section>
-
-          <section className="space-y-2">
-            <h2 className="text-lg font-medium">Signals Detected</h2>
-            {constitution.signals.length === 0 ? (
-              <p className="text-gray-600">No signals detected from these answers.</p>
-            ) : (
-              <ul className="space-y-2">
-                {constitution.signals.map((s) => (
-                  <li
-                    key={`${s.signal_id}-${s.source_question_ids.join(",")}`}
-                    className="border-l-2 border-gray-300 pl-3"
-                  >
-                    <p className="text-sm">
-                      <span className="font-mono text-xs text-gray-500">
-                        {s.signal_id}
-                      </span>
-                      <span className="text-gray-400 text-xs">
-                        {" "}
-                        · from {s.from_card} · {s.source_question_ids.join(", ")}
-                      </span>
-                    </p>
-                    <p className="text-sm text-gray-700">{s.description}</p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          <section className="space-y-4">
-            <h2 className="text-lg font-medium">Possible Tensions</h2>
-            <p className="text-sm text-gray-600 italic">
-              These are patterns that may be present. You are the final authority.
-            </p>
-            {constitution.tensions.length === 0 ? (
-              <p className="text-gray-600">
-                No canonical tensions surfaced from the current signals.
-              </p>
-            ) : (
-              <ul className="space-y-6">
-                {constitution.tensions.map((t) => {
-                  const status =
-                    confirmations[t.tension_id]?.status ?? "unconfirmed";
-                  const isOpen = !!explainOpen[t.tension_id];
-                  const note = confirmations[t.tension_id]?.note ?? "";
-                  return (
-                    <li
-                      key={t.tension_id}
-                      className="border border-gray-200 rounded-md p-4 space-y-3"
-                    >
-                      <div className="flex items-baseline justify-between gap-2">
-                        <p className="font-medium">
-                          <span className="font-mono text-xs text-gray-500 mr-2">
-                            {t.tension_id}
-                          </span>
-                          {t.type}
-                        </p>
-                        <span className="text-xs text-gray-500">
-                          {status === "unconfirmed" ? "awaiting you" : status}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-700">{t.description}</p>
-                      <p className="text-sm italic text-gray-600">
-                        {t.user_prompt}
-                      </p>
-                      <StrengthenedBy signals={t.strengthened_by} />
-                      <p className="text-xs text-gray-500">
-                        Source signals:{" "}
-                        {t.signals_involved
-                          .map((s) => `${s.signal_id} (${s.from_card})`)
-                          .join(" · ")}
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        <ConfirmButton
-                          active={status === "confirmed"}
-                          onClick={() =>
-                            setTensionStatus(t.tension_id, "confirmed")
-                          }
-                        >
-                          Yes
-                        </ConfirmButton>
-                        <ConfirmButton
-                          active={status === "partially_confirmed"}
-                          onClick={() =>
-                            setTensionStatus(
-                              t.tension_id,
-                              "partially_confirmed"
-                            )
-                          }
-                        >
-                          Partially
-                        </ConfirmButton>
-                        <ConfirmButton
-                          active={status === "rejected"}
-                          onClick={() =>
-                            setTensionStatus(t.tension_id, "rejected")
-                          }
-                        >
-                          No
-                        </ConfirmButton>
-                        <ConfirmButton
-                          active={isOpen}
-                          onClick={() => toggleExplain(t.tension_id)}
-                        >
-                          Explain
-                        </ConfirmButton>
-                      </div>
-                      {isOpen && (
-                        <textarea
-                          value={note}
-                          onChange={(e) => setNote(t.tension_id, e.target.value)}
-                          placeholder="In your own words…"
-                          className="w-full border border-gray-300 rounded p-2 text-sm"
-                          rows={3}
-                        />
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </section>
-
-          <section className="space-y-2">
-            <h2 className="text-lg font-medium">Sacred Values</h2>
-            {constitution.sacred_values.length === 0 ? (
-              <p className="text-gray-600">No sacred value selected.</p>
-            ) : (
-              <ul className="list-disc list-inside">
-                {constitution.sacred_values.map((v) => (
-                  <li key={v}>{v}</li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          <section className="space-y-2">
-            <h2 className="text-lg font-medium">Bridge Signals</h2>
-            <p className="text-sm text-gray-600 italic">
-              Placeholder. Shared moral ground with people of different
-              worldviews will appear here as the system grows.
-            </p>
-          </section>
-
-          <div className="pt-4">
-            <button
-              onClick={restart}
-              className="text-sm underline text-gray-600 hover:text-gray-900"
-            >
-              Start over
-            </button>
+      <>
+        <IdentityAndContextPage
+          onSubmit={handleSubmitDemographics}
+          onSkip={handleSkipDemographics}
+          isSubmitting={isSaving}
+        />
+        {saveError ? (
+          <div
+            role="alert"
+            style={{
+              position: "fixed",
+              bottom: 16,
+              left: "50%",
+              transform: "translateX(-50%)",
+              background: "var(--paper-warm)",
+              border: "1px solid var(--rule)",
+              borderRadius: 6,
+              padding: "10px 14px",
+              fontSize: 13,
+              color: "var(--ink)",
+              maxWidth: 520,
+              boxShadow: "0 6px 20px rgba(26,23,19,.12)",
+            }}
+          >
+            <span className="font-mono uppercase" style={{ fontSize: 10, letterSpacing: "0.12em", color: "var(--ink-mute)", marginRight: 8 }}>
+              save error
+            </span>
+            {saveError}
           </div>
-        </div>
-      </main>
+        ) : null}
+      </>
     );
   }
 
-  return (
-    <main className="min-h-screen flex items-center justify-center p-6">
-      <div className="max-w-xl w-full space-y-8">
-        <div className="space-y-1 text-center">
-          <p className="text-xs uppercase tracking-widest text-gray-500">
-            Who Are You?
-          </p>
-          <p className="text-xs text-gray-500">
-            Question {current + 1} of {questions.length} ·{" "}
-            <span className="font-mono">{question.card_id}</span>
-          </p>
-        </div>
-
-        <p className="text-xl leading-snug text-center">{question.text}</p>
-
-        {question.type === "ranking" ? (
-          <RankingAnswerWidget
-            key={question.question_id}
-            items={question.items}
-            initial={
-              (() => {
-                const prev = answers.find(
-                  (a) => a.question_id === question.question_id
-                );
-                return prev && prev.type === "ranking" ? prev.order : undefined;
-              })()
-            }
-            onSubmit={submitRanking}
-          />
-        ) : question.type === "freeform" ? (
-          <FreeformAnswer
-            key={question.question_id}
-            initial={(() => {
-              const prev = answers.find(
-                (a) => a.question_id === question.question_id
-              );
-              return prev && prev.type !== "ranking" ? prev.response : "";
-            })()}
-            onSubmit={handleFreeformSubmit}
-          />
-        ) : (
-          <div className="flex flex-col gap-3">
-            {question.options.map((opt) => (
-              <button
-                key={opt.label}
-                onClick={() => handleAnswer(opt.label)}
-                className="border border-gray-300 p-3 rounded text-left hover:border-gray-900 hover:bg-gray-50 transition"
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {current > 0 && (
-          <div className="text-center">
-            <button
-              onClick={() => setCurrent(current - 1)}
-              className="text-xs text-gray-500 underline hover:text-gray-900"
-            >
-              Back
-            </button>
-          </div>
-        )}
-      </div>
-    </main>
-  );
-}
-
-function RankingAnswerWidget({
-  items,
-  initial,
-  onSubmit,
-}: {
-  items: RankingItem[];
-  initial: string[] | undefined;
-  onSubmit: (order: string[]) => void;
-}) {
-  const [order, setOrder] = useState<string[]>(
-    initial && initial.length === items.length ? initial : items.map((i) => i.id)
-  );
-  const helper = "Drag to reorder, or focus a grip and use space + arrows.";
-  return (
-    <div className="flex flex-col gap-4">
-      <p className="text-xs text-gray-500 italic">{helper}</p>
-      <Ranking items={items} initialOrder={order} onChange={setOrder} />
-      <button
-        onClick={() => onSubmit(order)}
-        className="self-end text-sm px-4 py-2 rounded border border-gray-900 bg-gray-900 text-white hover:opacity-90 transition"
-      >
-        Continue
-      </button>
-    </div>
-  );
-}
-
-function FreeformAnswer({
-  initial,
-  onSubmit,
-}: {
-  initial: string;
-  onSubmit: (text: string) => void;
-}) {
-  const [text, setText] = useState(initial);
-  const disabled = text.trim().length === 0;
-  return (
-    <div className="flex flex-col gap-3">
-      <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder="Answer in your own words…"
-        rows={5}
-        className="border border-gray-300 rounded p-3 text-sm leading-relaxed focus:outline-none focus:border-gray-900"
-      />
-      <button
-        disabled={disabled}
-        onClick={() => onSubmit(text)}
-        className={
-          "self-end text-sm px-4 py-2 rounded border transition " +
-          (disabled
-            ? "border-gray-200 text-gray-400 cursor-not-allowed"
-            : "border-gray-900 bg-gray-900 text-white hover:opacity-90")
+  if (phase === "result" && constitution) {
+    return (
+      <InnerConstitutionPage
+        constitution={constitution}
+        confirmations={confirmations}
+        setConfirmations={setConfirmations}
+        explainOpen={explainOpen}
+        setExplainOpen={setExplainOpen}
+        onRestart={restart}
+        demographics={
+          submittedDemographics
+            ? { answers: submittedDemographics }
+            : null
         }
-      >
-        Continue
-      </button>
-    </div>
-  );
-}
+        sessionDate={sessionSavedAt}
+        answers={answers}
+      />
+    );
+  }
 
-function StrengthenedBy({ signals }: { signals: Signal[] }) {
-  if (signals.length === 0) return null;
-  const ids = Array.from(
-    new Set(signals.flatMap((s) => s.source_question_ids))
-  );
-  if (ids.length === 0) return null;
-  const joined =
-    ids.length === 1
-      ? ids[0]
-      : ids.length === 2
-      ? `${ids[0]} and ${ids[1]}`
-      : ids.slice(0, -1).join(", ") + ", and " + ids[ids.length - 1];
-  const noun = ids.length === 1 ? "response" : "responses";
-  return (
-    <p className="text-xs text-gray-500 italic">
-      Strengthened by your {noun} to {joined}.
-    </p>
-  );
-}
+  if (phase === "second_pass") {
+    return (
+      <SecondPassPage
+        skippedQuestionIds={skippedQuestionIds}
+        totalQuestionCount={questions.length}
+        onComplete={handleSecondPassComplete}
+      />
+    );
+  }
 
-function ConfirmButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
+  const cardName = CARD_KICKER_NAME[question.card_id] ?? question.card_id.toUpperCase();
+  const kicker = `CARD ${current + 1} · ${cardName} · ${question.question_id}`;
+
   return (
-    <button
-      onClick={onClick}
-      className={
-        "text-sm px-3 py-1.5 rounded border transition " +
-        (active
-          ? "border-gray-900 bg-gray-900 text-white"
-          : "border-gray-300 hover:border-gray-900")
+    <QuestionShell
+      kicker={kicker}
+      cardId={question.card_id}
+      prompt={question.text}
+      helper={
+        question.type === "ranking" ||
+        question.type === "ranking_derived" ||
+        question.type === "multiselect_derived"
+          ? question.helper
+          : undefined
+      }
+      currentIndex={current}
+      totalCount={questions.length}
+      onBack={current > 0 ? () => setCurrent(current - 1) : undefined}
+      canContinue={canContinue}
+      onContinue={handleContinue}
+      mode="first_pass"
+      onSkip={handleSkip}
+      continueLabel={
+        question.type === "ranking" || question.type === "ranking_derived"
+          ? "Accept"
+          : undefined
+      }
+      unskippable={
+        (question.type === "freeform" || question.type === "forced") &&
+        question.unskippable === true
       }
     >
-      {children}
-    </button>
+      {question.type === "ranking" ? (
+        <Ranking
+          key={question.question_id}
+          items={question.items}
+          initialOrder={Array.isArray(draft) ? draft : undefined}
+          onChange={(order) => updateDraft(order)}
+          overlay={
+            ALLOCATION_PARENT_RANKINGS.has(question.question_id)
+              ? overlays[question.question_id]
+              : undefined
+          }
+          onOverlayChange={
+            ALLOCATION_PARENT_RANKINGS.has(question.question_id)
+              ? (next) =>
+                  setOverlays((prev) => ({
+                    ...prev,
+                    [question.question_id]: next,
+                  }))
+              : undefined
+          }
+        />
+      ) : question.type === "freeform" ? (
+        <FreeformInput
+          key={question.question_id}
+          value={typeof draft === "string" ? draft : ""}
+          onChange={(text) => updateDraft(text)}
+        />
+      ) : question.type === "forced" ? (
+        <ForcedChoiceList
+          key={question.question_id}
+          options={question.options}
+          selectedLabel={typeof draft === "string" ? draft : ""}
+          onSelect={(label) => updateDraft(label)}
+        />
+      ) : question.type === "ranking_derived" && derivedItems ? (
+        <Ranking
+          key={question.question_id}
+          items={derivedItems.items}
+          initialOrder={Array.isArray(draft) ? draft : undefined}
+          onChange={(order) => updateDraft(order)}
+        />
+      ) : question.type === "multiselect_derived" &&
+        multiSelectDerivedItems &&
+        question.none_option &&
+        question.other_option ? (
+        <MultiSelectDerived
+          key={question.question_id}
+          beliefAnchor={beliefAnchor}
+          items={multiSelectDerivedItems}
+          noneOption={question.none_option}
+          otherOption={question.other_option}
+          selectedIds={
+            multiSelectState[question.question_id]?.selectedIds ?? []
+          }
+          otherText={multiSelectState[question.question_id]?.otherText ?? ""}
+          onSelectionsChange={(selectedIds) =>
+            setMultiSelectState((prev) => ({
+              ...prev,
+              [question.question_id]: {
+                selectedIds,
+                otherText: prev[question.question_id]?.otherText ?? "",
+              },
+            }))
+          }
+          onOtherTextChange={(text) =>
+            setMultiSelectState((prev) => ({
+              ...prev,
+              [question.question_id]: {
+                selectedIds: prev[question.question_id]?.selectedIds ?? [],
+                otherText: text,
+              },
+            }))
+          }
+        />
+      ) : null /* derived question with insufficient parent data — cascade-skip effect handles it */}
+    </QuestionShell>
   );
 }
+
+function ForcedChoiceList({
+  options,
+  selectedLabel,
+  onSelect,
+}: {
+  options: QuestionOption[];
+  selectedLabel: string;
+  onSelect: (label: string) => void;
+}) {
+  return (
+    <div className="flex flex-col" style={{ gap: 10 }}>
+      {options.map((opt) => {
+        const selected = opt.label === selectedLabel;
+        return (
+          <button
+            key={opt.label}
+            onClick={() => onSelect(opt.label)}
+            data-focus-ring
+            className="font-serif text-left"
+            style={{
+              background: selected ? "var(--umber-wash)" : "var(--paper-warm)",
+              border: selected ? "1px solid var(--umber)" : "1px solid var(--rule)",
+              color: "var(--ink)",
+              padding: "14px 16px",
+              fontSize: 16,
+              lineHeight: 1.4,
+              minHeight: 44,
+              borderRadius: 8,
+              cursor: "pointer",
+              transition: "background 120ms ease-out, border-color 120ms ease-out",
+            }}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function FreeformInput({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (text: string) => void;
+}) {
+  return (
+    <textarea
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder="Answer in your own words…"
+      rows={6}
+      data-focus-ring
+      className="w-full font-serif"
+      style={{
+        background: "var(--paper-warm)",
+        color: "var(--ink)",
+        border: "1px solid var(--rule)",
+        padding: 16,
+        fontSize: 16,
+        lineHeight: 1.5,
+        borderRadius: 8,
+        resize: "vertical",
+      }}
+    />
+  );
+}
+

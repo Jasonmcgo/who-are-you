@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" fill="none" stroke="#1a1713" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+  
+  
+  <path d="M160 296 L 160 200" stroke-width="3"></path>
+  
+  <circle cx="160" cy="200" r="6" fill="#1a1713" stroke="none"></circle>
+  
+  <path d="M160 200 C 148 184, 124 168, 100 156" stroke-width="3"></path>
+  <path d="M160 200 C 172 184, 196 168, 220 156" stroke-width="3"></path>
+  
+  <g stroke-width="2">
+    <path d="M100 156 L 88 144"></path>
+    <path d="M100 156 L 96 138"></path>
+    <path d="M220 156 L 232 144"></path>
+    <path d="M220 156 L 224 138"></path>
+  </g>
+  
+  <path d="M154 196 C 142 178, 124 168, 108 160" stroke-width="1.4" opacity="0.55"></path>
+  <path d="M166 196 C 178 178, 196 168, 212 160" stroke-width="1.4" opacity="0.55"></path>
+  
+  <ellipse cx="160" cy="200" rx="116" ry="100" stroke-width="1.6" opacity="0.45"></ellipse>
+  
+  <g>
+    
+    <path d="M160 196&#xA;             C 144 176, 144 156, 160 132&#xA;             C 176 156, 176 176, 160 196 Z" fill="#8a4a1f" fill-opacity="0.18" stroke="#8a4a1f" stroke-width="2.2"></path>
+    
+    <path d="M160 188&#xA;             C 152 174, 152 162, 160 148&#xA;             C 168 162, 168 174, 160 188 Z" stroke="#1a1713" stroke-width="1.8"></path>
+    
+    <path d="M160 142 L 158 134 M160 142 L 162 134" stroke-width="1.4" opacity="0.7"></path>
+  </g>
+</svg>

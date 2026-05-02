@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# CC-021a — researcher-uploaded attachments. The DB stores metadata; the
+# bytes live on disk under attachments/<session_id>/. Never commit them.
+/attachments/
+
+# Office app lock files (LibreOffice / Excel write the .~lock.* sentinel
+# while a workbook is open; never useful in version control).
+.~lock.*#

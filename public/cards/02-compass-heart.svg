@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" fill="none" stroke="#1a1713" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+  
+  <path d="M160 268&#xA;           C 130 248, 88 224, 70 188&#xA;           C 52 152, 64 110, 96 96&#xA;           C 122 84, 144 96, 156 116&#xA;           C 158 96, 168 80, 188 76&#xA;           C 220 72, 252 100, 250 142&#xA;           C 248 188, 200 232, 160 268 Z"></path>
+  
+  <path d="M156 116 C 152 96, 144 80, 132 70" stroke-width="2"></path>
+  <path d="M168 100 C 174 84, 186 72, 200 68" stroke-width="2"></path>
+  
+  <g transform="translate(160 170)">
+    
+    <circle r="58" stroke-width="1.8"></circle>
+    <circle r="44" stroke-width="1" opacity="0.5"></circle>
+    
+    <path d="M0 -58 L8 0 L0 58 L-8 0 Z"></path>
+    <path d="M-58 0 L0 -8 L58 0 L0 8 Z" stroke-width="1.6" opacity="0.7"></path>
+    
+    <g stroke-width="1.4" opacity="0.7">
+      <line x1="41" y1="-41" x2="48" y2="-48"></line>
+      <line x1="-41" y1="-41" x2="-48" y2="-48"></line>
+      <line x1="41" y1="41" x2="48" y2="48"></line>
+      <line x1="-41" y1="41" x2="-48" y2="48"></line>
+    </g>
+    
+    <path d="M0 -52 L6 0 L-6 0 Z" fill="#8a4a1f" stroke="#8a4a1f"></path>
+    <path d="M0 52 L6 0 L-6 0 Z" stroke-width="1.6"></path>
+    
+    <circle r="3.5" fill="#1a1713" stroke="none"></circle>
+    
+    <text x="0" y="-66" text-anchor="middle" font-family="Georgia, serif" font-size="14" font-style="italic" fill="#1a1713" stroke="none">N</text>
+  </g>
+</svg>

@@ -1,0 +1,286 @@
+{
+  "id": "ee81ed84-b3a1-4a65-a3cb-81aaf2667ec6",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.demographics": {
+      "name": "demographics",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "session_id": {
+          "name": "session_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "name_value": {
+          "name": "name_value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name_state": {
+          "name": "name_state",
+          "type": "field_state",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'not_answered'"
+        },
+        "gender_value": {
+          "name": "gender_value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gender_state": {
+          "name": "gender_state",
+          "type": "field_state",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'not_answered'"
+        },
+        "age_decade": {
+          "name": "age_decade",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "age_state": {
+          "name": "age_state",
+          "type": "field_state",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'not_answered'"
+        },
+        "location_country": {
+          "name": "location_country",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "location_region": {
+          "name": "location_region",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "location_state": {
+          "name": "location_state",
+          "type": "field_state",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'not_answered'"
+        },
+        "marital_status_value": {
+          "name": "marital_status_value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "marital_status_state": {
+          "name": "marital_status_state",
+          "type": "field_state",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'not_answered'"
+        },
+        "education_value": {
+          "name": "education_value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "education_state": {
+          "name": "education_state",
+          "type": "field_state",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'not_answered'"
+        },
+        "political_value": {
+          "name": "political_value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "political_state": {
+          "name": "political_state",
+          "type": "field_state",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'not_answered'"
+        },
+        "religious_value": {
+          "name": "religious_value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "religious_state": {
+          "name": "religious_state",
+          "type": "field_state",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'not_answered'"
+        },
+        "profession_value": {
+          "name": "profession_value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "profession_state": {
+          "name": "profession_state",
+          "type": "field_state",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'not_answered'"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "demographics_session_id_sessions_id_fk": {
+          "name": "demographics_session_id_sessions_id_fk",
+          "tableFrom": "demographics",
+          "tableTo": "sessions",
+          "columnsFrom": [
+            "session_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "demographics_session_id_unique": {
+          "name": "demographics_session_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "session_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.sessions": {
+      "name": "sessions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "answers": {
+          "name": "answers",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "inner_constitution": {
+          "name": "inner_constitution",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "skipped_question_ids": {
+          "name": "skipped_question_ids",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "meta_signals": {
+          "name": "meta_signals",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "allocation_overlays": {
+          "name": "allocation_overlays",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "belief_under_tension": {
+          "name": "belief_under_tension",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.field_state": {
+      "name": "field_state",
+      "schema": "public",
+      "values": [
+        "specified",
+        "prefer_not_to_say",
+        "not_answered"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

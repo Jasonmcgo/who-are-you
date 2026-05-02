@@ -1,3 +1,5 @@
+> Superseded by docs/design-spec-v2.md (2026-04-26).
+
 # Who Are You? — Design Specification
 
 **Status:** Draft 01 — round one of design lab work

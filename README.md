@@ -20,6 +20,41 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Database
+
+The opt-in Save flow on the result page (CC-019) writes saved sessions and demographic context to a local Postgres database via Drizzle ORM. The dev server runs without a database — the connection only opens when a user clicks Save — so you can iterate on the UI flow without setting up Postgres.
+
+When you do want to enable persistence:
+
+1. Create a local Postgres database: `createdb who_are_you` (or use pgAdmin).
+2. Add `DATABASE_URL=postgresql://user:pass@localhost:5432/who_are_you` to `.env.local`.
+3. Apply the schema migration: `npm run db:migrate`.
+4. (Optional) Browse the data: `npm run db:studio` opens Drizzle Studio.
+
+Schema lives in [`db/schema.ts`](db/schema.ts); generated migrations land in [`db/migrations/`](db/migrations/). Regenerate after schema edits with `npm run db:generate`.
+
+The save flow is opt-in by default per [`docs/canon/demographic-rules.md`](docs/canon/demographic-rules.md). A user who completes the test and does not click Save leaves no record on the server.
+
+## Researcher UI (CC-021a)
+
+A passcode-protected admin surface at `/admin` lists all saved sessions, opens any one to view its full Inner Constitution, and supports per-session file attachments (LLM rewrites, interview notes, audio recordings, etc.).
+
+To enable:
+
+1. Add a passcode to `.env.local`:
+
+   ```
+   ADMIN_PASSCODE=<a-passphrase-you-pick>
+   ```
+
+2. Run the schema migration if you haven't already (the attachments table lands in `0001_skinny_nebula.sql`): `npm run db:migrate`.
+3. Restart the dev server so the new env var takes effect.
+4. Navigate to `http://localhost:3003/admin`, enter the passcode.
+
+Attachment files live on disk under `attachments/<session_id>/` and are gitignored. Their metadata (filename, MIME type, size, label, notes) lives in the `attachments` Postgres table; deleting a session cascade-deletes its attachment rows, but the on-disk files are cleaned up by the per-attachment delete handler — manual session removal from `psql` will leave orphan files in `attachments/<session_id>/` that you'd remove with `rm -rf`.
+
+The admin auth is intentionally minimal — a single shared passcode validated by [`middleware.ts`](middleware.ts) — appropriate for local single-user research use only. Real auth (and object storage instead of local disk) lands in CC-021b alongside cloud deployment.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
