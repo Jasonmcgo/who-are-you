@@ -47,3 +47,5 @@ next-env.d.ts
 # Office app lock files (LibreOffice / Excel write the .~lock.* sentinel
 # while a workbook is open; never useful in version control).
 .~lock.*#
+~$*
+question-bank-relationship-table-v[3-9]*.xlsx

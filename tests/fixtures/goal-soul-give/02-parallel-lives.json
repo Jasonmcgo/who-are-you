@@ -1,0 +1,20 @@
+[
+  { "question_id": "Q-E1-outward", "card_id": "sacred", "question_text": "outward energy", "type": "ranking", "order": ["building", "solving", "restoring"] },
+  { "question_id": "Q-E1-inward",  "card_id": "sacred", "question_text": "inward energy",  "type": "ranking", "order": ["caring", "learning", "enjoying"] },
+  { "question_id": "Q-A1", "card_id": "agency", "question_text": "spend most of your time", "type": "forced", "response": "Building or creating" },
+  { "question_id": "Q-A2", "card_id": "agency", "question_text": "where energy goes",       "type": "forced", "response": "Building or creating something new" },
+  { "question_id": "Q-3C1",       "card_id": "role",   "question_text": "drive priority",       "type": "ranking", "order": ["cost", "coverage", "compliance"] },
+  { "question_id": "Q-Ambition1", "card_id": "role",   "question_text": "what does the win look like", "type": "ranking", "order": ["success", "legacy", "wealth", "fame"] },
+  { "question_id": "Q-Stakes1", "card_id": "sacred", "question_text": "concrete stakes", "type": "ranking", "order": ["close_relationships", "health", "money", "job", "reputation"] },
+  { "question_id": "Q-S1", "card_id": "sacred", "question_text": "qualities of self", "type": "ranking", "order": ["peace", "stability", "freedom", "truth", "loyalty", "honor"] },
+  { "question_id": "Q-S2", "card_id": "sacred", "question_text": "claims on you", "type": "ranking", "order": ["compassion", "family", "mercy", "faith", "justice", "knowledge"] },
+  { "question_id": "Q-X4-relational", "card_id": "context", "question_text": "relational trust", "type": "ranking", "order": ["partner", "family", "friend"] },
+  { "question_id": "Q-X4-chosen",     "card_id": "context", "question_text": "chosen trust",     "type": "ranking", "order": ["own_counsel", "mentor", "outside_expert"] },
+  { "question_id": "Q-S3-close", "card_id": "sacred", "question_text": "close-circle money", "type": "ranking", "order": ["family", "friends", "yourself"] },
+  { "question_id": "Q-T1", "card_id": "temperament", "question_text": "hard problem", "type": "ranking", "order": ["se", "ni", "ne", "si"] },
+  { "question_id": "Q-T7", "card_id": "temperament", "question_text": "hard call",    "type": "ranking", "order": ["te", "fi", "ti", "fe"] },
+  { "question_id": "Q-T8", "card_id": "temperament", "question_text": "someone struggling", "type": "ranking", "order": ["fe", "fi", "ti", "te"] },
+  { "question_id": "Q-P1", "card_id": "pressure", "question_text": "expressing a belief that costs relationships", "type": "forced", "response": "Stay silent" },
+  { "question_id": "Q-P2", "card_id": "pressure", "question_text": "belief at job risk", "type": "forced", "response": "Change your position" },
+  { "question_id": "Q-I1", "card_id": "conviction", "question_text": "belief you'd bear cost to keep", "type": "freeform", "response": "There are things I have stopped saying out loud at work because of how it could affect my position, but I still hold them privately at home." }
+]

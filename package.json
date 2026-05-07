@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start -p 3003",
     "lint": "eslint",
+    "audit:goal-soul-give": "tsx tests/audit/goalSoulGive.audit.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio"
@@ -27,6 +28,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }

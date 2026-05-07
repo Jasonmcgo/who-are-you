@@ -34,6 +34,7 @@ import { buildDriveTension, computeDriveOutput } from "./drive";
 import { computeOceanOutput } from "./ocean";
 import { computeWorkMapOutput } from "./workMap";
 import { computeLoveMapOutput } from "./loveMap";
+import { computeGoalSoulGive } from "./goalSoulGive";
 
 // CC-022a Item 1 helpers — name threading. Provided here as the engine-
 // layer primitives so prose generators (CC-022b consumers) can substitute
@@ -1442,6 +1443,14 @@ export function buildInnerConstitution(
     agency
   );
 
+  // CC-067 — Goal/Soul/Give derivation. Composes existing signals into Goal,
+  // Soul, and Vulnerability composites; places into one of six named regions
+  // (Give / Striving / Longing / Gripping / Parallel-Lives / Neutral).
+  // Returns undefined when fewer than 8 signals are present or when neither
+  // Q-E1 ranking was answered. The Mirror render layer guards on presence
+  // and emits a "## Closing Read" section when populated.
+  const goalSoulGiveOutput = computeGoalSoulGive(signals, answers);
+
   const shape_outputs: ShapeOutputs = {
     lens, compass, conviction, gravity, trust,
     weather: weatherOut, fire: fireOut, path,
@@ -1497,6 +1506,10 @@ export function buildInnerConstitution(
     // undefined only when both register matching is empty AND Resource
     // Balance is healthy. Resource Balance distortion alone fires the field.
     loveMap: loveMapOutput,
+    // CC-067 — Goal/Soul/Give derivation. Optional; computeGoalSoulGive
+    // returns undefined for thin-signal sessions or when no Q-E1 evidence
+    // exists. The render layer guards on presence.
+    goalSoulGive: goalSoulGiveOutput,
   };
 
   baseConstitution.mirror = generateMirror(baseConstitution, {

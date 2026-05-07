@@ -597,6 +597,42 @@ export type LoveMapOutput = {
   prose: string;
 };
 
+// CC-067 — Goal/Soul/Give derivation layer (CC-A of the four-CC chain in
+// docs/goal-soul-give-spec.md). Engine-level read of coherence between
+// outward-form (Goal) and inward-love (Soul), plus an orthogonal
+// Vulnerability vector. The narrative layer speaks Work/Love/Give plus the
+// six named regions (Give / Striving / Longing / Gripping / Parallel-Lives /
+// Neutral). Engine vocabulary (Goal / Soul / Vulnerability) appears only in
+// the evidence object and audit logs — never in user-facing prose.
+export type GoalSoulQuadrant =
+  | "give"
+  | "striving"
+  | "longing"
+  | "gripping"
+  | "parallel_lives"
+  | "neutral";
+
+export type GoalSoulScores = {
+  goal: number;          // 0-100
+  soul: number;          // 0-100
+  vulnerability: number; // -50 to +50
+};
+
+export type GoalSoulEvidence = {
+  goalDrivers: string[];
+  soulDrivers: string[];
+  vulnerabilityDrivers: string[];
+  grippingClusterFires: boolean;
+  confidence: "high" | "medium" | "low";
+};
+
+export type GoalSoulGiveOutput = {
+  scores: GoalSoulScores;
+  quadrant: GoalSoulQuadrant;
+  evidence: GoalSoulEvidence;
+  prose: string;
+};
+
 export type ShapeOutputs = {
   lens: FullSwotOutput;
   compass: FullSwotOutput;
@@ -746,6 +782,10 @@ export type InnerConstitution = {
   // sessions don't carry the field, and `computeLoveMapOutput` returns
   // undefined when no register fires AND the Resource Balance is healthy.
   loveMap?: LoveMapOutput;
+  // CC-067 addition — Goal/Soul/Give derivation. Optional because pre-CC-067
+  // saved sessions don't carry the field; `computeGoalSoulGive` returns
+  // undefined when input signals are insufficient.
+  goalSoulGive?: GoalSoulGiveOutput;
 };
 
 // CC-021a — Admin-surface types for the researcher UI. These describe API

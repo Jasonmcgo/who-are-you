@@ -315,6 +315,19 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
     out.push(simpleSummary);
   }
 
+  // 9b. CC-067 — Closing Read. Engine-level Goal/Soul/Give synthesis, narrated
+  // in Work/Love/Give vocabulary plus the named-region nouns (Purpose,
+  // Striving, Longing, Gripping, the Parallel-Lives sentence, or the Neutral
+  // fallback). Skip entirely when computeGoalSoulGive returned undefined or
+  // produced empty prose.
+  const goalSoulGiveProse = constitution.goalSoulGive?.prose;
+  if (goalSoulGiveProse && goalSoulGiveProse.length > 0) {
+    out.push("");
+    out.push("## Closing Read");
+    out.push("");
+    out.push(goalSoulGiveProse);
+  }
+
   // 10. Disposition Map (OCEAN). Silently omits for pre-CC-037 / thin-signal
   // sessions where the engine didn't produce an ocean output.
   if (constitution.ocean) {
