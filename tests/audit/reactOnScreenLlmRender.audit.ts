@@ -432,13 +432,17 @@ async function runAudit(): Promise<void> {
     }
     const hits: string[] = [];
     for (const d of dirsToCheck) walk(d, hits);
-    // Filter out the actual route file (the source of truth) and the
-    // audit file itself (in case the recursive walk picked it up).
+    // Filter out the actual route file (the source of truth), the audit
+    // file itself (in case the recursive walk picked it up), and any
+    // user-facing route file that mounts InnerConstitutionPage
+    // (`/assessment/page.tsx`, `/report/[sessionId]/page.tsx`).
     const filtered = hits.filter(
       (p) =>
         !p.includes("/app/api/report-cards/route.ts") &&
         !p.includes("reactOnScreenLlmRender.audit.ts") &&
-        !p.endsWith("InnerConstitutionPage.tsx")
+        !p.endsWith("InnerConstitutionPage.tsx") &&
+        !p.includes("/app/assessment/page.tsx") &&
+        !p.includes("/app/report/")
     );
     results.push(
       filtered.length === 0

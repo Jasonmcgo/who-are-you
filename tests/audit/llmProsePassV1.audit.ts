@@ -59,7 +59,11 @@ type AssertionResult =
 
 const NON_SCOPED_MARKERS: Array<{ id: string; start: string }> = [
   { id: "open-tensions", start: "## Open Tensions" },
-  { id: "mirror-types-seed", start: "## Mirror-Types Seed" },
+  // CC-LAUNCH-VOICE-POLISH B4 — user-mode renders the singularized
+  // "Mirror-Type Seed" heading (clinician keeps the legacy plural for
+  // audit baselines). renderUser() drives this audit's renders, so
+  // anchor on the user-mode heading.
+  { id: "mirror-types-seed", start: "## Mirror-Type Seed" },
   { id: "conflict-translation", start: "## Conflict Translation" },
   { id: "work-map", start: "## Work Map" },
   { id: "love-map", start: "## Love Map" },

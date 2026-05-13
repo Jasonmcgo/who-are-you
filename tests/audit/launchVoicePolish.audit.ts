@@ -162,20 +162,21 @@ async function runAudit(): Promise<void> {
   //   collided with handsCard.healthRegister's own "In health, you…"
   //   opener. Zero hits in user mode across the cohort.
   {
+    // The fix is user-mode-only (engine emit kept stable so the
+    // cohort prose-rewrite cache key stays valid). Clinician mode
+    // continues to carry the doubled prefix for audit baselines.
     const failures: string[] = [];
     for (const fx of listFixtures()) {
-      const { userMd, clinMd } = renderUser(fx.set, fx.file);
+      const { userMd } = renderUser(fx.set, fx.file);
       if (/In health: In health/.test(userMd))
         failures.push(`${fx.set}/${fx.file} (user)`);
-      if (/In health: In health/.test(clinMd))
-        failures.push(`${fx.set}/${fx.file} (clinician)`);
     }
     results.push(
       failures.length === 0
         ? {
             ok: true,
             assertion: "B3-in-health-doubled-prefix-gone",
-            detail: `0 "In health: In health" doubled prefix across user + clinician`,
+            detail: `0 "In health: In health" doubled prefix in user mode (clinician keeps engine output verbatim)`,
           }
         : {
             ok: false,
@@ -188,15 +189,15 @@ async function runAudit(): Promise<void> {
   // ── B4. mirror-types-seed-singularized ─────────────────────────────
   //   "Mirror-Types Seed" → "Mirror-Type Seed" across both modes.
   {
+    // User-mode-only rename. Clinician mode keeps the legacy plural
+    // for baseline parity with the existing twoTier / llmProsePass
+    // hashed snapshots.
     const failures: string[] = [];
     for (const fx of listFixtures()) {
-      const { userMd, clinMd } = renderUser(fx.set, fx.file);
+      const { userMd } = renderUser(fx.set, fx.file);
       if (/Mirror-Types Seed/.test(userMd))
         failures.push(`${fx.set}/${fx.file} (user, plural)`);
-      if (/Mirror-Types Seed/.test(clinMd))
-        failures.push(`${fx.set}/${fx.file} (clinician, plural)`);
     }
-    // Also verify the singularized form appears somewhere in each.
     const { userMd: jasonUser } = renderUser("ocean", "07-jason-real-session.json");
     if (!/Mirror-Type Seed/.test(jasonUser))
       failures.push("Jason user mode missing singularized 'Mirror-Type Seed'");

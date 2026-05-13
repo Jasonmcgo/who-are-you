@@ -147,10 +147,21 @@ function runAudit(): AssertionResult[] {
     // Risk Form prose: italic line below the bullet list.
     // CC-AIM-CALIBRATION — the renderer prefers `riskFormFromAim.prose`
     // when present (canonical source); accept either reading's prose.
+    //
+    // CC-LAUNCH-VOICE-POLISH B2 — user-mode strips "(formerly X)"
+    // parentheticals from the rendered output, so the engine prose
+    // (`renderedProse`) won't match the user-mode markdown verbatim
+    // when it carries a parenthetical. Apply the same strip to the
+    // expected text before doing the inclusion check.
     const renderedProse = c.riskFormFromAim?.prose ?? c.riskForm?.prose;
+    const renderedProseUserMode = renderedProse?.replace(
+      /\s*\(formerly [^)]+\)/g,
+      ""
+    );
     const riskFormProsePresent =
       c.riskForm || c.riskFormFromAim
-        ? renderedProse !== undefined && md.includes(renderedProse)
+        ? renderedProseUserMode !== undefined &&
+          md.includes(renderedProseUserMode)
         : true;
 
     rows.push({

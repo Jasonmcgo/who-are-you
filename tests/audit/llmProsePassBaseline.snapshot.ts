@@ -21,7 +21,7 @@ const OUT = join(__dirname, "llmProsePassBaseline.snapshot.json");
 // pass. Each entry: [start header (or marker), end-marker before].
 const NON_SCOPED_MARKERS: Array<{ id: string; start: string }> = [
   { id: "open-tensions", start: "## Open Tensions" },
-  { id: "mirror-types-seed", start: "## Mirror-Types Seed" },
+  { id: "mirror-types-seed", start: "## Mirror-Type Seed" },
   { id: "conflict-translation", start: "## Conflict Translation" },
   { id: "work-map", start: "## Work Map" },
   { id: "love-map", start: "## Love Map" },

@@ -556,7 +556,20 @@ function applyUserModeMask(md: string, userName?: string | null): string {
   // too (Risk Form prose, etc.) because the parenthetical is engine
   // documentation that has no place on the user surface regardless of
   // which line carries it.
-  return out.join("\n").replace(/\s*\(formerly [^)]+\)/g, "");
+  //
+  // CC-LAUNCH-VOICE-POLISH B7 — strip the Drive distribution donut
+  // SVG block from user-mode output. The cached Path LLM rewrite
+  // carries the full multi-line SVG (the LLM copied it through during
+  // cohort regen); a single multi-line regex removes the whole block
+  // including its trailing newline. Clinician mode bypasses this
+  // function so the donut survives for audit.
+  return out
+    .join("\n")
+    .replace(/\s*\(formerly [^)]+\)/g, "")
+    .replace(
+      /<svg[^>]*aria-label="Drive distribution donut chart"[\s\S]*?<\/svg>\s*/g,
+      ""
+    );
 }
 
 // CC-DISPOSITION-COLLAPSE-DEFAULT — plain-language summary-line generator

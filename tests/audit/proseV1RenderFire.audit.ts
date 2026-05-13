@@ -160,6 +160,26 @@ async function runAudit(): Promise<void> {
           if (!userBody.includes(strengthPara)) {
             failures.push(`${fx.id}/${cardId} (cache Strength paragraph absent in user body)`);
           }
+        } else if (cardId === "path") {
+          // CC-LAUNCH-VOICE-POLISH B2 + B7 — Path user-mode body diverges
+          // from cache by two known user-mode-only transforms: the
+          // "(formerly …)" parenthetical strip + the Drive distribution
+          // donut SVG suppression. Check that the cache rewrite's
+          // "**Work** — " paragraph (the most distinctive signature
+          // shared across Path rewrites) appears verbatim in user body.
+          const workIdx = cached.indexOf("**Work** — ");
+          if (workIdx < 0) {
+            failures.push(`${fx.id}/${cardId} (cache lacks **Work** marker)`);
+            continue;
+          }
+          const sentenceEnd = cached.indexOf("\n\n", workIdx + 20);
+          const workPara = cached.slice(
+            workIdx,
+            sentenceEnd < 0 ? undefined : sentenceEnd
+          );
+          if (!userBody.includes(workPara)) {
+            failures.push(`${fx.id}/${cardId} (cache **Work** paragraph absent in user body)`);
+          }
         } else {
           if (userBody !== cached.trimEnd()) {
             failures.push(`${fx.id}/${cardId} (user body != cache)`);
@@ -213,7 +233,27 @@ async function runAudit(): Promise<void> {
           failures.push(`${fx.id}/${cardId} (cache miss)`);
           continue;
         }
-        if (userBody !== cached.trimEnd()) {
+        if (cardId === "path") {
+          // CC-LAUNCH-VOICE-POLISH B2 + B7 — Path user body diverges
+          // from cache by the (formerly …) parenthetical strip + the
+          // Drive donut SVG suppression. Accept the body if the
+          // cache rewrite's signature **Work** paragraph survives.
+          const workIdx = cached.indexOf("**Work** — ");
+          if (workIdx < 0) {
+            failures.push(`${fx.id}/${cardId} (cache lacks **Work** marker)`);
+            continue;
+          }
+          const sentenceEnd = cached.indexOf("\n\n", workIdx + 20);
+          const workPara = cached.slice(
+            workIdx,
+            sentenceEnd < 0 ? undefined : sentenceEnd
+          );
+          if (!userBody.includes(workPara)) {
+            failures.push(
+              `${fx.id}/${cardId} (cache **Work** paragraph absent in user body)`
+            );
+          }
+        } else if (userBody !== cached.trimEnd()) {
           failures.push(`${fx.id}/${cardId} (user body diverges from cache)`);
         }
       }
@@ -223,7 +263,7 @@ async function runAudit(): Promise<void> {
         ? {
             ok: true,
             assertion: "compass-and-path-fire-specifically",
-            detail: `Compass + Path splices verified across Jason/Cindy/Daniel`,
+            detail: `Compass + Path splices verified across Jason/Cindy/Daniel (Path allows formerly-strip + donut-strip)`,
           }
         : {
             ok: false,
@@ -335,6 +375,24 @@ async function runAudit(): Promise<void> {
           } else {
             failures.push(`${fx.set}/${fx.file}/${cardId}`);
           }
+        } else if (cardId === "path") {
+          // CC-LAUNCH-VOICE-POLISH B2 + B7 — Path user body diverges
+          // from cache by (formerly) strip + donut SVG suppression.
+          const workIdx = cached.indexOf("**Work** — ");
+          if (workIdx < 0) {
+            failures.push(`${fx.set}/${fx.file}/${cardId} (cache lacks **Work** marker)`);
+            continue;
+          }
+          const sentenceEnd = cached.indexOf("\n\n", workIdx + 20);
+          const workPara = cached.slice(
+            workIdx,
+            sentenceEnd < 0 ? undefined : sentenceEnd
+          );
+          if (userBody.includes(workPara)) {
+            hit++;
+          } else {
+            failures.push(`${fx.set}/${fx.file}/${cardId}`);
+          }
         } else if (userBody === cached.trimEnd()) {
           hit++;
         } else {
@@ -347,7 +405,7 @@ async function runAudit(): Promise<void> {
         ? {
             ok: true,
             assertion: "cohort-sweep-100pct-byte-match",
-            detail: `${hit}/${total} cohort (fixture × card) splices match cache byte-for-byte`,
+            detail: `${hit}/${total} cohort (fixture × card) splices match cache (Hands + Path allow user-mode post-processing)`,
           }
         : {
             ok: false,
@@ -392,6 +450,17 @@ async function runAudit(): Promise<void> {
             sentenceEnd < 0 ? undefined : sentenceEnd
           );
           if (userBody.includes(strengthPara)) counts[cardId]++;
+        } else if (cardId === "path") {
+          // CC-LAUNCH-VOICE-POLISH B2 + B7 — Path user body diverges
+          // from cache by (formerly) strip + donut SVG suppression.
+          const workIdx = cached.indexOf("**Work** — ");
+          if (workIdx < 0) continue;
+          const sentenceEnd = cached.indexOf("\n\n", workIdx + 20);
+          const workPara = cached.slice(
+            workIdx,
+            sentenceEnd < 0 ? undefined : sentenceEnd
+          );
+          if (userBody.includes(workPara)) counts[cardId]++;
         } else if (userBody === cached.trimEnd()) {
           counts[cardId]++;
         }
