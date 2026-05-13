@@ -761,7 +761,7 @@
         <p class="lede">50 questions. One trajectory. A clearer view of <em>why you're here</em>, where you're aimed, and the next honest step.</p>
         <div class="cta-row">
           <a href="#" class="btn btn-primary">Begin the 50 Questions <span class="arrow">→</span></a>
-          <a href="#vignettes" class="btn btn-ghost">Give it to someone you love</a>
+          <a href="/assessment" class="btn btn-ghost" data-share-cta>Pass along to someone that matters</a>
         </div>
       </div>
 
@@ -1400,7 +1400,7 @@
 
     <div class="cta-row" style="justify-content:center;">
       <a href="#" class="btn btn-primary">Begin the 50 Questions <span class="arrow">→</span></a>
-      <a href="#" class="btn btn-ghost">Give it to someone</a>
+      <a href="/assessment" class="btn btn-ghost" data-share-cta>Pass along to someone that matters</a>
     </div>
   </div>
 </section>
@@ -1414,6 +1414,57 @@
     </div>
   </div>
 </footer>
+
+<!-- CC-HEADER-NAV-AND-EMAIL-GATE — share-CTA clipboard handler. The
+     "Pass along to someone that matters" anchors are still real links
+     (so middle-click / right-click opens /assessment as expected), but
+     the primary left-click copies the canonical assessment URL to
+     clipboard and shows a brief "Link copied" confirmation in place of
+     the label. After ~2 s the label reverts. Pure inline JS — no
+     external dependency, no client-component wrapper. -->
+<script>
+(function () {
+  var SHARE_URL = "https://the50degreelife.com/assessment";
+  var CONFIRM_TEXT = "Link copied — paste it in an email or message";
+  var REVERT_MS = 2000;
+  var anchors = document.querySelectorAll("[data-share-cta]");
+  anchors.forEach(function (a) {
+    var originalText = a.textContent;
+    a.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      function showConfirm() {
+        a.textContent = CONFIRM_TEXT;
+        setTimeout(function () { a.textContent = originalText; }, REVERT_MS);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(SHARE_URL).then(showConfirm, function () {
+          // Modern API failed; fall through to legacy.
+          legacyCopy();
+        });
+      } else {
+        legacyCopy();
+      }
+      function legacyCopy() {
+        try {
+          var tmp = document.createElement("textarea");
+          tmp.value = SHARE_URL;
+          tmp.style.position = "fixed";
+          tmp.style.opacity = "0";
+          document.body.appendChild(tmp);
+          tmp.select();
+          document.execCommand("copy");
+          document.body.removeChild(tmp);
+          showConfirm();
+        } catch (err) {
+          // Last resort — show the URL inline so the user can copy by hand.
+          a.textContent = "Copy this link: " + SHARE_URL;
+          setTimeout(function () { a.textContent = originalText; }, REVERT_MS * 2);
+        }
+      }
+    });
+  });
+})();
+</script>
 
 </body>
 </html>

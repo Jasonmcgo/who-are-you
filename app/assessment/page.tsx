@@ -619,7 +619,10 @@ export default function Home() {
   // (advanceFromIndex Item 7). commitSave transitions identity_context →
   // result on success; the user lands on the portrait with their just-
   // saved demographics already threaded through.
-  async function commitSave(demographicAnswers: DemographicAnswer[]) {
+  async function commitSave(
+    demographicAnswers: DemographicAnswer[],
+    contact?: { email: string; mobile: string | null }
+  ) {
     if (!constitution) return;
     setIsSaving(true);
     setSaveError(null);
@@ -632,6 +635,8 @@ export default function Home() {
         allocationOverlays: constitution.allocation_overlays,
         beliefUnderTension: constitution.belief_under_tension,
         demographicAnswers,
+        contactEmail: contact?.email ?? null,
+        contactMobile: contact?.mobile ?? null,
       });
       setSubmittedDemographics(demographicAnswers);
       setSessionSavedAt(new Date());
@@ -647,8 +652,11 @@ export default function Home() {
     }
   }
 
-  function handleSubmitDemographics(answers: DemographicAnswer[]) {
-    void commitSave(answers);
+  function handleSubmitDemographics(
+    answers: DemographicAnswer[],
+    contact: { email: string; mobile: string | null }
+  ) {
+    void commitSave(answers, contact);
   }
 
   function handleSkipDemographics() {

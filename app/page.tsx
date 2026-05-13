@@ -14,6 +14,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import type { Metadata } from "next";
+import LandingShareCtaWiring from "./components/LandingShareCtaWiring";
 
 const RAW_HTML = readFileSync(
   join(process.cwd(), "web", "index.html"),
@@ -74,6 +75,11 @@ export default function LandingPage() {
         className="landing-page-root"
         dangerouslySetInnerHTML={{ __html: BODY_CONTENT }}
       />
+      {/* CC-HEADER-NAV-AND-EMAIL-GATE — attaches click handlers to the
+          [data-share-cta] anchors emitted from the static HTML. Scripts
+          inside dangerouslySetInnerHTML don't execute, so the wiring
+          lives in a tiny client component that runs after hydration. */}
+      <LandingShareCtaWiring />
     </>
   );
 }

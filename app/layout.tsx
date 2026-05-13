@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Source_Serif_4, JetBrains_Mono, Inter_Tight } from "next/font/google";
 import "./globals.css";
+import SiteHeader from "./components/SiteHeader";
 
 const sourceSerif = Source_Serif_4({
   variable: "--font-source-serif",
@@ -40,7 +41,10 @@ export default function RootLayout({
       lang="en"
       className={`${sourceSerif.variable} ${jetbrainsMono.variable} ${interTight.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <SiteHeader />
+        {children}
+      </body>
     </html>
   );
 }

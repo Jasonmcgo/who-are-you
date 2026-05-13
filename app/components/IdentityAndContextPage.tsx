@@ -21,10 +21,32 @@ import type { DemographicAnswer } from "../../lib/types";
 // flow's auto-focus pulled the viewport to the bottom of the form.
 
 type Props = {
-  onSubmit: (answers: DemographicAnswer[]) => void;
+  onSubmit: (
+    answers: DemographicAnswer[],
+    contact: { email: string; mobile: string | null }
+  ) => void;
   onSkip: () => void;
   isSubmitting?: boolean;
 };
+
+// CC-HEADER-NAV-AND-EMAIL-GATE — permissive email regex per Rule 2.
+// Requires `something@something.something`; no SMTP-grade strictness.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// CC-HEADER-NAV-AND-EMAIL-GATE — optional mobile: when non-empty,
+// must look phone-ish (digits, spaces, dashes, parens, +). Empty
+// passes. Storage keeps the raw input intact.
+const MOBILE_RE = /^[\d\s\-+()]+$/;
+
+export function isValidEmail(s: string): boolean {
+  return EMAIL_RE.test(s.trim());
+}
+
+export function isAcceptableMobile(s: string): boolean {
+  const trimmed = s.trim();
+  if (trimmed.length === 0) return true;
+  return MOBILE_RE.test(trimmed);
+}
 
 type LocalFieldState = {
   state: FieldState;
@@ -43,6 +65,17 @@ export default function IdentityAndContextPage({
   const [fieldState, setFieldState] = useState<Record<string, LocalFieldState>>(
     {}
   );
+  // CC-HEADER-NAV-AND-EMAIL-GATE — contact fields. Email is required +
+  // gates the Continue button; mobile is optional but if filled must
+  // look phone-ish. `attemptedSubmit` arms the red error helper text
+  // only after the user has tried to proceed (avoids shouting at them
+  // before they've finished typing).
+  const [email, setEmail] = useState<string>("");
+  const [mobile, setMobile] = useState<string>("");
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
+  const emailValid = isValidEmail(email);
+  const mobileValid = isAcceptableMobile(mobile);
+  const canSubmit = emailValid && mobileValid;
 
   // CC-022a Item 8 — reset scroll on mount. The prior flow's submit-area
   // chrome (or browser autoscroll-into-view from focus) was landing the
@@ -90,6 +123,13 @@ export default function IdentityAndContextPage({
   }
 
   function handleSave() {
+    // CC-HEADER-NAV-AND-EMAIL-GATE — required email gate. If missing
+    // or malformed, arm the error helper and stop. Mobile is optional
+    // but blocks submission when present + malformed.
+    if (!canSubmit) {
+      setAttemptedSubmit(true);
+      return;
+    }
     const answers: DemographicAnswer[] = DEMOGRAPHIC_FIELDS.map((f) => {
       const s = get(f.field_id);
       if (s.state === "prefer_not_to_say") {
@@ -105,7 +145,10 @@ export default function IdentityAndContextPage({
       }
       return { field_id: f.field_id, state: "not_answered" };
     });
-    onSubmit(answers);
+    onSubmit(answers, {
+      email: email.trim(),
+      mobile: mobile.trim().length > 0 ? mobile.trim() : null,
+    });
   }
 
   return (
@@ -157,6 +200,26 @@ export default function IdentityAndContextPage({
         />
 
         <div className="flex flex-col" style={{ gap: 36 }}>
+          {/* CC-HEADER-NAV-AND-EMAIL-GATE — contact block. Email is
+              required; mobile is optional. Rendered above the existing
+              optional demographic fields so the gate is visually clear
+              before the user enters the rest of the form. */}
+          <ContactBlock
+            email={email}
+            mobile={mobile}
+            emailValid={emailValid}
+            mobileValid={mobileValid}
+            attemptedSubmit={attemptedSubmit}
+            onEmailChange={(v) => {
+              setEmail(v);
+              if (attemptedSubmit) setAttemptedSubmit(false);
+            }}
+            onMobileChange={(v) => {
+              setMobile(v);
+              if (attemptedSubmit) setAttemptedSubmit(false);
+            }}
+          />
+
           {DEMOGRAPHIC_FIELDS.map((field) => (
             <FieldBlock
               key={field.field_id}
@@ -187,22 +250,30 @@ export default function IdentityAndContextPage({
           <button
             type="button"
             onClick={handleSave}
-            disabled={isSubmitting}
+            disabled={isSubmitting || !canSubmit}
+            aria-disabled={isSubmitting || !canSubmit}
             data-focus-ring
             className="font-mono uppercase"
             style={{
               fontSize: 12,
               letterSpacing: "0.08em",
-              background: isSubmitting ? "transparent" : "var(--umber)",
-              color: isSubmitting ? "var(--ink-faint)" : "var(--paper)",
-              border: isSubmitting
-                ? "1px solid var(--rule)"
-                : "1px solid var(--umber)",
+              background:
+                isSubmitting || !canSubmit ? "transparent" : "var(--umber)",
+              color:
+                isSubmitting || !canSubmit
+                  ? "var(--ink-faint)"
+                  : "var(--paper)",
+              border:
+                isSubmitting || !canSubmit
+                  ? "1px solid var(--rule)"
+                  : "1px solid var(--umber)",
               padding: "14px 20px",
-              cursor: isSubmitting ? "not-allowed" : "pointer",
+              cursor:
+                isSubmitting || !canSubmit ? "not-allowed" : "pointer",
               minHeight: 48,
               transition: "background 120ms ease-out",
               alignSelf: "stretch",
+              opacity: !canSubmit && !isSubmitting ? 0.7 : 1,
             }}
           >
             {isSubmitting ? "saving…" : "save and finish →"}
@@ -243,6 +314,160 @@ export default function IdentityAndContextPage({
         </footer>
       </div>
     </main>
+  );
+}
+
+// CC-HEADER-NAV-AND-EMAIL-GATE — contact block. Required email +
+// optional mobile. Visually consistent with the existing FieldBlock
+// register; one error helper toggles red when an invalid email is
+// submitted. No modal / alert / toast.
+function ContactBlock({
+  email,
+  mobile,
+  emailValid,
+  mobileValid,
+  attemptedSubmit,
+  onEmailChange,
+  onMobileChange,
+}: {
+  email: string;
+  mobile: string;
+  emailValid: boolean;
+  mobileValid: boolean;
+  attemptedSubmit: boolean;
+  onEmailChange: (v: string) => void;
+  onMobileChange: (v: string) => void;
+}) {
+  const emailError = attemptedSubmit && !emailValid;
+  const mobileError = attemptedSubmit && !mobileValid && mobile.trim().length > 0;
+  return (
+    <section
+      className="flex flex-col"
+      style={{
+        gap: 14,
+        padding: "18px 0",
+        borderBottom: "1px solid var(--rule-soft, rgba(26,23,19,0.08))",
+      }}
+    >
+      <div className="flex flex-col" style={{ gap: 6 }}>
+        <label
+          htmlFor="contact-email"
+          className="font-mono uppercase"
+          style={{
+            fontSize: 11,
+            letterSpacing: "0.12em",
+            color: "var(--ink-mute, #807566)",
+          }}
+        >
+          Email address
+        </label>
+        <input
+          id="contact-email"
+          type="email"
+          required
+          inputMode="email"
+          autoComplete="email"
+          value={email}
+          onChange={(e) => onEmailChange(e.target.value)}
+          aria-invalid={emailError}
+          aria-describedby="contact-email-helper"
+          className="font-serif"
+          style={{
+            fontSize: 15,
+            color: "var(--ink, #1a1713)",
+            background: "var(--paper, #f6f2ea)",
+            border: `1px solid ${
+              emailError
+                ? "var(--umber, #8a4a1f)"
+                : "var(--rule, rgba(26,23,19,0.14))"
+            }`,
+            borderRadius: 6,
+            padding: "10px 12px",
+            outline: "none",
+          }}
+        />
+        <p
+          id="contact-email-helper"
+          className="font-serif italic"
+          style={{
+            fontSize: 13,
+            color: emailError
+              ? "var(--umber, #8a4a1f)"
+              : "var(--ink-soft, #433d33)",
+            margin: 0,
+            lineHeight: 1.5,
+          }}
+        >
+          {emailError
+            ? "Please enter a valid email to view your reading."
+            : "Required to view your reading. We won't share your email."}
+        </p>
+      </div>
+      <div className="flex flex-col" style={{ gap: 6 }}>
+        <label
+          htmlFor="contact-mobile"
+          className="font-mono uppercase"
+          style={{
+            fontSize: 11,
+            letterSpacing: "0.12em",
+            color: "var(--ink-mute, #807566)",
+          }}
+        >
+          Mobile number
+        </label>
+        <input
+          id="contact-mobile"
+          type="tel"
+          inputMode="tel"
+          autoComplete="tel"
+          value={mobile}
+          onChange={(e) => onMobileChange(e.target.value)}
+          aria-invalid={mobileError}
+          aria-describedby="contact-mobile-helper"
+          className="font-serif"
+          style={{
+            fontSize: 15,
+            color: "var(--ink, #1a1713)",
+            background: "var(--paper, #f6f2ea)",
+            border: `1px solid ${
+              mobileError
+                ? "var(--umber, #8a4a1f)"
+                : "var(--rule, rgba(26,23,19,0.14))"
+            }`,
+            borderRadius: 6,
+            padding: "10px 12px",
+            outline: "none",
+          }}
+        />
+        <p
+          id="contact-mobile-helper"
+          className="font-serif italic"
+          style={{
+            fontSize: 13,
+            color: mobileError
+              ? "var(--umber, #8a4a1f)"
+              : "var(--ink-soft, #433d33)",
+            margin: 0,
+            lineHeight: 1.5,
+          }}
+        >
+          {mobileError
+            ? "Please enter a valid phone number, or leave this blank."
+            : "Optional. Only for follow-up if you ask for it."}
+        </p>
+      </div>
+      <p
+        className="font-serif italic"
+        style={{
+          fontSize: 12,
+          color: "var(--ink-mute, #807566)",
+          margin: 0,
+          lineHeight: 1.5,
+        }}
+      >
+        We won&apos;t share your contact info.
+      </p>
+    </section>
   );
 }
 

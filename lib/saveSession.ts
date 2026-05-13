@@ -29,6 +29,11 @@ type SaveSessionArgs = {
   allocationOverlays?: InnerConstitution["allocation_overlays"];
   beliefUnderTension?: BeliefUnderTension | null;
   demographicAnswers: DemographicAnswer[];
+  // CC-HEADER-NAV-AND-EMAIL-GATE — contact fields. `contactEmail` is
+  // required at the client gate; passed null when an older caller
+  // omits it (existing flows continue to work without modification).
+  contactEmail?: string | null;
+  contactMobile?: string | null;
 };
 
 export async function saveSession(
@@ -49,6 +54,11 @@ export async function saveSession(
       .returning({ id: sessions.id });
 
     const demoRow = buildDemographicsRow(session.id, args.demographicAnswers);
+    // CC-HEADER-NAV-AND-EMAIL-GATE — contact fields live in the same
+    // demographics row. Email is required at the UI gate; mobile is
+    // optional. Both stored raw.
+    demoRow.contact_email = args.contactEmail ?? null;
+    demoRow.contact_mobile = args.contactMobile ?? null;
     await tx.insert(demographics).values(demoRow);
 
     return { sessionId: session.id };

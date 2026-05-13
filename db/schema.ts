@@ -112,6 +112,15 @@ export const demographics = pgTable("demographics", {
   profession_state: fieldStateEnum("profession_state")
     .notNull()
     .default("not_answered"),
+
+  // CC-HEADER-NAV-AND-EMAIL-GATE — contact fields. `contact_email` is
+  // required by the user-facing demographics gate (the Continue button
+  // refuses to fire without a valid email), but the column itself is
+  // nullable so legacy rows (created before this CC) survive the
+  // migration without backfill. `contact_mobile` is optional in the
+  // UI — stored raw to preserve the user's own formatting.
+  contact_email: text("contact_email"),
+  contact_mobile: text("contact_mobile"),
 });
 
 // CC-021a — Attachments table. One row per uploaded file associated with a
