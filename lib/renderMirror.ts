@@ -401,6 +401,21 @@ const CONTEXT_SUBSTITUTIONS: Array<[RegExp, string]> = [
     /(\*how you [^*]+\*) — Big Five (Openness|Conscientiousness|Extraversion|Agreeableness|Neuroticism|Emotional Reactivity)\b/g,
     "$1",
   ],
+  // CC-LAUNCH-VOICE-POLISH B2 — engine-internal "(formerly Wisdom-
+  // governed)" / "(formerly Reckless-fearful)" / "(formerly Free
+  // movement)" parentheticals are documentation that shouldn't reach
+  // the user surface. Strip the whole parenthetical (including the
+  // leading space) from any line that carries it. Clinician mode
+  // bypasses the mask entirely so audit metadata stays intact.
+  [/\s*\(formerly [^)]+\)/g, ""],
+  // CC-LAUNCH-VOICE-POLISH B3 — collapse the doubled "In health:" lead-in
+  // in the Hands engine prose. The template emits "**Under Pressure** —
+  // In health: " and `handsCard.healthRegister` opens with "In health,
+  // you build…", producing "In health: In health, you build…" on read.
+  // User-mode substitution drops the redundant "In health: " prefix
+  // when followed by "In health, "; clinician mode keeps the engine
+  // output verbatim for audit fidelity.
+  [/In health: In health,/g, "In health,"],
   // CC-SMALL-FIXES-BUNDLE Fix 3 — Closing Read canon-echo strip. The
   // engine `composeClosingReadProse` emits each archetype's canonical
   // closing line as a sentence inside the Closing Read paragraph,
@@ -478,15 +493,37 @@ function isProtectedLine(line: string): boolean {
   return false;
 }
 
-function applyUserModeMask(md: string): string {
+function applyUserModeMask(md: string, userName?: string | null): string {
   const lines = md.split("\n");
   const out: string[] = [];
+  // CC-LAUNCH-VOICE-POLISH B1 — third-person name → second-person
+  // substitution. Many engine pattern composers (identityEngine.ts
+  // around lines 6121-6500) interpolate the user's name into prose
+  // ("Jason ranked highest", "Jason's shape, the meaningful…"). On the
+  // user surface this is wrong: the assessment should speak TO the
+  // user, not ABOUT them. We catch the leak class with a mask-level
+  // substitution rather than touching dozens of template call sites.
+  // The masthead's "For: {name}" line is excluded so the name still
+  // appears once as the report's intentional dedication.
+  const nameSubs: Array<[RegExp, string]> = [];
+  if (userName && userName.trim().length > 0) {
+    const escaped = userName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    // Possessive first so the trailing 's doesn't survive into the
+    // singular replacement (e.g. "Jason's" → "your", not "your's").
+    nameSubs.push([new RegExp(`\\b${escaped}'s\\b`, "g"), "your"]);
+    nameSubs.push([new RegExp(`\\b${escaped}\\b`, "g"), "you"]);
+  }
   for (const line of lines) {
     if (isProtectedLine(line)) {
       out.push(line);
       continue;
     }
     let s = line;
+    // CC-LAUNCH-VOICE-POLISH B1 — name swap runs before the rest. The
+    // masthead "For: {name}" line is excluded.
+    if (nameSubs.length > 0 && !s.includes(`For: ${userName}`)) {
+      for (const [re, rep] of nameSubs) s = s.replace(re, rep);
+    }
     // CC-SUBSTITUTION-LEAK-CLEANUP — context-aware phrase rewrites run
     // BEFORE the bare strips, so the strip's pattern is no longer present
     // in the line by the time it runs. Targeted per known leak site.
@@ -504,13 +541,22 @@ function applyUserModeMask(md: string): string {
       /^## Disposition Signal Mix\b.*/,
       "## How Your Disposition Reads"
     );
+    // CC-LAUNCH-VOICE-POLISH B4 — singularize the section heading on the
+    // user surface ("Mirror-Types Seed" → "Mirror-Type Seed"). Clinician
+    // mode keeps the legacy plural for baseline parity.
+    s = s.replace(/^## Mirror-Types Seed\b/, "## Mirror-Type Seed");
     // Collapse double-spaces + orphaned punctuation that may result.
     s = s.replace(/ +([,.;:])/g, "$1").replace(/  +/g, " ");
     // Trim trailing whitespace introduced by mid-line removals.
     s = s.replace(/[ \t]+$/g, "");
     out.push(s);
   }
-  return out.join("\n");
+  // CC-LAUNCH-VOICE-POLISH B2 — global strip of "(formerly X)"
+  // parentheticals AFTER the per-line mask. Runs over protected lines
+  // too (Risk Form prose, etc.) because the parenthetical is engine
+  // documentation that has no place on the user surface regardless of
+  // which line carries it.
+  return out.join("\n").replace(/\s*\(formerly [^)]+\)/g, "");
 }
 
 // CC-DISPOSITION-COLLAPSE-DEFAULT — plain-language summary-line generator
@@ -553,6 +599,11 @@ export function composeDispositionSummaryLine(
 export function renderMirrorAsMarkdown(args: RenderArgs): string {
   const { constitution, demographics, includeBeliefAnchor } = args;
   const generatedAt = args.generatedAt ?? new Date();
+  // CC-LAUNCH-VOICE-POLISH — hoist renderMode once at the top so the
+  // emit-time conditional fixes (suppress MBTI disclosure line, hide
+  // donut, wrap architect failure-mode in <details>) can branch on it
+  // alongside the late splice path.
+  const renderMode = args.renderMode ?? "user";
   const out: string[] = [];
   // CC-PROSE-1B Layer 5 — three callouts at three depths. Computed once
   // so 5A (after Top Gifts/Edges table), 5B (inside Synthesis section),
@@ -627,7 +678,12 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
   }
 
   // 1a. MBTI disclosure — mirrors MbtiDisclosure.tsx exactly.
+  // CC-LAUNCH-VOICE-POLISH B5 — clinician mode preserves the disclosure
+  // line for audit reference; user mode suppresses it entirely (the
+  // Lens reading already carries the canonical interpretation and the
+  // borrowed-system label adds noise for the user-facing surface).
   if (
+    renderMode === "clinician" &&
     constitution.lens_stack.confidence === "high" &&
     constitution.lens_stack.mbtiCode
   ) {
@@ -1284,6 +1340,11 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
       out.push(`**Growth Edge** — ${h.growthEdge}`);
       out.push("");
       out.push(
+        // Engine body kept as-is so the cohort prose-rewrite cache key
+        // is stable. CC-LAUNCH-VOICE-POLISH B3 strips the doubled "In
+        // health: In health" prefix via a user-mode CONTEXT_SUBSTITUTION
+        // in applyUserModeMask — clinician mode preserves the raw
+        // engine output for audit baselines.
         `**Under Pressure** — In health: ${h.underPressure.healthRegister} Under load: ${h.underPressure.pressureRegister} ${h.underPressure.integrationLine}`
       );
       out.push("");
@@ -1403,6 +1464,14 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
     // CC-PROSE-1 Layer 3b — Drive distribution donut chart. Renders
     // alongside the existing prose narrative (NOT replacing it). Centered
     // "Claimed #1" annotation when Q-3C1 was answered.
+    //
+    // CC-LAUNCH-VOICE-POLISH B7 — donut stays in the engine body so the
+    // Path prose-rewrite cache key (which hashes the engine body) keeps
+    // hitting the committed cache. The cached LLM rewrite for Path
+    // already drops the SVG block from the user-mode output during the
+    // splice; clinician mode keeps the raw donut for audit reference.
+    // The React on-screen PathExpanded component also suppresses the
+    // donut at its own surface (see app/components/PathExpanded.tsx).
     out.push("");
     out.push(
       renderDriveDistributionDonut(
@@ -1464,6 +1533,10 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
   out.push(cross.conflictTranslation);
 
   out.push("");
+  // CC-LAUNCH-VOICE-POLISH B4 — singularization. Engine emits the legacy
+  // plural so the existing cohort baselines stay byte-identical in
+  // clinician mode; the user-mode mask rewrites the heading to the
+  // singular form below.
   out.push("## Mirror-Types Seed");
   out.push("");
   out.push(cross.mirrorTypesSeed);
@@ -1531,8 +1604,8 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
   // CC-TWO-TIER-RENDER-SURFACE-CLEANUP — clinician mode emits the raw
   // engine output verbatim (byte-identical to legacy). User mode runs
   // the LLM rewrite substitution (when cache hits) + the user-mode
-  // surface mask.
-  const renderMode = args.renderMode ?? "user";
+  // surface mask. `renderMode` was hoisted to the top of the function
+  // by CC-LAUNCH-VOICE-POLISH so emit-time fixes can branch on it.
   if (renderMode === "clinician") return raw;
 
   // CC-LLM-PROSE-PASS-V1 — substitute LLM-rewritten section bodies for
@@ -1587,7 +1660,10 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
   // full template.
   raw = enforceHandsTemplate(raw, constitution.handsCard ?? null);
 
-  return applyUserModeMask(raw);
+  // CC-LAUNCH-VOICE-POLISH B1 — pass the demographics name into the
+  // mask so third-person interpolations in engine pattern composers
+  // get swapped to second-person on user surface.
+  return applyUserModeMask(raw, getUserName(demographics));
 }
 
 /**

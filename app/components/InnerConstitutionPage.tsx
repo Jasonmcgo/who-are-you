@@ -77,6 +77,13 @@ type Props = {
   // omitted (legacy callers), the Keystone falls back to generic
   // dimension-label prose.
   answers?: Answer[];
+  // CC-REPORT-PERMALINK — when present, the "Return to this reading"
+  // section renders above the Share This Reading block with a copyable
+  // /report/<sessionId> permalink. Threaded by the /assessment flow
+  // after `saveSession` resolves AND by the /report/[sessionId] route.
+  // Omitted (or null) for in-progress / pre-save renders; the section
+  // silently hides.
+  sessionId?: string | null;
 };
 
 function SectionRule() {
@@ -145,6 +152,7 @@ export default function InnerConstitutionPage({
   sessionDate,
   hideShareBlock,
   answers,
+  sessionId,
 }: Props) {
   // CC-020 — Share block local state. The toggle defaults on (the user
   // owns their own data); flipping it off omits the belief anchor from
@@ -152,6 +160,9 @@ export default function InnerConstitutionPage({
   // brief inline confirmation after navigator.clipboard.writeText.
   const [includeBeliefAnchor, setIncludeBeliefAnchor] = useState(true);
   const [copiedFlash, setCopiedFlash] = useState(false);
+  // CC-REPORT-PERMALINK — independent flash state for the "Copy link"
+  // button so it can't confusingly trigger the markdown copy's flash.
+  const [copiedLinkFlash, setCopiedLinkFlash] = useState(false);
   // CC-LLM-RENDER-PRODUCTION-POLISH — visible loading state on the
   // share buttons. Set true while `/api/render` is resolving; set false
   // on success / failure / 30s safety timeout. Disables the button +
@@ -276,6 +287,29 @@ export default function InnerConstitutionPage({
         }
       );
     });
+  }
+
+  // CC-REPORT-PERMALINK — copy the /report/<sessionId> URL to the
+  // clipboard. URL is composed at call time from window.location.origin
+  // so it follows whatever host the user reached the page through
+  // (localhost / preview / production). Soft-fails the same way the
+  // markdown copy does — sandboxed iframes and insecure contexts can
+  // reject clipboard writes.
+  async function handleCopyLink() {
+    if (!sessionId) return;
+    const origin =
+      typeof window !== "undefined" && window.location?.origin
+        ? window.location.origin
+        : "";
+    const url = `${origin}/report/${sessionId}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedLinkFlash(true);
+      window.setTimeout(() => setCopiedLinkFlash(false), 2000);
+    } catch {
+      // Soft-fail; the URL is also visible as plain text and the user
+      // can select-and-copy or bookmark the address bar directly.
+    }
   }
 
   async function handleCopyMarkdown() {
@@ -1061,7 +1095,7 @@ export default function InnerConstitutionPage({
           className="flex flex-col"
           style={{ gap: 14, paddingTop: 12, paddingBottom: 12 }}
         >
-          <SectionLabel>Mirror-Types Seed</SectionLabel>
+          <SectionLabel>Mirror-Type Seed</SectionLabel>
           <SectionParagraph text={cross.mirrorTypesSeed} />
         </section>
 
@@ -1127,6 +1161,86 @@ export default function InnerConstitutionPage({
             Save now happens before the portrait renders (research-mode
             posture per the amended demographic-rules.md Rule 5); by the
             time this page mounts, the session is already persisted. */}
+
+        {/* CC-REPORT-PERMALINK — "Return to this reading" section. Renders
+            ONLY when a sessionId is available (i.e., after the session is
+            persisted) AND when the Share block is visible (admin view
+            suppresses both — admin has its own Re-Render panel). Placed
+            immediately above the Share This Reading block so the bookmark
+            affordance is the first share-class action the user sees. */}
+        {hideShareBlock || !sessionId ? null : (
+        <div data-print-hide="permalink" data-section="permalink">
+          <SectionRule />
+          <section
+            className="flex flex-col"
+            style={{ gap: 14, paddingTop: 12, paddingBottom: 12 }}
+            aria-labelledby="permalink-heading"
+          >
+            <SectionLabel>
+              <span id="permalink-heading">Return to this reading</span>
+            </SectionLabel>
+            <p
+              className="font-serif italic"
+              style={{
+                fontSize: 14.5,
+                color: "var(--ink-soft)",
+                lineHeight: 1.55,
+                margin: 0,
+              }}
+            >
+              Bookmark this link to return any time. Anyone with the link can view this reading.
+            </p>
+            <div
+              className="flex flex-row flex-wrap"
+              style={{
+                gap: 10,
+                paddingTop: 4,
+                alignItems: "center",
+              }}
+            >
+              <code
+                className="font-mono"
+                style={{
+                  fontSize: 12.5,
+                  letterSpacing: "0.01em",
+                  padding: "10px 12px",
+                  background: "var(--paper-soft, transparent)",
+                  color: "var(--ink)",
+                  border: "1px solid var(--rule)",
+                  borderRadius: 6,
+                  wordBreak: "break-all",
+                  flex: "1 1 320px",
+                  minHeight: 40,
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
+                {`/report/${sessionId}`}
+              </code>
+              <button
+                type="button"
+                onClick={handleCopyLink}
+                data-focus-ring
+                data-action="copy-link"
+                className="font-mono uppercase"
+                style={{
+                  fontSize: 11,
+                  letterSpacing: "0.08em",
+                  padding: "10px 16px",
+                  background: "transparent",
+                  color: "var(--ink)",
+                  border: "1px solid var(--rule)",
+                  borderRadius: 6,
+                  cursor: "pointer",
+                  minHeight: 40,
+                }}
+              >
+                {copiedLinkFlash ? "Copied" : "Copy link"}
+              </button>
+            </div>
+          </section>
+        </div>
+        )}
 
         {/* CC-020 — Share block. Renders unconditionally on the result page.
             Print, copy-as-markdown, and download-markdown are all browser-

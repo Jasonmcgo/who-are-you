@@ -104,11 +104,15 @@ export default function PathExpanded({
             rank={drive.claimed}
           />
           {/* CC-PROSE-1 Layer 3b — shared donut SVG composer (markdown
-              parity). Renders the same donut output as the markdown side
-              alongside the existing PieChart visualization. The canonical
-              "Claimed #1: [bucket]" centered annotation makes the
-              claimed-vs-revealed read legible without parsing the
-              PieChart's rank badges. */}
+              parity). CC-LAUNCH-VOICE-POLISH B7 — suppressed from the
+              user-facing React surface: the donut's centered "Claimed
+              #1" annotation adds no information beyond the PieChart
+              above + the "Distribution: …" text line below, and at
+              narrow widths the donut labels truncate. The composer is
+              still imported + called in the markdown export (clinician
+              mode) for audit fidelity; this surface just omits the
+              SVG. Re-enable by restoring the <div> block below. */}
+          {/*
           <div
             aria-hidden="false"
             dangerouslySetInnerHTML={{
@@ -118,6 +122,7 @@ export default function PathExpanded({
               ),
             }}
           />
+          */}
           <p
             className="font-serif text-[15px] md:text-[15.5px]"
             style={{ color: "var(--ink)", lineHeight: 1.65, margin: 0 }}

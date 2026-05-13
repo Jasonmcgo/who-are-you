@@ -8,6 +8,62 @@ import type {
   InnerConstitution,
   MirrorOutput,
 } from "../../lib/types";
+import type { ProfileArchetype } from "../../lib/profileArchetype";
+
+// CC-LAUNCH-VOICE-POLISH B6 — per-archetype "unpack" paragraph for the
+// uncomfortable-but-true masthead line. Browser-native <details> + the
+// italic line as <summary>; click expands to reveal the explanation
+// paragraph below. Per the CC, caregiver / steward variants are
+// scaffolds for a future LLM refinement pass; the architect variant
+// is the canonical reference text.
+const UNCOMFORTABLE_DETAILS_BY_ARCHETYPE: Record<ProfileArchetype, string> = {
+  jasonType:
+    "Pattern-reading is a gift — you see the strategic shape before the room has finished forming it. The trap is sliding from \"I see what's happening\" into \"I should decide what to do about it.\" Those are different things. Authority to conclude comes from relationship to the affected parties, accountability for outcomes, having been asked, having earned trust over time, having stakes. Absorbing more context than the room doesn't, by itself, earn that authority. The check-question, when you feel the pull to call a shot: am I in the position that gets to make this call, or did I just take in more of the situation than the people who are?",
+  cindyType:
+    "Present-tense care is a gift — the closeness you have to people lets you see what they need before they've named it. The trap is sliding from \"I see what they need\" into \"I should decide for them.\" The check is similar: am I deciding for someone, or alongside them? Has the relationship actually given me the authority to act on their behalf, or only the closeness to see what they're going through?",
+  danielType:
+    "Holding precedent and continuity gives you genuine insight into what's worked and what hasn't — but that insight isn't, by itself, authority over what changes next. The check: am I the keeper of this thing, or am I assuming that being the longest-running observer makes me the right voice on its next chapter?",
+  unmappedType:
+    "Reading a situation closely is a gift, and the closeness can slide into a sense of authority to decide. The check, when you feel the pull to call a shot: am I in the position that gets to make this call, or have I just taken in more of the situation than the people who are?",
+};
+
+function UncomfortableButTrueDetails({
+  line,
+  archetype,
+}: {
+  line: string;
+  archetype: ProfileArchetype;
+}) {
+  const explanation =
+    UNCOMFORTABLE_DETAILS_BY_ARCHETYPE[archetype] ??
+    UNCOMFORTABLE_DETAILS_BY_ARCHETYPE.unmappedType;
+  return (
+    <details style={{ paddingTop: 12, paddingBottom: 4 }}>
+      <summary
+        className="font-serif italic text-[15px] md:text-[15.5px]"
+        style={{
+          color: "var(--ink-mute)",
+          lineHeight: 1.6,
+          listStyle: "none",
+          cursor: "pointer",
+        }}
+      >
+        {line}
+      </summary>
+      <p
+        className="font-serif text-[14.5px] md:text-[15px]"
+        style={{
+          color: "var(--ink-soft)",
+          lineHeight: 1.6,
+          margin: 0,
+          paddingTop: 10,
+        }}
+      >
+        {explanation}
+      </p>
+    </details>
+  );
+}
 import KeystoneReflection from "./KeystoneReflection";
 import {
   composeExecutiveRead,
@@ -267,18 +323,10 @@ export default function MirrorSection({
             the canon: silence is the canonical fallback, never a generic
             horoscope sentence. */}
         {mirror.uncomfortableButTrue && mirror.uncomfortableButTrue.length > 0 ? (
-          <p
-            className="font-serif italic text-[15px] md:text-[15.5px]"
-            style={{
-              color: "var(--ink-mute)",
-              lineHeight: 1.6,
-              margin: 0,
-              paddingTop: 12,
-              paddingBottom: 4,
-            }}
-          >
-            {mirror.uncomfortableButTrue}
-          </p>
+          <UncomfortableButTrueDetails
+            line={mirror.uncomfortableButTrue}
+            archetype={constitution?.profileArchetype?.primary ?? "unmappedType"}
+          />
         ) : null}
         {mbtiSlot ? <div style={{ paddingTop: 12 }}>{mbtiSlot}</div> : null}
       </div>

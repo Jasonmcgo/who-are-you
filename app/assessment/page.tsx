@@ -214,6 +214,10 @@ export default function Home() {
   // CC-020 — the timestamp the save committed. Used by buildFilename so the
   // .md filename matches the saved session's date.
   const [sessionSavedAt, setSessionSavedAt] = useState<Date | null>(null);
+  // CC-REPORT-PERMALINK — capture the sessionId returned from saveSession
+  // so the result render can surface the permalink affordance with the
+  // canonical /report/<id> URL.
+  const [savedSessionId, setSavedSessionId] = useState<string | null>(null);
   // CC-016 — per-question allocation overlays. Keyed by question_id.
   const [overlays, setOverlays] = useState<
     Record<string, Record<string, AspirationalOverlay>>
@@ -627,7 +631,7 @@ export default function Home() {
     setIsSaving(true);
     setSaveError(null);
     try {
-      await saveSession({
+      const { sessionId } = await saveSession({
         answers,
         innerConstitution: constitution,
         skippedQuestionIds,
@@ -640,6 +644,7 @@ export default function Home() {
       });
       setSubmittedDemographics(demographicAnswers);
       setSessionSavedAt(new Date());
+      setSavedSessionId(sessionId);
       setPhase("result");
     } catch (e) {
       setSaveError(
@@ -726,6 +731,7 @@ export default function Home() {
         }
         sessionDate={sessionSavedAt}
         answers={answers}
+        sessionId={savedSessionId}
       />
     );
   }
