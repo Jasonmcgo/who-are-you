@@ -401,6 +401,29 @@ const CONTEXT_SUBSTITUTIONS: Array<[RegExp, string]> = [
     /(\*how you [^*]+\*) — Big Five (Openness|Conscientiousness|Extraversion|Agreeableness|Neuroticism|Emotional Reactivity)\b/g,
     "$1",
   ],
+  // CC-SMALL-FIXES-BUNDLE Fix 3 — Closing Read canon-echo strip. The
+  // engine `composeClosingReadProse` emits each archetype's canonical
+  // closing line as a sentence inside the Closing Read paragraph,
+  // duplicating the canon that already lives in the final pull quote
+  // (callouts.finalLine via ARCHETYPE_CANONICAL_LINE) or in the Hands
+  // closing italic line. Anchor each substitution to the unique
+  // Closing Read preamble "work taking the form of love, love taking
+  // the form of work." so the strip only fires inside Closing Read.
+  // Architect: keep the trailing "Keep this shape honest" sentence.
+  [
+    /work taking the form of love, love taking the form of work\. The work is to translate conviction into visible, revisable, present-tense structure\. Keep this shape honest as the seasons turn\./g,
+    "work taking the form of love, love taking the form of work. Keep this shape honest as the seasons turn.",
+  ],
+  // Caregiver: drop the trailing canon entirely.
+  [
+    /work taking the form of love, love taking the form of work\. The work is not to care less\. It is to let love become sustainable enough to last\./g,
+    "work taking the form of love, love taking the form of work.",
+  ],
+  // Steward: drop the trailing canon entirely.
+  [
+    /work taking the form of love, love taking the form of work\. The work is not to abandon what has endured\. It is to let what has endured remain alive enough to update\./g,
+    "work taking the form of love, love taking the form of work.",
+  ],
 ];
 
 const STRIP_PATTERNS: RegExp[] = [
@@ -1556,5 +1579,83 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
     void proseRewriteHash;
   }
 
+  // CC-SMALL-FIXES-BUNDLE Fix 2 — enforce Hands template structure
+  // after the LLM splice. Some cohort cache entries (Cindy, Daniel)
+  // dropped the sub-header / italic opener / italic canon closing
+  // line. Inject what's missing using the engine `handsCard` data; the
+  // function is idempotent for Jason whose rewrite already carries the
+  // full template.
+  raw = enforceHandsTemplate(raw, constitution.handsCard ?? null);
+
   return applyUserModeMask(raw);
+}
+
+/**
+ * CC-SMALL-FIXES-BUNDLE Fix 2 — Hands template post-processor.
+ *
+ * The canonical Hands template in user mode is:
+ *
+ *   ### Hands — Work
+ *   **What you build and carry**
+ *   *<opener>*
+ *   **Strength** — …
+ *   **Growth Edge** — …
+ *   **Under Pressure** — …
+ *   **Practice** — …
+ *   *<italic explanation>*
+ *   *<italic canon closing line>*
+ *   *Hands is what your life makes real. Work Map is where that making may fit.*
+ *
+ * The LLM rewrites for Cindy and Daniel dropped one or more of: the
+ * sub-header, the italic opener, the italic canon closing line, and
+ * the italicization on the trail. This post-processor injects what's
+ * missing using `handsCard` engine data (openingLine / closingLine).
+ * Idempotent: when the rewrite already supplies a piece, no injection.
+ */
+function enforceHandsTemplate(
+  raw: string,
+  handsCard: import("./handsCard").HandsCardReading | null
+): string {
+  if (!handsCard) return raw;
+  const headerIdx = raw.indexOf("### Hands — Work");
+  if (headerIdx < 0) return raw;
+  const rest = raw.slice(headerIdx);
+  // Find the end of the Hands section — next "## " or "### " header.
+  const stopRel = rest.slice(20).search(/\n## |\n### /);
+  const sectionEnd =
+    stopRel < 0 ? raw.length - headerIdx : 20 + stopRel;
+  let section = raw.slice(headerIdx, headerIdx + sectionEnd);
+
+  // 1. Inject sub-header + italic opener if the sub-header is missing.
+  if (!section.includes("**What you build and carry**")) {
+    section = section.replace(
+      /^### Hands — Work\s*\n+/,
+      `### Hands — Work\n\n**What you build and carry**\n\n*${handsCard.openingLine}*\n\n`
+    );
+  }
+
+  // 2. Italicize the Work Map distinction trail if not already italic.
+  const trailRe = /(\n)(Hands is what your life makes real\. Work Map is where that making may fit\.)(\s*$|\n)/;
+  section = section.replace(trailRe, "$1*$2*$3");
+
+  // 3. Inject the italic canon closing line when missing. Detection:
+  //    count italic-only lines BETWEEN the last "**Practice** —" line
+  //    and the Work Map trail. The healthy template has exactly two
+  //    italic lines in that window (italic explanation + italic canon
+  //    closing). When the count is < 2, the rewrite dropped the canon
+  //    — inject it just before the trail.
+  const trailAnchor = "*Hands is what your life makes real. Work Map is where that making may fit.*";
+  const trailIdx = section.indexOf(trailAnchor);
+  if (trailIdx >= 0) {
+    // Find the start of the last "**Practice** —" line.
+    const practiceMarker = section.lastIndexOf("**Practice** —", trailIdx);
+    const windowStart = practiceMarker >= 0 ? practiceMarker : 0;
+    const window = section.slice(windowStart, trailIdx);
+    const italicLines = window.match(/^\*[^*\n]+\*\s*$/gm) ?? [];
+    if (italicLines.length < 2) {
+      const canonLine = `*${handsCard.closingLine}*\n\n`;
+      section = section.slice(0, trailIdx) + canonLine + section.slice(trailIdx);
+    }
+  }
+  return raw.slice(0, headerIdx) + section + raw.slice(headerIdx + sectionEnd);
 }
