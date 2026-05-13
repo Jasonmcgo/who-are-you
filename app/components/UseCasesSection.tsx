@@ -1,6 +1,25 @@
+import type { ProfileArchetype } from "@/lib/profileArchetype";
+
 export const USE_CASES_SECTION_TITLE = "What this is good for.";
 export const USE_CASES_SECTION_SUBHEAD =
   "This is not a verdict. It's a read you can return to. Here are ten places it earns its keep.";
+
+// CC-SHAPE-AWARE-PROSE-ROUTING — the "Family and coworker explanations"
+// item is the canonical "translate your shape into a sentence someone
+// can hold" example. Pre-CC, every report carried the architect-coded
+// long-arc-architect line regardless of shape. Now the line routes
+// through the user's archetype.
+export const FAMILY_EXPLANATION_BY_ARCHETYPE: Record<ProfileArchetype, string> =
+  {
+    jasonType:
+      "When the people closest to you are confused by what you do, the shape-language in this report gives you something portable to hand them. Not a four-letter type label — instead something like 'I see structure before others have named the problem, and the long arc of what I'm building is the thing I'm built to build, even when this room is asking for something shorter.' Read it back to yourself first; share the parts that hold.",
+    cindyType:
+      "When the people closest to you are confused by what you do, the shape-language in this report gives you something portable to hand them. Not a four-letter type label — instead something like 'I read what's happening in the room quickly, and I often respond before others have named the need. My growth edge is letting love become sustainable enough to last.' Read it back to yourself first; share the parts that hold.",
+    danielType:
+      "When the people closest to you are confused by what you do, the shape-language in this report gives you something portable to hand them. Not a four-letter type label — instead something like 'I trust what has endured, and I need to know when precedent is still wisdom and when it has become inertia. My growth edge is letting what has endured remain alive enough to update.' Read it back to yourself first; share the parts that hold.",
+    unmappedType:
+      "When the people closest to you are confused by what you do, the read gives you something portable to hand them. Not a personality type — instead a specific shape: how you tend to move, what you protect, what pulls you back, and what becomes available when the pull eases. Read it back to yourself first; share the parts that hold.",
+  };
 
 export const USE_CASES: ReadonlyArray<{
   title: string;
@@ -16,7 +35,7 @@ export const USE_CASES: ReadonlyArray<{
   },
   {
     title: "Family and coworker explanations.",
-    body: "When the people closest to you are confused by what you do, the analog label and the driver/instrument language give you something portable to hand them. Not 'I'm an INTJ' — instead 'I'm running the long-arc-architect register; the structure I'm building isn't the one this room is asking for, but it is the one I'm built to build.' Read it back to yourself first; share the parts that hold.",
+    body: "When the people closest to you are confused by what you do, the shape-language in this report gives you something portable to hand them. Not a four-letter type label — instead something like 'I see the long arc of what I'm building, and the structure I'm carrying isn't the one this room is asking for, but it is the one I'm built to build.' Read it back to yourself first; share the parts that hold.",
   },
   {
     title: "Conviction-vs-rigidity check.",
@@ -48,7 +67,22 @@ export const USE_CASES: ReadonlyArray<{
   },
 ];
 
-export default function UseCasesSection() {
+export default function UseCasesSection({
+  archetype,
+}: {
+  archetype?: ProfileArchetype;
+} = {}) {
+  // CC-SHAPE-AWARE-PROSE-ROUTING — when an archetype is provided
+  // (InnerConstitutionPage context), substitute the "Family and
+  // coworker explanations" body with the archetype-routed text. When
+  // no archetype is provided (home page / marketing pages), keep the
+  // default architect text so the example remains concrete.
+  const resolved = archetype ?? "jasonType";
+  const useCases = USE_CASES.map((useCase) =>
+    useCase.title === "Family and coworker explanations."
+      ? { ...useCase, body: FAMILY_EXPLANATION_BY_ARCHETYPE[resolved] }
+      : useCase
+  );
   return (
     <section
       className="flex flex-col"
@@ -77,7 +111,7 @@ export default function UseCasesSection() {
       >
         {USE_CASES_SECTION_SUBHEAD}
       </p>
-      {USE_CASES.map((useCase) => (
+      {useCases.map((useCase) => (
         <p
           key={useCase.title}
           className="font-serif text-[15.5px] md:text-[16px]"

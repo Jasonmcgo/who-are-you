@@ -1,0 +1,24 @@
+{
+  "label": "Crisis class — Do I have purpose? grip with both axes below 30 (Goal 22 + Soul 25). The reinvention loop: untethered, restless, no current project to commit to first.",
+  "synthetic": true,
+  "primalCluster": {
+    "primary": "Do I have purpose?",
+    "confidence": "high",
+    "contributingGrips": ["Grips a plan that used to work under pressure", "Pressure adaptation under economic stress"],
+    "scores": {
+      "Am I safe?": 0,
+      "Am I secure?": 0.5,
+      "Am I loved?": 0,
+      "Am I wanted?": 0,
+      "Am I successful?": 0,
+      "Am I good enough?": 0,
+      "Do I have purpose?": 1.5
+    }
+  },
+  "goalScore": 22,
+  "soulScore": 25,
+  "expected": {
+    "pathClass": "crisis",
+    "crisisFlavor": "restless-without-anchor"
+  }
+}

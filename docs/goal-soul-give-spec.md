@@ -14,7 +14,7 @@ Surfaces:
 
 - **Scoring model:** two derived axis composites (Goal, Soul) plus an orthogonal Vulnerability/Openness Z-score, computed mostly from existing signals.
 - **Closing Purpose narrative:** quadrant placement (Give / Striving / Longing / Gripping) drives the synthesis paragraph that closes the report.
-- **Pattern catalog:** one or two new cross-card patterns (Generative Builder, Parallel Lives, Defensive Builder).
+- **Pattern catalog:** one or two new cross-card patterns (Generative Builder, Defensive Builder). Parallel Lives was removed post-revision; the asymmetric lift now carries that diagnostic.
 - **No new shape card.** The eight-card body-map metaphor stays intact.
 
 The model continues to render eight body-map cards. Goal/Soul sits *above* them as a meta-read of coherence.
@@ -39,13 +39,22 @@ Axis question: **What do you love enough to become available to?**
 
 Note on register: Love is the Soul-line anchor, not Presence. Presence is a condition of Soul, a fruit of Soul, or the state in which Goal and Soul join — but it is not the primary definition. This guards against drifting into therapy register and against the marble-statue humanity gap (accuracy without warmth).
 
-### Vulnerability / Openness vector (Z, orthogonal)
+### Vulnerability / Openness as a growable quality
 
 The willingness to be seen, corrected, contradicted, or moved. The capacity to let one's own building or loving be unfinished in the presence of another.
 
-Vulnerability is **not** part of the 2x2. Picture Goal and Soul as the X/Y plane and Vulnerability as the Z-axis coming out of the page. High Vulnerability lifts a person toward the synthesis (NE) regardless of which 2x2 quadrant they currently sit in.
+**Vulnerability is a quality, not a third axis.** It is computed internally as a composite (`raw_vulnerability` ∈ [-50, +50], same signal pool as before) and **folded into the math that produces displayed Goal and Soul scores** as an asymmetric lift/suppression factor. The user does NOT see a Vulnerability score on the dashboard. Vulnerability is named in narrative prose as a quality the user can grow — *openness, courage, willingness to be seen* — but never displayed as a number.
 
-Critical rule: do not collapse Vulnerability into Soul. A person can score high Soul with low Vulnerability (the loving but defended caretaker), high Goal with high Vulnerability (the builder who lets unfinished work be seen), or high Goal **and** high Soul with low Vulnerability (the compartmentalized person whose verbs and nouns inhabit different rooms).
+**Asymmetric lift (canon, post-revision):** Vulnerability does NOT suppress Goal and Soul equally. Low Vulnerability reduces Soul (the integration/love-line) substantially more than it reduces raw productive motion. A high-output builder with thin Vulnerability keeps a strong Goal score; their Soul score reflects the integration gap. The math is in §7.
+
+**Internal accounting (preserved for audit and debug):**
+- `raw_goal` — the unmodified Goal composite (0–100)
+- `raw_soul` — the unmodified Soul composite (0–100)
+- `vulnerability_composite` — the V composite (-50 to +50)
+- `adjusted_goal` — the V-lifted Goal score, displayed to user
+- `adjusted_soul` — the V-lifted Soul score, displayed to user
+
+The dashboard surface in §13 specifies what's user-facing.
 
 ### The Freedom / Fear pole
 
@@ -72,23 +81,29 @@ This single construct now has two levels of resolution: the engine reads the axe
 
 ## 4. Quadrant Definitions
 
-### NE — Give / Purpose / Generativity (high Goal × high Soul × sufficient Vulnerability)
+The 2×2 has **two named user-facing quadrants** — Giving (NE) and Gripping (SW) — and **two unnamed regions** (SE and NW) described as Goal-leaning or Soul-leaning. The visual plot labels Giving and Gripping; SE and NW appear as positions on the chart but carry no quadrant name. Prose describes SE and NW using descriptors, not labels.
 
-Form serving love. Expression serving truth. Work becoming gift.
+This simplification is intentional. Two destinations and one trap (Goal-leaning and Soul-leaning are the descriptors of *direction*, not *categories*). The product's job is to point toward Giving and away from Gripping; intermediate states are read as movement, not identity.
 
-Renders for: Work + Love, giving, inspiring others to give, meaningful courage, vulnerability as posture, moral peace, contribution, mission, generative building, creative expression in service of human need. The narrative may use *purpose, calling, generativity, contribution, mission*. *Destiny* is allowed only when confidence is high — high Goal, high Soul, high Vulnerability, and at least one supporting cross-card pattern firing.
+### NE — Giving / Purpose / Generativity (visible label)
 
-### SE — Striving / Producing (high Goal, low Soul)
+Form serving love. Expression serving truth. Work becoming gift. The open hand.
 
-Motion without enough love. Achievement detached from care. Solving without human attachment. Execution without meaning. Money or provision untethered from deeper purpose.
+Fires on: high adjusted Goal × high adjusted Soul. The Vulnerability lift (§7) is what produces this combination — without sufficient Vulnerability, raw scores get suppressed before reaching the NE region.
 
-Striving is **not** failure. It is capable but incomplete. The completion is not more output — it is anchoring the output in what the person actually loves.
+Renders for: Work + Love, giving, inspiring others to give, meaningful courage, vulnerability as posture, moral peace, contribution, mission, generative building, creative expression in service of human need. The narrative may use *purpose, calling, generativity, contribution, mission*. *Destiny* is allowed only when confidence is high and at least one supporting cross-card pattern firing.
 
-### NW — Longing (low Goal, high Soul)
+### SE — Goal-leaning region (no visible label)
 
-Love without enough form. Care without action. Empathy without structure. Meaning without motion. Tenderness without agency.
+High adjusted Goal, low adjusted Soul. The visual shows the line on the SE side of the 2×2; the dashboard does NOT name this region. Prose describes the user as "Goal-leaning" — capable productive motion ahead of the love-line — and points at the lift toward Giving.
 
-Longing is **not** weakness. It is unincarnated love. The completion is form — the structure, habit, work, or commitment that lets what the person loves become real for someone other than themselves.
+The completion is anchoring the output in what the person actually loves. Common pattern: high raw_goal, raw_soul moderate, vulnerability thin → Soul gets suppressed disproportionately → user reads Goal-leaning. The honest read is *the line is real, the lift is what's missing.*
+
+### NW — Soul-leaning region (no visible label)
+
+Low adjusted Goal, high adjusted Soul. The visual shows the line on the NW side of the 2×2; the dashboard does NOT name this region. Prose describes the user as "Soul-leaning" — love-line ahead of form — and points at the lift toward Giving.
+
+The completion is form — the structure, habit, work, or commitment that lets love land in the world for someone other than the person themselves. Soul-leaning is unincarnated love, not weakness.
 
 ### SW — Gripping / FUD (cluster, see below)
 
@@ -241,29 +256,96 @@ vulnerability_score =
   - 15 * (hides_belief OR adapts_under_economic_pressure OR adapts_under_social_pressure, capped)
 ```
 
-### Quadrant placement
+### Vulnerability composite (engine-internal)
 
 ```
-goal_high = goal_score ≥ 50
-soul_high = soul_score ≥ 50
-vuln_sufficient = vulnerability_score ≥ 0  (i.e., not net-closed)
+vulnerability_composite =
+    20 * (Q-I1 freeform present (≥40 chars) OR conviction_under_cost present)
+  + 15 * (high_conviction_expression from Q-P1)
+  + 15 * (high_conviction_under_risk from Q-P2)
+  + 15 * (Q-X4-chosen does NOT rank own_counsel first)
+  + 20 * (OCEAN-Openness derived score above median)
+  - 15 * (hides_belief OR adapts_under_economic_pressure OR adapts_under_social_pressure, capped)
+
+clamped to [-50, +50]
+```
+
+Computed but NOT displayed on the dashboard. Used as the lift factor below.
+
+### Asymmetric lift / suppression (canon)
+
+Vulnerability lifts and suppresses Goal and Soul **asymmetrically**. Low Vulnerability suppresses Soul (the integration/love-line) substantially more than it suppresses raw productive motion. A high-output builder with thin Vulnerability keeps a strong Goal score; their Soul score reflects the integration gap.
+
+```
+vulnerability_normalized = (vulnerability_composite + 50) / 100   # range 0..1
+
+# Asymmetric lift factors
+goal_lift_factor = 0.85 + 0.30 * vulnerability_normalized        # range 0.85..1.15
+soul_lift_factor = 0.60 + 0.80 * vulnerability_normalized        # range 0.60..1.40
+
+adjusted_goal = clamp(raw_goal * goal_lift_factor, 0, 100)
+adjusted_soul = clamp(raw_soul * soul_lift_factor, 0, 100)
+```
+
+Behavior at the three reference points:
+
+| Vulnerability | goal_lift | soul_lift | Interpretation |
+|---|---|---|---|
+| Deep closure (V = -50, normalized = 0) | 0.85× | 0.60× | Goal mildly suppressed; Soul significantly suppressed. The integration gap is real. |
+| Neutral (V = 0, normalized = 0.5) | 1.00× | 1.00× | Raw scores unchanged. |
+| Deep openness (V = +50, normalized = 1) | 1.15× | 1.40× | Goal mildly lifted; Soul significantly lifted. The synthesis becomes possible. |
+
+The asymmetry encodes the canon: **vulnerability gates the love-line more than it gates productive motion.** A Striving high-output builder with thin Vulnerability shouldn't have their Goal score crushed; their Soul score should reflect the gap.
+
+The CC implementing this should validate the lift factors against test fixtures before locking them. The 0.85/0.30 and 0.60/0.80 constants are exported tunables, not canon.
+
+### Quadrant placement (revised — Parallel Lives removed)
+
+```
+goal_high = adjusted_goal ≥ 50
+soul_high = adjusted_soul ≥ 50
 gripping_cluster_fires = (see §4 SW cluster requirement)
 
-if goal_high and soul_high and vuln_sufficient:
-    quadrant = NE (Give)
-elif goal_high and soul_high and not vuln_sufficient:
-    quadrant = NE-compartmentalized (Parallel Lives pattern)
+if goal_high and soul_high:
+    quadrant = NE (Giving)
 elif goal_high and not soul_high:
-    quadrant = SE (Striving)
+    quadrant = SE (Goal-leaning region, no label)
 elif not goal_high and soul_high:
-    quadrant = NW (Longing)
+    quadrant = NW (Soul-leaning region, no label)
 elif gripping_cluster_fires:
     quadrant = SW (Gripping)
 else:
     quadrant = neutral / transition (do not render Gripping narrative)
 ```
 
-**Canon (CC-067 clarification):** the algorithm above intentionally places Striving above the Gripping cluster check. A person with `goal_high = True` whose Gripping cluster *also* fires renders as **Striving with a defensive/protective modifier** (carried by the Defensive Builder pattern in CC-C), NOT as primary SW Gripping. Primary Gripping is reserved for defensive pressure paired with low Goal AND thin Soul. Rationale: the §10 Gripping render frames the state as *a season rather than a shape*, which does not fit a high-output person who is clearly accomplishing things even if defensively. The pattern catalog is the cleaner architectural carrier for high-output defensive cases.
+**Canon (post-revision):**
+- Parallel Lives is removed entirely. The compartmentalized high-G + high-S + low-V case used to fork to a "Parallel Lives" branch; with the asymmetric lift in place, low Vulnerability suppresses adjusted_soul before the comparison reaches `soul_high`, so the user lands in the SE region (Goal-leaning) instead of falsely scoring NE Giving. The math captures the diagnostic; no separate label needed.
+- Striving sits above the Gripping cluster check intentionally. A person with `goal_high = True` whose Gripping cluster *also* fires renders as Goal-leaning with a defensive/protective modifier (carried by the Defensive Builder pattern in §9), NOT as primary SW Gripping. Primary Gripping is reserved for defensive pressure paired with low Goal AND thin Soul.
+
+### Gripping Pull (separate read, dashboard-visible)
+
+Independent of quadrant placement, the engine computes a **Gripping Pull score** (0–100) that names the strength of defensive-cluster signals firing for this user, and an associated **named-signal list** rendered alongside.
+
+```
+gripping_pull =
+    25 * (Q-Stakes1 money OR job OR reputation in top-1)
+  + 15 * (Q-Stakes1 money OR job OR reputation in top-2 but not top-1)
+  + 10 * (each pressure-adaptation signal firing: hides_belief, adapts_under_economic_pressure, adapts_under_social_pressure, chaos_exposure — capped at 30)
+  + 25 * (vulnerability_composite < 0)
+  + 20 * (raw_soul < 35)
+
+clamped to [0, 100]
+```
+
+The named-signal list is the human-readable enumeration of which signals contributed. Examples:
+
+- *Reputation stakes elevated*
+- *Pressure adaptation under economic stress*
+- *Conviction concealment*
+- *Limited openness signal*
+- *Thin love-line evidence*
+
+A user can have a moderate Gripping Pull (say, 30–50) without being in the SW Gripping quadrant — they're not stuck, but the cluster is partially active. The dashboard surfaces this so users can see *what's holding them back* even when they're not at the bottom-left. Per §13 dashboard spec, Gripping Pull is shown both as the 0–100 score AND as the named-signal list.
 
 ### Notes on weighting
 
@@ -315,7 +397,9 @@ Add to the existing pattern catalog in `lib/workMap.ts` / `lib/loveMap.ts` / whe
 
 ### Generative Builder
 
-**Fires when:** `goal_score ≥ 60` AND `soul_score ≥ 60` AND `vulnerability_score ≥ 10` AND (`building_motive_present` OR `building_motive_expressive`).
+**Canonical future form (after Q-Purpose-Building / CC-B):** `goal_score ≥ 70` AND `soul_score ≥ 70` AND `vulnerability_score ≥ 20` AND (`building_motive_present` OR `building_motive_expressive`).
+
+**CC-070 deployed heuristic form (current):** fires only inside the Giving quadrant when adjusted Goal ≥ 70, adjusted Soul ≥ 70, raw Vulnerability ≥ 20, Q-E1 outward + inward align (building or solving top-1 outward, caring top-1 inward), and Q-S2 + Q-Ambition1 align (a Soul-line value top-2 with a Goal-line ambition top-2). The thresholds were tightened from 60/60/10 to 70/70/20 so the pattern does not over-fire on compartmentalized cases that the asymmetric lift now routes into the Goal-leaning region.
 
 **Read:** form serving love. The person builds or creates in service of something they protect.
 
@@ -325,19 +409,23 @@ Add to the existing pattern catalog in `lib/workMap.ts` / `lib/loveMap.ts` / whe
 
 (Engine-internal name. Avoid surfacing this label to users — *Defensive Builder* and especially *Gripper Disguised as Builder* read as accusation. The user-facing render should be neutral.)
 
-**Fires when:** (`building_motive_protective` OR `building_motive_control`) AND Gripping cluster active AND `vulnerability_score < 0` AND thin Soul-line.
+**Canonical future form (after Q-Purpose-Building / CC-B):** (`building_motive_protective` OR `building_motive_control`) AND Gripping cluster active AND `vulnerability_score < 0` AND thin Soul-line.
+
+**CC-070 deployed heuristic form (current):** fires only inside the Goal-leaning / Striving engine quadrant when `compliance_drive` ranks top-1 or top-2 in Q-3C1, the Gripping cluster fires, raw `vulnerability_composite < 0`, and raw Soul is thin (`raw_soul < 35`). This approximates the queued `building_motive_*` signals with the existing Compliance-as-protection evidence until Q-Purpose-Building ships.
 
 **Read:** building primarily to prevent collapse, exposure, or loss.
 
 **Renders in:** softened closing narrative — *"the model is reading building as protection right now."* Never as a stable identity claim. May be a season rather than a shape.
 
-### Parallel Lives
+### ~~Parallel Lives~~ — REMOVED (post-revision)
 
-**Fires when:** `goal_score ≥ 60` AND `soul_score ≥ 60` AND `vulnerability_score < 0`.
+Parallel Lives was the high-G + high-S + low-V case carved out as a separate diagnostic. **It is no longer a pattern in this spec.**
 
-**Read:** the verbs and the nouns are both strong but inhabit different rooms. Building well at work and loving well at home, but the two haven't yet synthesized into Give.
+Rationale: with the §7 asymmetric lift in place, low Vulnerability suppresses `adjusted_soul` before the comparison reaches `soul_high`, so a user with strong raw scores but thin Vulnerability automatically lands in the SE Goal-leaning region with their displayed Soul score reflecting the integration gap. The math captures the diagnostic; the separate "Parallel Lives" label was over-clinical and confusing.
 
-**Renders in:** closing Purpose narrative as a diagnostic. **This is a high-value pattern** — many capable, kind people land here, and the report's most useful single sentence may be naming this gap and pointing to Vulnerability as the bridge.
+The compartmentalized case is now read as: high adjusted_goal, low adjusted_soul, with the prose explaining that the Soul-line is suppressed because the integration isn't yet alive — the lift is named as vulnerability/openness/courage, the next move is to grow the quality so the displayed scores can rise together.
+
+Removed from: catalog, render targets, prose templates, audit fixtures.
 
 ## 10. Closing Purpose Render Examples
 
@@ -348,32 +436,38 @@ Sample closings, ~3-5 sentences each. The CC implementing this should produce fi
 - **"Instrument" over "model"** in user-facing copy. *The instrument reads…* lands warmer than *the model reads…* and frames the report as a tool rather than a verdict-machine.
 - **"Giving" over "generativity"** in user-facing copy. Lower-case English over academic register.
 - **No engine-layer words in user-facing prose.** "Goal," "Soul," "Vulnerability" do not appear; the narrative uses Work, Love, Give, Purpose, plus the named-region nouns.
-- **No engine-internal pattern names in user-facing prose.** "Parallel Lives," "Defensive Builder," "Gripper" never surface to users. The Parallel Lives quadrant renders narratively as *what you build and who you love appearing to live in different rooms*; the bridge is named without the label.
+- **No engine-internal pattern names in user-facing prose.** "Parallel Lives," "Defensive Builder," "Generative Builder," "Gripper" never surface to users. Parallel Lives is removed as a rendered quadrant; its former compartmentalized read is carried by the Goal-leaning prose without the label.
 - **Each closing must name a bridge or next movement, not merely describe the quadrant.** A closing that only names where the user is reads as a verdict; one that points at the next move reads as honest companionship. The bridge can be a sentence ("The completion is…", "The way out is rarely…", "The bridge to giving is…", "The work is…"), an action verb, or a forward-pointing clause. If a closing reads as a label without a forward-pointing close, it has not yet earned the render.
 
 ### NE — Give
 
-> Your verbs and your nouns appear to be pulling in the same direction. What you build, who you serve, and what you protect are not in three different rooms. The instrument reads this as the early shape of giving — work taking the form of love, love taking the form of work. Whatever you're moving toward next, the conditions are here for it to mean what you want it to mean.
+> Your verbs and your nouns appear to be pulling in the same direction. What you build, who you serve, and what you protect are not living in three different rooms. The instrument reads this as the early shape of giving — work taking the form of love, love taking the form of work. Whatever you're moving toward next, the conditions are here for it to mean what you want it to mean. The work is to keep this shape honest as the seasons turn.
 
-### SE — Striving
+### SE — Goal-leaning
 
-> Your form is strong. Your purpose is forming. The instrument sees consistent productive motion — building, solving, executing — without yet a clear love-line connecting it to what you protect. Striving is capable but unfinished; the completion is not more output, it's anchoring the output in what you actually love.
+> Your form is strong; your purpose is still forming. The instrument sees consistent productive motion — building, solving, executing — without yet a clear love-line connecting it to what you protect. This is a Work-leaning shape: capable but unfinished, and the work is not more output. The completion is to anchor the output in what you actually love: to let the people, the cause, or the calling that already claims you become the reason the building is happening at all. The next move is rarely to push harder — it is to find that anchor.
 
-### NW — Longing
+### NW — Soul-leaning
 
-> What you love is clear. The form is forming. The instrument sees deep relational and moral signal without yet the structure or motion that would let it land in the world. Longing is not weakness — it is unincarnated love. The completion is form: the structure, habit, work, or commitment that lets what you love become real for someone other than you.
+> What you love is clear. The form is still forming. The instrument sees deep relational and moral signal without yet the structure or motion that would let it land in the world for someone other than you. This is a Love-leaning shape — love-line ahead of form, not weakness, but love that hasn't yet been incarnated. The completion is form: the structure, habit, work, or commitment that lets what you love become real to a person other than yourself. The next move is to give that love a body.
 
 ### SW — Gripping (only when cluster fires)
 
-> The instrument is reading defensive pressure right now. What you're holding appears to be held against loss more than for love or motion. This may be a season rather than a shape — Gripping rarely names a person; more often it names a moment they're in. The way out is rarely more holding.
+> The instrument is reading defensive pressure right now. What you're holding appears to be held against loss more than for love or motion. This may be a season rather than a shape — that posture rarely names a person; more often it names a moment they're inside. The way out is rarely more holding. The next move, when there is energy for it, is to find one place where a slightly more open hand produces less collapse, not more.
 
-### Parallel Lives (high G + high S + low V)
+### ~~Parallel Lives~~ — REMOVED (post-revision)
 
-> What you build and who you love both come through clearly — but the two appear to live in different rooms. The verbs and the nouns are strong; they don't yet inhabit the same space. The bridge to Give isn't more building or more loving — it's vulnerability. The willingness to let the two halves of your life see each other.
+Per §9 revision, this template is no longer rendered. The compartmentalized high-G + high-S + low-V case is now read by the §7 asymmetric lift: low Vulnerability suppresses adjusted_soul, the user lands in the SE Goal-leaning region, and the SE prose names the gap and points at the lift. The bridge — vulnerability/openness/willingness — is named in the SE Goal-leaning prose, not in a separate template.
+
+Sample SE Goal-leaning prose (replaces Parallel Lives use case):
+
+> Your form is strong; your purpose is still forming. The instrument sees consistent productive motion — building, solving, executing — without the love-line yet showing up at the same scale. The Soul-line is real, but quieter — held in private rather than alive in the work. The next move is rarely more output; it is letting the willingness to be seen lift what's already there. What you build and what you love can pull together when the willingness to let them see each other catches up.
+
+(The compartmentalized framing — "the two halves of your life see each other" — survives in this prose as a specific bridge sentence inside the SE Goal-leaning template, without the Parallel Lives label.)
 
 ### Neutral / Transition (low G + low S + Gripping cluster fails)
 
-> The signal here is quiet. That isn't a verdict — sometimes the model is reading a season of rest, recovery, or transition rather than a settled shape. The body-map cards above still hold; the synthesis read may be more useful after another pass.
+> The signal here is quiet. That is not a verdict — sometimes the instrument is reading a season of rest, recovery, or transition rather than a settled shape. The body-map cards above still hold. The synthesis read may become more useful after another pass, or after the season changes. The next move is not to force a verdict where the evidence is thin — it is to let the picture clarify on its own time.
 
 ## 11. Canon Language
 
@@ -415,14 +509,258 @@ These lines should never appear verbatim in copy when their underlying claim wou
 
 ## 12. Risks and Guardrails
 
-1. **Do not collapse Compliance into Gripping.** Compliance is one of the three Drive buckets and represents legitimate stewardship/risk-management. Gripping is fear-driven contraction. Distinguishable by Soul-line activity, Vulnerability score, and Stakes composition (close-relationships and health = stewardship; money and reputation under pressure-adaptation = Gripping).
-2. **Do not collapse Vulnerability into Soul.** Z-axis, not Y-axis. The compartmentalized high-G high-S low-V case is the proof — it would be invisible if Vulnerability were folded into Soul.
-3. **Do not make Soul too abstract.** Love is the anchor, not Presence. Presence is downstream. Avoid "Soul becoming present in the world" phrasings — they drift into therapy register and reinforce the marble-statue humanity gap.
-4. **Do not create a ninth shape card.** Goal/Soul is rendered in the closing Purpose narrative and as a kicker on Path · Gait. The eight-card body-map metaphor stays intact.
-5. **Do not let Work/Love/Give compete with Goal/Soul.** They are the same construct at two levels of resolution. Engine speaks axes; narrative speaks regions. Reports should not run both languages in parallel.
-6. **Prefer synthesis reads when supported, not only contradiction reads.** The model's tension-detection (claimed-vs-revealed Drive, sacred-vs-stakes, 3C-vs-energy) is strong but defaults the report toward "here's where you're inconsistent." Goal/Soul/Give introduces a coherence read — NE means verbs and nouns pulling the same direction, and the closing narrative gets to say so. Do not default every interesting pattern into contradiction.
-7. **Do not surface engine-internal names to users.** *Defensive Builder*, *Gripper Disguised as Builder*, *Parallel Lives* — these are pattern-catalog identifiers, not user-facing labels. The closing narrative should soften further.
-8. **Do not infer Gripping from low signal.** Low Goal + low Soul defaults to neutral/transition unless the cluster fires. Gripping is a verdict; verdicts require evidence.
+1. **Do not collapse Compliance into Gripping.** Compliance is one of the three Drive buckets and represents legitimate stewardship/risk-management. Gripping is fear-driven contraction. Distinguishable by Soul-line activity, Vulnerability composite, and Stakes composition (close-relationships and health = stewardship; money and reputation under pressure-adaptation = Gripping).
+2. **Vulnerability folds into Goal/Soul math (post-revision); the asymmetric lift is canon.** Soul gets a larger lift coefficient than Goal. Do NOT apply equal lift to both axes — that would falsely flatten the high-output builder with thin Vulnerability. The 0.85/0.30 (Goal) and 0.60/0.80 (Soul) constants are exported tunables; the asymmetry is the canon.
+3. **Do not display Vulnerability as a numeric score.** Vulnerability is engine-internal. The dashboard surfaces adjusted_goal, adjusted_soul, angle (Direction), length (Movement Strength), and Gripping Pull — never a Vulnerability number. Vulnerability is named in narrative prose as a quality the user can grow.
+4. **Do not make Soul too abstract.** Love is the anchor, not Presence. Presence is downstream. Avoid "Soul becoming present in the world" phrasings — they drift into therapy register and reinforce the marble-statue humanity gap.
+5. **Do not create a ninth shape card.** Goal/Soul is rendered in the closing Purpose narrative + Movement section + dashboard, plus as a kicker on Path · Gait. The eight-card body-map metaphor stays intact.
+6. **Do not let Work/Love/Give compete with Goal/Soul in narrative prose.** They are the same construct at two levels of resolution. The dashboard surface uses engine vocabulary (Goal, Soul, Giving, Gripping). Narrative prose uses the Work/Love/Give register. Don't run both languages in the same paragraph.
+7. **Carve-out for user-facing labels (post-revision):** *Giving* (NE) and *Gripping* (SW) are user-facing as quadrant labels on the dashboard surface AND as named states in prose. *Striving*, *Longing*, *Parallel Lives*, *Defensive Builder*, *Generative Builder*, and *Gripper Disguised as Builder* remain engine-internal — never user-facing as labels. Striving and Longing become *descriptors* (Goal-leaning, Soul-leaning) in narrative prose, not regional names.
+8. **Prefer synthesis reads when supported, not only contradiction reads.** The model's tension-detection (claimed-vs-revealed Drive, sacred-vs-stakes, 3C-vs-energy) is strong but defaults the report toward "here's where you're inconsistent." Goal/Soul/Give introduces a coherence read — NE means verbs and nouns pulling the same direction, and the closing narrative gets to say so. Do not default every interesting pattern into contradiction.
+9. **Do not infer Gripping (the SW quadrant) from low signal.** Low adjusted_goal + low adjusted_soul defaults to neutral/transition unless the Gripping cluster fires. Gripping is a verdict; verdicts require evidence.
+10. **Gripping Pull is a separate read from quadrant placement.** A user can have a moderate Gripping Pull score (e.g., 30–50) without being in the SW Gripping quadrant — they're not stuck, but the cluster is partially active. Render Gripping Pull always; render the SW Gripping quadrant only when the cluster fully fires.
+11. **Parallel Lives is removed entirely (post-revision).** Do not re-introduce it as a pattern, label, prose template, or detection branch. The compartmentalized case is now captured by the §7 asymmetric lift suppressing adjusted_soul.
+
+---
+
+## 13. Movement Layer (Static Read for MVP, Trajectory Read Downstream)
+
+Goal/Soul/Give locates a user in a 2×2 plane of derived composites. The Movement layer reads that location **directionally** — not just *where* the user is, but the *shape and scale* of the line from origin to that point, and (eventually) how that line is changing over time.
+
+The Movement read is the part of the instrument that converts the report from descriptive (*here are some things to consider*) to prescriptive (*here is what wants more energy, vulnerability, courage, action*). This is its purpose and its register: tough-love companionship.
+
+### 13.1 Geometry
+
+The Goal/Soul plane is Cartesian: Goal = X (0–100), Soul = Y (0–100). The Movement read is the polar transform of that point.
+
+- **Angle (degrees, 0°–90°):** `atan2(soul, goal) × 180 / π`, clamped to [0°, 90°]. 0° = pure Goal pursuit (Striving leaning); 45° = balanced Give; 90° = pure Soul pursuit (Longing leaning). The angle is the *shape* of the user's posture — how verbs and nouns are weighted relative to each other.
+- **Length (0–100, normalized):** `sqrt(goal² + soul²) / sqrt(2)` clamped to [0, 100]. Long line = full activity on both axes; short line = thin total Goal-and-Soul presence. Length is the *scale* of the user's posture.
+
+Edge cases:
+
+- **goal = 0 AND soul = 0:** length = 0, angle undefined. Render as the deepest stuck case — minimum signal across both axes. Movement read fires the strongest call to motion (per §13.8, no soft-fallback in MVP).
+- **goal = 0, soul > 0:** angle = 90°, length = soul / sqrt(2). Pure Longing.
+- **goal > 0, soul = 0:** angle = 0°, length = goal / sqrt(2). Pure Striving.
+- **goal = 100, soul = 100:** angle = 45°, length = 100. Full Generative.
+
+### 13.2 The trajectory thesis
+
+Over a life arc, a person's line should:
+
+1. **Rise in angle** — from the Goal-leaning shape that survival and early career require, toward a more balanced shape (typically somewhere in 35°–70° depending on life goals) that includes the Love-line in proportion.
+2. **Grow in length** — accumulated activity on both axes as life lived deepens both verbs and nouns.
+
+Both increases together produce *Give* — generativity at scale. Either alone is incomplete: a long Goal-only line is Striving at scale (rich but unanchored); a balanced short line is forming-Give without the activity yet to embody it.
+
+The trajectory thesis is a **forward-projection** for the Movement read in MVP — guidance language about what direction a line typically wants to move at the user's life stage, not observed data. It becomes **observed trajectory** once the platform supports repeat assessments.
+
+### 13.2a The 50/50 teaching coordinate (memorable, NOT prescriptive)
+
+The instrument is bounded at 50 questions (see `AGENTS.md` Question Bank Architecture) and the angle is bounded at 90°. The numeric symmetry is felicitous: somewhere around the midpoint of a life arc, an angle in the neighborhood of 50° is approximately where a thriving trajectory tends to converge — Goal and Soul roughly balanced, Movement Strength meaningful, Vulnerability lift active enough to keep the line from collapsing toward Gripping.
+
+This is a **teaching coordinate**, not a prescription. It is offered as a memorable convergence point for thinking about the model — *50 questions, 50 degrees, often around 50 years* — but does NOT claim that any specific user *should* be at any specific angle at any specific age.
+
+Specifically forbidden interpretations:
+
+- A 22-year-old at 5° is not behind. Their season legitimately favors Goal-line activity; the angle is expected to rise as the season turns.
+- A 75-year-old at 30° is not failed. The angle and length carry whatever the lived arc actually carries; the coordinate is descriptive of trajectories *that converge*, not normative for any individual life.
+- A 50-year-old at 50° is not a target users should aim toward. Some lives integrate at 35°, some at 70°. The coordinate names a center, not a destination.
+
+The canonical move is **forward, away from Gripping** — regardless of where the user starts. The 50/50 coordinate is a useful frame for prompt-writers and report explanations; it is not a math rule, not a guidance threshold, and not a moralizing yardstick. §13.11 guardrails (no specific angles by demographic; tough-love has a floor) remain binding.
+
+### 13.3 Static vs trajectory split
+
+- **Static read (MVP, CC-070 scope):** computes angle and length from the current assessment; renders posture description with movement-suggestion guidance gated by life-stage demographics. No history.
+- **Trajectory read (downstream, post-platform-CC):** stores composites across repeat assessments; renders deltas (*"Six months ago you were at 8°. You're now at 14°. The line is rising."*) and projected trajectories. Requires user accounts, persistent storage, and opt-in consent for longitudinal tracking. Out of scope until those product capabilities exist.
+
+### 13.4 Render placement (post-revision: Dashboard + prose)
+
+The Movement section is now structured in **two layers**:
+
+1. **Dashboard surface (top of `## Movement` section)** — visible engine state: scores, angle, length (relabeled as "Direction" and "Movement Strength" for users), Gripping Pull score, named-signal list, and the 2×2 visual plot.
+2. **Narrative prose (below the dashboard)** — the existing Movement prose, derived from the displayed values. Speaks in the geometric/motion/warmer registers; explains and contextualizes what the dashboard shows.
+
+This order reverses the prior "prose-only" architecture per the post-CC-070 canon revision: data first, then explanation derived from the data. The dashboard does not duplicate the prose; the prose does not restate the dashboard. Each carries its own register.
+
+### 13.4a Dashboard surface specification (canon)
+
+The Movement dashboard renders the following user-facing fields, in this order:
+
+| Field | Source | Display | Notes |
+|---|---|---|---|
+| Goal score | `adjusted_goal` | "Goal: 80 / 100" | Engine-layer label *Goal* is user-facing on the dashboard surface (carve-out per §12.7). |
+| Soul score | `adjusted_soul` | "Soul: 45 / 100" | Same carve-out. |
+| Direction | `angle` | "Direction: 29° (Goal-leaning)" | The angle in degrees plus a one-word descriptor: *Goal-leaning*, *balanced*, *Soul-leaning*. The descriptor is computed from the angle's region: 0–35° = Goal-leaning, 35–55° = balanced, 55–90° = Soul-leaning. |
+| Movement Strength | `length` | "Movement Strength: 65 / 100" | Length normalized 0–100. |
+| Quadrant | computed | "Quadrant: Giving" or "Quadrant: Gripping" or omitted | Only Giving (NE) and Gripping (SW) appear as labels. SE and NW render as "(Goal-leaning region)" and "(Soul-leaning region)" without quadrant naming. |
+| Gripping Pull | `gripping_pull` | "Gripping Pull: 22 / 100" | The 0–100 score from §7. Always shown, even when low. |
+| Gripping Pull signals | `gripping_pull.signals` | bullet list | Named, plain-English list of the firing signals. Examples: *Reputation stakes elevated, Pressure adaptation under economic stress, Limited openness signal*. Empty list when score = 0. |
+
+The 2×2 visual plot:
+- Square aspect ratio (1:1)
+- Goal axis horizontal (right = high Goal); Soul axis vertical (up = high Soul)
+- Both axes scaled 0–100
+- A line drawn from origin (0,0) to the user's `(adjusted_goal, adjusted_soul)` point
+- Quadrant guides: light dashed lines at goal=50 and soul=50
+- Quadrant labels: "Giving" in the NE corner, "Gripping" in the SW corner. SE and NW corners unlabeled.
+- Direction label (e.g., "29°") rendered near the angle's apex at the origin
+- Movement Strength label (e.g., "65") rendered near the line's midpoint or at the endpoint
+
+The dashboard surface uses **engine-layer vocabulary** (Goal, Soul, Giving, Gripping). The narrative prose below the dashboard uses the **narrative register** (Work axis, Love-line, the line, the work, the bridge to giving, etc.) — the two layers don't speak the same language, by design.
+
+What is **not** displayed on the dashboard:
+- Vulnerability score (engine-internal; named only in narrative prose as a quality)
+- raw_goal, raw_soul (engine-internal; preserved for audit/debug)
+- Confidence band (currently engine-internal; may surface in a future CC)
+- Pattern names other than Giving/Gripping ("Defensive Builder", "Generative Builder" remain engine-internal)
+
+### 13.5 Narrative prose register (post-revision)
+
+The narrative prose below the dashboard speaks in the geometric/motion/warmer registers from §13.6. It explains what the dashboard shows in human terms. **It does NOT restate the dashboard's numbers.** The dashboard says "Goal: 80, Soul: 45, Direction: 29°"; the prose says "your line leans toward the Work axis, with the love-line beginning to register, and the next move is what would let it rise."
+
+Required prose shape: 3–5 sentences. First sentence names the posture (Goal-leaning / Soul-leaning / balanced) without restating the numerical Direction. Final sentence names a bridge or next move. The dashboard does the precision work; the prose does the meaning work.
+
+### 13.5b Angle-band sub-rules for the Movement narrative prose
+
+The Movement narrative prose layer (§13.5) varies by **angle band** within each quadrant. Five bands are canonical:
+
+| Band | Range | Quadrant region | Prose register |
+|---|---|---|---|
+| Deep Goal-leaning | 0°–19° | SE | Productive motion ahead of the love-line; anchor the output. |
+| **Productive NE movement (Goal-side)** | **20°–44°** | **SE** | **Affirm out-of-Gripping; identify Goal as stronger; prescribe Soul-lift practices.** |
+| Balanced sweet spot | 45°–54° | NE | Verbs and nouns pulling together when length meaningful. |
+| **Productive NE movement (Soul-side)** | **55°–79°** | **NW** | **TBD canon — symmetric Goal-lift practices. See §13.5c.** |
+| Deep Soul-leaning | 80°–90° | NW | Love-line ahead of form; the completion is form. |
+
+#### Canon for the 20°–44° band (Productive NE movement, Goal-side)
+
+When `angle ∈ [20°, 44°]` AND `length ≥ 40` AND `raw_soul ≥ 20`, the Movement narrative prose follows this composition:
+
+1. **First sentence — affirmation.** Before any prescription, name the position honestly. The user is outside Gripping; both axes are present; the lift toward Giving is happening. Example: *"Your line sits in productive NE movement — leading on the Work axis, with the love-line beginning to register at meaningful scale. The lift toward giving has started."*
+
+2. **Second sentence — observation.** Identify Goal as the stronger axis without prescribing more output. The user does not need to produce more; that is not the lift. Example: *"What's strong here is the form — the building, the structure, the productive motion that has earned the position you're at."*
+
+3. **Bridge sentence(s) — prescribe Soul-lift practices.** Recommend one or more of the following five practices as the move (one or two per render, not all five at once). The practices, verbatim canon:
+
+   1. **Name the beloved.** Make the people, the cause, or the calling concrete; an abstract love-line reads thinner than a named one.
+   2. **Allocate resources to the sacred value.** Time, attention, and resources flow toward what's said to matter, and the gap between *named* and *funded* is the most common love-line gap.
+   3. **Translate care visibly.** The internal love-line is real; the external sign of it can be sparse. The work is making the care legible to the people it's for.
+   4. **Convert structure into mercy.** The same structuring gift that builds systems can build relief, comfort, and care. Use the gift in service of the love-line.
+   5. **Choose one recurring act of Giving that does not depend on urgency.** Small and durable beats large and crisis-driven. The act survives the season.
+
+4. **Final sentence — landing.** Close on the Soul-lift framing without restating the dashboard's numerical readouts. Example: *"The next move is rarely more output — it is letting one of these practices become regular enough that the love-line catches up to the form."*
+
+User-facing register note: this subsection names architectural engine concepts in the spec, but the deployed Movement narrative substitutes narrative vocabulary where it renders to users. The engine-vocabulary guard forbids `goal`, `soul`, and `vulnerability` substrings in Movement narrative prose; user-facing examples therefore say "leading on the Work axis" and "love-line" rather than the engine terms.
+
+#### Selection rule for which practice(s) to render
+
+Pick one or two practices per Movement narrative based on the user's strongest body-map signals. Selection is first-firing-wins in this order:
+
+1. Low Extraversion or compartmentalized signal cluster → *Translate care visibly*.
+2. High Conscientiousness + structurer (Te) prominence → *Convert structure into mercy*.
+3. Sacred-Words-vs-Sacred-Spending tension firing → *Allocate resources to the sacred value*.
+4. Default / no earlier branch fires → *Name the beloved* + *Choose one recurring act*.
+
+#### Forbidden in 20°–44° prose
+
+- **Do NOT prescribe more output.** The user is already producing. The work is not "build harder" or "ship more"; it is the Soul-lift.
+- **Do NOT moralize on the asymmetry.** *"You're not loving enough"* is forbidden; *"the love-line is forming and these practices help it land"* is in-register.
+- **Do NOT lock all five practices into every render.** Maximum two practices named per Movement read.
+- **Do NOT use the words "Striving" or "Goal-leaning" as a label** in the affirmation sentence — say "productive NE movement" or "the lift toward giving has started" instead.
+
+### 13.5c Symmetric 55°–79° band (TBD canon — flagged for workshop)
+
+The mirror band — `angle ∈ [55°, 79°]` AND `length ≥ 40` AND `raw_goal ≥ 20` — is the Soul-leading user whose love-line is alive but not yet incarnated in form. The composition shape mirrors §13.5b: affirmation, observation (Soul as the stronger axis), prescription of Goal-lift practices, landing.
+
+The five Goal-lift practices are **TBD canon** — they need workshop authoring before lock. Speculative starting candidates (NOT canon yet):
+
+1. Name the form — what would the love look like built?
+2. Schedule the build — carve a recurring block.
+3. Make love legible as work — commitment, structure, contract.
+4. Convert care into a system — so the love survives the day's energy.
+5. Ship one small thing the love asks for, even unfinished.
+
+A future workshop session locks the symmetric set. Until then, 55°–79° prose uses the existing NW Soul-leaning template without the band-specific affirmation/prescription structure.
+
+### 13.6 Vocabulary register (priority-ordered, mixable)
+
+For the **narrative prose** layer (NOT the dashboard surface), three registers are usable in priority order. Mixing registers within a single Movement prose is fine when natural; the priority order is which register *anchors* the read, not which is exclusive.
+
+1. **Geometric (priority 1):** *the line, the angle, the scale*. Concrete and measurable. *Your line is rising. The angle is balanced. The scale is short.* Primary register for narrative prose; carries the geometry honestly.
+2. **Motion (priority 2):** *the posture, the rise, the trajectory*. Dynamic frame. *Your posture leans toward the Work axis. The rise is gentle. The trajectory points toward giving.* Use to soften where the geometric register would read as cold.
+3. **Warmer (priority 3):** *the shape, the balance*. Less precise but more accessible. *Your shape is forming. The balance leans toward Work.* Use sparingly, for moments where the warmer register lands a closing.
+
+The dashboard surface uses **engine vocabulary** (Goal, Soul, Direction, Movement Strength, Giving, Gripping, Gripping Pull) — that's the data register and stays exact. Don't mix engine vocabulary into narrative prose; don't mix narrative vocabulary into dashboard fields.
+
+### 13.7 Demographics gating
+
+Life-stage guidance gates on **age (decade) + profession** only for MVP. Marital_status and the (currently absent) children/dependents field are NOT used by Movement read in CC-070. Parent-stage gating is deferred entirely to a future CC that adds a children field AND authors parent-specific guidance prose.
+
+Per `demographic-rules.md` Rule 4: demographics may shape the Movement read's *guidance language* (interpolation), but MUST NOT change the angle/length math. Demographics has zero derivation impact.
+
+Illustrative guidance shapes (CC-070 authors final prose):
+
+- *Early-career professional (1990s–2000s decade, Knowledge worker):* Work-leaning short line is expected; the prompt is letting the line tilt as the season changes.
+- *Mid-career (1970s decade, Healthcare):* the line typically broadens at this stage; both axes deserve activity.
+- *Entrepreneur (any decade, Self-employed/Entrepreneur):* venture-building pulls the line hard toward Work; the question is whether the Love-line is pulling alongside or being deferred.
+
+### 13.8 Confidence gating (MVP register)
+
+For MVP, the Movement read renders **regardless of composite confidence**. A low-confidence read is NOT withheld behind a soft fallback (*"the picture isn't clear enough yet"*) — that response defeats the layer's purpose. Low signal density across Goal/Soul/Vulnerability composites correlates strongly with stuck-ness in the SW register; users in that state need *more* prompt to action, not less.
+
+The MVP register is **tough-love companionship**: the Movement read names the short line and the thin signal honestly, and points at what motion would clarify the picture. Example shape:
+
+> Your line is short and hard to read clearly. The signal here is thin. That is itself a Movement read: thin signal often means motion is what's needed to make the picture clearer. Willingness, courage, action, contact with what already matters to you — the line begins to widen when the verbs and the nouns get used. The next move is the smallest motion that contacts what already matters.
+
+A future CC may add a soft fallback for users where low signal density reflects assessment incompleteness rather than stuck-ness. Until then, the strong read ships and observes.
+
+### 13.9 Pattern catalog interaction
+
+Movement read is **independent** of the cross-card pattern catalog (§9). When patterns fire (Defensive Builder, Generative Builder — *Parallel Lives is removed per the post-revision §9*), they render in their assigned surfaces — Closing Read kicker for Defensive Builder, Path · Gait card kicker for Generative Builder. Movement read does NOT read pattern fires; it reads geometry directly off `adjusted_goal` and `adjusted_soul`.
+
+This independence is intentional. Patterns are categorical (fires or doesn't); Movement is continuous (an angle and a length). Compositing them in either direction collapses information.
+
+### 13.10 Visual plot — ships in CC-A (post-revision)
+
+The 2×2 visual plot is **part of the Goal/Soul Dashboard CC** (the next CC, no longer deferred). The plot specification is in §13.4a. Earlier draft of this section deferred the visual to a follow-up CC; that decision is reversed per the post-CC-070 canon revision — the dashboard surface is incomplete without the visual.
+
+Implementation notes (carried from CC-070's recommendations for the visual plot):
+- Hand-rolled SVG, ~80 lines. Recharts/Chart.js are overkill for one line + axis pair + labels.
+- 90° arc only — Goal and Soul are positive composites, so only the first quadrant of the (line origin) coordinate plane is needed.
+- Square 1:1 aspect ratio (CSS `aspect-ratio: 1 / 1` on the wrapper).
+- Mobile breakpoint: full-width up to ~360px square; tablet/desktop: 320–400px.
+- Special render for length=0: dot at origin, no line, label "the line has not yet been drawn" (matches the Neutral/Transition render).
+- Special render for low confidence: line at 50% opacity with a "thin signal" annotation rather than a degree label.
+
+### 13.11 Movement-specific guardrails
+
+In addition to §12 general guardrails, the Movement layer adds:
+
+- **Do NOT moralize on a short Movement Strength.** A short line reflects a moment, not a person. A short Movement Strength at age 22 is not a verdict; a short one at age 60 describes a posture, not a worth.
+- **Do NOT prescribe specific Direction values by demographic.** The trajectory thesis is direction (the angle should rise; Movement Strength should grow), not a target. *"You should be at 35°"* is therapy register and is forbidden.
+- **Do NOT collapse the Movement narrative into the dashboard or into Closing Read.** The dashboard, the Movement narrative, and Closing Read are three reads with three registers; each carries its own work.
+- **Do NOT render Movement narrative prose with engine-layer words.** *Goal*, *Soul*, *Vulnerability*, *Direction*, *Movement Strength*, *Gripping Pull* are dashboard-surface labels — they appear in the dashboard data block but NOT in the narrative prose below it. Narrative prose uses the geometric / motion / warmer registers.
+- **Do NOT speak both forward-projection and observed-trajectory simultaneously.** Until repeat assessments exist, Movement read speaks only forward-projection. When trajectory data lands, the read shifts; it does not become both.
+- **Tough-love has a floor.** *Honest companionship* is the register; cruelty is not. *"Your Movement Strength is low — show up for your own life"* is editorial overreach. *"The line is short right now, and the work is to lengthen it through motion that contacts what you actually love"* is in-register.
+- **Vulnerability is named in narrative prose as a growable quality, never as a number.** *"Vulnerability would lift this"*, *"the next move is the willingness to be seen"*, *"openness is what makes the line rise"* — all in-register. *"Your Vulnerability score is 22"* is forbidden — Vulnerability is engine-internal and never appears as a numeric field.
+- **The 20°–44° angle band carries an affirmation rule.** Per §13.5b, when a user lands in this productive-NE-movement band with meaningful length, the prose's first sentence names the position honestly (out of Gripping, both axes active, lift toward Giving has started) BEFORE any prescription. Skipping the affirmation in this band is editorial overreach — the user has earned the position; the prose says so.
+- **Soul-lift practices in 20°–44° prose are canonical, not optional.** Per §13.5b, one or two of the five practices appear in the bridge sentence(s); selecting which is signal-driven, not decorative.
+
+---
+
+## 14. OCEAN Integration (cross-reference to ocean-disposition-spec.md)
+
+OCEAN/Disposition is a **disposition layer**, not an identity layer. It sits below the Goal/Soul/Give synthesis in the report's hierarchy: Body Map → Goal/Soul/Give synthesis → OCEAN/Disposition → Applied Maps. Big Five trait readings translate and color the deeper outputs; they never stand alone as a personality verdict and never lead the report.
+
+Full architecture in `docs/ocean-disposition-spec.md`. The cross-references below summarize how each trait modifies the Goal/Soul read; deeper rules (composition, render canon, subdimensions, register interpretation) live in the OCEAN memo.
+
+- **Conscientiousness × Goal.** High Conscientiousness strengthens the Work-line — the disposition channel through which productive motion gets organized, sustained, and finished. Risk: high Conscientiousness with thin Soul can entrench Striving.
+- **Openness × Soul** (and **Architectural Openness × Goal+Soul integration**). Non-architectural Openness (Intellectual, Aesthetic, Novelty) tends to feed Soul. Architectural Openness — disciplined imagination that resolves into structure — sits at the integration point and strongly corroborates the Generative Builder pattern.
+- **Extraversion × Soul visibility.** Low Extraversion can make a strong Love-line invisible to others — the user reads as Goal-leaning on the dashboard even with strong raw Soul, because the Vulnerability lift is what makes Soul-line activity visible enough to score.
+- **Agreeableness × Soul interpretation.** High Agreeableness with high Soul typically reads as protective care, loyalty, and service. Low Agreeableness with high Soul can read as moral conviction, cause-driven service, or loyalty to truth/justice over relational accommodation. **In this instrument the Agreeableness signal predominantly expresses as loyalty/service/moral concern, not accommodation/social softness** — render canon §4 of the OCEAN memo is binding.
+- **Emotional Reactivity × pressure response.** Low Emotional Reactivity can preserve steadiness under cost but may also conceal grief, longing, tenderness, or need. The Weather/Fire body-map cards already read pressure response; OCEAN adds the dispositional layer.
+
+Render integration is implemented per the OCEAN memo §7–§8 composition rules and is **out of scope for the CC-067 → CC-070 chain**. OCEAN-side CCs follow once the Goal/Soul/Give chain settles.
 
 ---
 
@@ -432,7 +770,7 @@ This memo should be treated as a prompt architecture source. It enables five pro
 
 1. **Derivation prompts** — compute Goal, Soul, Vulnerability, quadrant, confidence, and evidence.
 2. **Narrative prompts** — render the closing Purpose section using Work/Love/Give language.
-3. **Pattern prompts** — detect Generative Builder, Parallel Lives, Defensive Builder, and future synthesis patterns.
+3. **Pattern prompts** — detect Generative Builder, Defensive Builder, and future synthesis patterns.
 4. **Audit prompts** — test for overreach, especially false Gripping, Compliance-as-fear, and low-signal misreads.
 5. **Calibration prompts** — compare test reports and determine whether the quadrant placement feels earned.
 
@@ -440,7 +778,7 @@ Prompt writers should preserve this hierarchy:
 
 - **Engine layer:** Goal / Soul / Vulnerability.
 - **Narrative layer:** Work / Love / Give.
-- **Report layer:** Purpose, Striving, Longing, Gripping, Parallel Lives, or Neutral / Transition.
+- **Report layer:** Purpose/Giving, Goal-leaning, Soul-leaning, Gripping, or Neutral / Transition.
 - **Guardrail layer:** do not over-diagnose, do not moralize low signal, and prefer synthesis reads when supported.
 
 ### Prompt-family-to-roadmap mapping
@@ -463,7 +801,7 @@ A future CC chain to implement this would proceed roughly as:
 
 1. **CC-A (derivation only):** implement Goal/Soul/Vulnerability composites against existing signals; validate quadrant placement on test sessions; render placeholder closing narratives. No new questions.
 2. **CC-B (motive disambiguation):** add Q-Purpose-Building, five new `building_motive_*` signals, drive-bucket tags. Update `data/questions.ts`, `lib/types.ts`, `lib/drive.ts`. Update the question-bank xlsx (v4).
-3. **CC-C (pattern catalog):** add Generative Builder, Defensive Builder, Parallel Lives patterns to the catalog. Wire into Path · Gait kicker.
+3. **CC-C (pattern catalog):** add Generative Builder and Defensive Builder patterns to the catalog. Wire into Path · Gait kicker.
 4. **CC-D (closing narrative):** author the final Purpose section render. Pull canon language from this memo. Ensure synthesis reads land warmer than contradiction reads.
 
 Each CC should be authored in chat with full guardrails per AGENTS.md (Launch Directive, Execution Directive, Bash Commands, Read First, Allowed-to-Modify, Out of Scope, Acceptance Criteria, Report Back).

@@ -408,6 +408,13 @@ export type PathOutput = {
   // signal map. Pre-CC-026 saved sessions that lack Q-3C1 still render the
   // distribution from existing inputs (case will be "unstated").
   drive?: DriveOutput;
+  // CC-SYNTHESIS-3 — LLM-articulated Path master synthesis paragraph,
+  // pulled from `lib/cache/synthesis3-paragraphs.json` at engine-build
+  // time. When present, the renderer prefers this paragraph over the
+  // mechanical CC-SYNTHESIS-1F composer output (`composePathMasterSynthesis`).
+  // Null when no cached paragraph exists for the fixture's input hash —
+  // renderer falls back to the mechanical version.
+  masterSynthesisLlm?: string | null;
 };
 
 // CC-026 — Drive framework (claimed-vs-revealed why-axis).
@@ -431,13 +438,29 @@ export type DriveRanking = {
   third: DriveBucket;
 };
 
-export type DriveDistribution = {
+/**
+ * DriveMix — Cost/Coverage/Compliance as relative emphasis, summing to 100.
+ *
+ * Used for: pie-chart rendering ("you're 40% Cost, 35% Coverage, 25%
+ * Compliance"). NOT used for interpretive math, lean classifiers, or
+ * Aim composition — those consume `DriveStrengths` (independent 0-100
+ * substance scores) per canon §10.
+ *
+ * Per canon — `docs/canon/trajectory-model-refinement.md` §10.
+ */
+export type DriveMix = {
   cost: number; // 0–100, summing with coverage + compliance to 100
   coverage: number;
   compliance: number;
   rankAware: boolean;
   inputCount: { cost: number; coverage: number; compliance: number };
 };
+
+/**
+ * Backward-compat alias — preserved until consumers migrate. Per canon
+ * §10 the canonical name is `DriveMix`.
+ */
+export type DriveDistribution = DriveMix;
 
 export type DriveCase =
   | "aligned"
@@ -452,6 +475,35 @@ export type DriveOutput = {
   claimed?: DriveRanking; // present when Q-3C1 was answered
   case: DriveCase;
   prose: string; // case-specific interpretation paragraph
+  // CC-3CS-STRENGTH-MIX-AXIS-ALIGNMENT — independent 0-100 substance
+  // scores for the three buckets. Cost couples to Goal-axis substance,
+  // Coverage to Soul-axis, Compliance to wise-risk substance. Optional
+  // because the field is attached AFTER the existing Drive computation
+  // (which runs before goalSoulGive) — pre-CC saved sessions don't
+  // carry the field.
+  strengths?: DriveStrengths;
+};
+
+/**
+ * DriveStrengths — independent 0-100 substance scores. Do not sum to 100.
+ *
+ * Used for: interpretive math (lean classifiers, Aim composition,
+ * Risk Form thresholds). Distinct from `DriveMix`, which is a
+ * 100%-summing emphasis ratio used for pie-chart language only.
+ *
+ * Per canon §10 / §11. The §11 reframing names the third Strength
+ * "wise risk" (governance, discernment, restraint — not timid
+ * rule-following). The field `compliance` is preserved for backward
+ * compatibility; new code should read `wiseRisk` (always === compliance).
+ */
+export type DriveStrengths = {
+  cost: number; // 0-100 — Goal-axis substance (work, output, craft, building)
+  coverage: number; // 0-100 — Soul-axis substance (love, care, presence)
+  compliance: number; // 0-100 — wise-risk substance (governance, discernment, restraint)
+  /** CC-STRENGTH-MIGRATION-AND-STAKES-SPLIT §11 — forward-facing alias
+   *  for `compliance`. Always equal to `compliance`. New code should
+   *  prefer `wiseRisk` to reinforce the §11 semantic reframing. */
+  wiseRisk: number;
 };
 
 // CC-037 — OCEAN Derivation framework (Big-5 dimensions derived from existing
@@ -482,10 +534,100 @@ export type OceanCase =
   | "balanced"
   | "n-elevated";
 
+// CC-072 — Disposition Signal Mix (post-CC-037 reframe per
+// docs/ocean-disposition-spec.md). The pre-CC-072 `distribution`
+// (100%-summing across O/C/E/A/N) is misleading: Big Five traits are
+// independent dimensions, not slices of a fixed pie. CC-072 introduces
+// independent per-trait intensities (each 0–100, no cross-normalization),
+// plus a separate dominance ranking, four Openness subdimensions, and a
+// proxy-only flag for Emotional Reactivity. The legacy 100%-summing field
+// is retained as `signalShareLegacy` for one CC of backward-compat and
+// scheduled for removal in a follow-up CODEX (acceptance §AC-5).
+
+export type OceanIntensity = number; // 0..100
+
+export type OceanIntensityBand =
+  | "under-detected" // 0–19
+  | "low" // 20–39
+  | "moderate" // 40–59
+  | "moderate-high" // 60–79
+  | "high"; // 80–100
+
+export type OceanIntensities = {
+  openness: OceanIntensity;
+  conscientiousness: OceanIntensity;
+  extraversion: OceanIntensity;
+  agreeableness: OceanIntensity;
+  emotionalReactivity: OceanIntensity;
+};
+
+export type OceanIntensityBands = {
+  openness: OceanIntensityBand;
+  conscientiousness: OceanIntensityBand;
+  extraversion: OceanIntensityBand;
+  agreeableness: OceanIntensityBand;
+  emotionalReactivity: OceanIntensityBand;
+};
+
+// Dominance rank order across the five traits, with a per-trait signal
+// count for tie-breaking and audit transparency. `ranked[0]` is the
+// strongest signal; `ranked[4]` is the weakest.
+export type OceanDominance = {
+  ranked: OceanBucket[];
+  signalCounts: Record<OceanBucket, number>;
+};
+
+// CC-072 — Openness subdimensions (memo §3). Re-tagged from existing
+// signals; no new SignalIds added. The `flavor` field carries the
+// dashboard's lead-with-flavor sentence selector per memo §3.5.
+export type OpennessSubdimensionId =
+  | "intellectual"
+  | "aesthetic"
+  | "novelty"
+  | "architectural";
+
+export type OpennessSubdimensions = Record<OpennessSubdimensionId, OceanIntensity>;
+
+export type OpennessFlavor =
+  | "intellectual_led"
+  | "aesthetic_led"
+  | "novelty_led"
+  | "architectural_led"
+  | "mixed";
+
+// CC-072 — Emotional Reactivity proxy disclosure (memo §5). When the
+// computed intensity is exactly 0 OR signal density is below threshold,
+// `proxyOnly` is true and the user-facing render translates to "low or
+// under-detected" with the §5.2 disclosure.
+export type EmotionalReactivityConfidence = {
+  proxyOnly: boolean;
+  signalDensity: number; // count of contributing signals
+};
+
+// The dashboard payload — assembled from the OCEAN computations and
+// rendered by lib/oceanDashboard.ts.
+export type DispositionSignalMix = {
+  intensities: OceanIntensities;
+  bands: OceanIntensityBands;
+  dominance: OceanDominance;
+  opennessSubdimensions: OpennessSubdimensions;
+  opennessFlavor: OpennessFlavor;
+  emotionalReactivityConfidence: EmotionalReactivityConfidence;
+};
+
 export type OceanOutput = {
+  // CC-072 — `distribution` is the pre-CC-072 100%-summing field. Kept on
+  // the type for backward-compat with engine-internal consumers
+  // (lib/workMap.ts cross-checks, admin pages); marked deprecated for
+  // user-facing surfaces (acceptance §AC-5). The user-facing render no
+  // longer emits this field — see `dispositionSignalMix` below.
+  /** @deprecated CC-072: render `dispositionSignalMix` instead. Field retained for engine-internal cross-references; scheduled for removal in a follow-up CODEX. */
   distribution: OceanDistribution;
   case: OceanCase;
   prose: string;
+  // CC-072 — Disposition Signal Mix (independent intensities, dominance,
+  // subdimensions, ER proxy-only flag).
+  dispositionSignalMix: DispositionSignalMix;
 };
 
 // CC-042 — Work Map Derivation framework. Composes existing measurements
@@ -597,25 +739,39 @@ export type LoveMapOutput = {
   prose: string;
 };
 
-// CC-067 — Goal/Soul/Give derivation layer (CC-A of the four-CC chain in
+// CC-067 — Goal/Soul/Give derivation layer (CC-A of the chain in
 // docs/goal-soul-give-spec.md). Engine-level read of coherence between
-// outward-form (Goal) and inward-love (Soul), plus an orthogonal
-// Vulnerability vector. The narrative layer speaks Work/Love/Give plus the
-// six named regions (Give / Striving / Longing / Gripping / Parallel-Lives /
-// Neutral). Engine vocabulary (Goal / Soul / Vulnerability) appears only in
-// the evidence object and audit logs — never in user-facing prose.
+// outward-form (Goal) and inward-love (Soul). Vulnerability is computed
+// engine-internally and applied as an asymmetric lift on Goal/Soul (CC-071);
+// it is NOT a third axis the user sees and NOT exposed as a numeric score on
+// any user-facing surface (spec §12.3, §13.4a).
+//
+// CC-071 quadrant union: `parallel_lives` is removed entirely. The
+// compartmentalized high-G + high-S + thin-V case is captured by the
+// asymmetric lift suppressing `adjustedScores.soul` rather than by a
+// separate quadrant label. Spec §9 / §12.11.
 export type GoalSoulQuadrant =
   | "give"
   | "striving"
   | "longing"
   | "gripping"
-  | "parallel_lives"
   | "neutral";
 
-export type GoalSoulScores = {
+// CC-067 — engine-internal raw composite scores. Goal and Soul are the
+// 0–100 sums of the §7 weighted predicates; vulnerability is the
+// engine-internal Z-score (clamped to [-50, +50]).
+export type GoalSoulRawScores = {
   goal: number;          // 0-100
   soul: number;          // 0-100
-  vulnerability: number; // -50 to +50
+  vulnerability: number; // -50 to +50; engine-internal only
+};
+
+// CC-071 — adjusted scores after the asymmetric lift (spec §7). These are
+// the Goal/Soul values the user sees on the dashboard and the values
+// quadrant placement reads.
+export type GoalSoulAdjustedScores = {
+  goal: number; // 0-100, post-lift
+  soul: number; // 0-100, post-lift
 };
 
 export type GoalSoulEvidence = {
@@ -626,11 +782,135 @@ export type GoalSoulEvidence = {
   confidence: "high" | "medium" | "low";
 };
 
+// CC-071 — Gripping Pull score (spec §7). Independent of quadrant placement.
+// A user can have moderate Gripping Pull (e.g., 30–50) without being in the
+// SW Gripping quadrant — they're not stuck, but the cluster is partially
+// active. Surfaced on the dashboard as a 0–100 score plus a named-signal
+// list of which signals contributed.
+export type GrippingPullSignal = {
+  id: string;          // engine-internal signal identifier
+  humanReadable: string; // user-facing plain-English label
+};
+
+export type GrippingPull = {
+  score: number; // 0..100 — LEGACY additive composition (preserved for backward compat)
+  signals: GrippingPullSignal[]; // non-empty when score > 0
+  // CC-AIM-REBUILD-MOVEMENT-LIMITER Segment 3 — Stakes ≠ Grip split.
+  // All optional because the fields are attached post-goalSoulGive in
+  // the engine chain; pre-CC saved sessions don't carry them.
+  stakesLoad?: number; // 0-100 — objective stakes (what's on the line)
+  defensiveGrip?: number; // 0-100 — subjective collapse (how stakes hijack)
+  gripAmplifier?: number; // 1.0-1.5 multiplier
+  gripFromDefensive?: number; // 0-100 — canonical multiplicative Grip
+};
+
 export type GoalSoulGiveOutput = {
-  scores: GoalSoulScores;
+  // CC-071 — `rawScores` and `adjustedScores` replace the pre-CC-071 single
+  // `scores` field. Raw scores are preserved for audit/debug; adjusted
+  // scores are what the dashboard displays and what quadrant placement
+  // reads. The asymmetric lift mapping lives in lib/goalSoulGive.ts.
+  rawScores: GoalSoulRawScores;
+  adjustedScores: GoalSoulAdjustedScores;
   quadrant: GoalSoulQuadrant;
   evidence: GoalSoulEvidence;
   prose: string;
+  // CC-071 — Gripping Pull is a separate dashboard read, computed alongside
+  // (not from) the adjusted scores. Always present (score may be 0; signals
+  // empty when score is 0).
+  grippingPull: GrippingPull;
+};
+
+// CC-070 — Cross-card pattern catalog (heuristic). Three patterns ride on
+// top of CC-067's quadrant placement: Parallel Lives (already rendered by
+// the Closing Read template, kicker exists for downstream consumers but
+// renders nothing additional); Defensive Builder (heuristic, kicker
+// appended to the Striving Closing Read at render time); Generative
+// Builder (heuristic, kicker on the Path · Gait shape card). All three
+// are derivation-only — they read existing signals, never new measurement.
+// Q-Purpose-Building / `building_motive_*` signals from spec §9 are
+// deferred to CC-B; CC-070 approximates the firing conditions with
+// existing-signal heuristics.
+// CC-071 — `parallel_lives` removed from the union. The compartmentalized
+// case is now captured by the asymmetric lift in lib/goalSoulGive.ts.
+export type CrossCardPatternId =
+  | "defensive_builder"
+  | "generative_builder";
+
+export type CrossCardPattern = {
+  id: CrossCardPatternId;
+  kickerProse: string; // empty string when the pattern carries no kicker
+  renderTarget:
+    | "closing_read_suffix"
+    | "path_gait_card"
+    | "closing_read_body";
+};
+
+export type GoalSoulPatterns = {
+  fired: CrossCardPattern[];
+};
+
+// CC-070 — Movement layer (static read for MVP, trajectory read deferred).
+// Polar transform of the Goal/Soul plane produces an angle (posture) and a
+// length (scale). The user-facing prose mixes geometric / motion / warmer
+// vocabulary registers per spec §13.6, with the geometric register as the
+// primary anchor in MVP. Demographics gate guidance language only — they
+// have ZERO impact on angle / length math (canon § demographic-rules.md
+// Rule 4). Engine vocabulary (Goal / Soul / Vulnerability) never appears
+// in `prose`; the audit enforces.
+export type MovementVocabularyRegister = "geometric" | "motion" | "warmer";
+
+export type LifeStageGate =
+  | "early_career"
+  | "mid_career"
+  | "entrepreneur"
+  | "late_career"
+  | "retirement"
+  | "unknown";
+
+// CC-071 — Movement Dashboard surface (spec §13.4a). The dashboard renders
+// the user-facing engine-vocabulary fields (Goal, Soul, Direction, Movement
+// Strength, Quadrant, Gripping Pull) above the narrative prose. Each field
+// is precomputed here so renderMirror.ts and lib/goalSoulDashboard.ts can
+// emit text + SVG without re-computing.
+export type DirectionDescriptor = "Goal-leaning" | "balanced" | "Soul-leaning";
+export type MovementStrengthDescriptor = "short" | "moderate" | "long" | "full";
+export type DashboardQuadrantLabel = "Giving" | "Gripping" | null;
+
+export type MovementDashboard = {
+  goalScore: number; // adjustedScores.goal
+  soulScore: number; // adjustedScores.soul
+  direction: {
+    angle: number; // 0..90 degrees
+    descriptor: DirectionDescriptor; // computed from angle band
+  };
+  movementStrength: {
+    length: number; // 0..100
+    descriptor: MovementStrengthDescriptor;
+  };
+  // Quadrant label is "Giving" (NE), "Gripping" (SW), or null (SE/NW
+  // unlabeled). Per spec §13.4a / acceptance §AC-19, no other label is
+  // emitted (no "Goal-leaning" / "Striving" as a label — those are
+  // descriptors, not categorical labels).
+  quadrantLabel: DashboardQuadrantLabel;
+  grippingPull: GrippingPull;
+  // CC-AIM-REBUILD-MOVEMENT-LIMITER Segment 4 — Movement Limiter.
+  // Attached post-Aim-computation. Optional because pre-CC saved
+  // sessions don't carry it.
+  movementLimiter?: import("./movementLimiter").UsableMovementReading;
+};
+
+export type MovementOutput = {
+  angle: number; // 0..90 degrees (mirrors dashboard.direction.angle)
+  length: number; // 0..100 normalized (mirrors dashboard.movementStrength.length)
+  anchorRegister: MovementVocabularyRegister;
+  prose: string; // narrative prose only — does NOT restate dashboard numbers
+  evidence: {
+    lifeStageGate: LifeStageGate;
+    confidence: "high" | "medium" | "low";
+  };
+  // CC-071 — dashboard surface. Always populated; renderMirror.ts emits
+  // both the dashboard text block and the SVG plot from this object.
+  dashboard: MovementDashboard;
 };
 
 export type ShapeOutputs = {
@@ -786,6 +1066,90 @@ export type InnerConstitution = {
   // saved sessions don't carry the field; `computeGoalSoulGive` returns
   // undefined when input signals are insufficient.
   goalSoulGive?: GoalSoulGiveOutput;
+  // CC-070 addition — cross-card pattern catalog (heuristic, no new signals).
+  // Optional; `detectGoalSoulPatterns` returns undefined when no quadrant
+  // is available or no pattern fires.
+  goalSoulPatterns?: GoalSoulPatterns;
+  // CC-070 addition — Movement layer (polar geometry off Goal/Soul scores
+  // with life-stage-gated guidance). Optional; `computeMovement` returns
+  // undefined when no goalSoulGive is available.
+  goalSoulMovement?: MovementOutput;
+  // CC-SYNTHESIS-1A Addition 1 — Risk Form 2x2 reading. Cross-tabulates
+  // Drive distribution.compliance bucket against grippingPull score.
+  // Optional because pre-CC-SYNTHESIS-1A saved sessions don't carry the
+  // field, and computation is silently skipped when goalSoulMovement is
+  // unavailable (no grip score to read).
+  riskForm?: import("./riskForm").RiskFormReading;
+  // CC-SYNTHESIS-1A Addition 2 — four-quadrant Movement label. Replaces
+  // the prior `goalSoulMovement.dashboard.quadrantLabel` two-state
+  // ("Giving" / "Gripping" / null) on the user-facing Quadrant line with
+  // one of four canonical labels keyed off the (Goal, Soul) plane.
+  // Optional for the same backward-compat reason.
+  movementQuadrant?: import("./movementQuadrant").MovementQuadrantReading;
+  // CC-GRIP-TAXONOMY — Primal cluster derivation. Maps the named grips
+  // in `goalSoulMovement.dashboard.grippingPull.signals` onto the 7
+  // Primal Questions (Am I safe / secure / loved / wanted / successful
+  // / good enough / have purpose). Optional because pre-CC saved
+  // sessions don't carry the field, AND because zero-grip users get a
+  // low-confidence cluster with `primary: null`.
+  gripTaxonomy?: import("./gripTaxonomy").PrimalCluster;
+  // CC-GRIP-TAXONOMY — LLM-articulated Grip section paragraph from the
+  // build-time cache. Same lifecycle as `path.masterSynthesisLlm`:
+  // populated when the input hash matches a cache entry; runtime
+  // fallback fills via `/api/grip/paragraph` when the static cache
+  // misses (server-only API call). Null on any failure → renderer
+  // falls back to the engine's generic prose.
+  gripParagraphLlm?: string | null;
+  // CC-PRIMAL-COHERENCE — two-path framework gating. Computes the gap
+  // between the user's actual Goal/Soul scores and the expected profile
+  // for their dominant Primal Question, then classifies path as
+  // `trajectory` (50° framework holds) or `crisis` (frame breaks).
+  // Optional because: (1) pre-CC saved sessions don't carry the field,
+  // and (2) computation requires both gripTaxonomy + goalSoulMovement,
+  // so thin-signal sessions silently fall through.
+  coherenceReading?: import("./primalCoherence").CoherenceReading;
+  // CC-AGE-CALIBRATION — developmental-band reading. Optional: null when
+  // age data is missing or below the 14-year-old floor.
+  bandReading?: import("./ageCalibration").BandReading | null;
+  // CC-AGE-CALIBRATION — flag set when age < 14 (instrument is not
+  // appropriate). Future render-layer CC may surface a different report.
+  tooYoungForInstrument?: boolean;
+  // CC-AIM-CALIBRATION — Aim composite (0-100) and the Aim-based Risk
+  // Form reading. Both optional because: (1) pre-CC saved sessions don't
+  // carry the fields; (2) Aim requires drive + movement + conviction
+  // inputs, which may be absent on thin-signal sessions.
+  aimReading?: import("./aim").AimReading;
+  riskFormFromAim?: import("./riskForm").RiskFormReading;
+  // CC-AIM-REBUILD-MOVEMENT-LIMITER Segment 1 — Phase 2 derivations.
+  // Each optional; thin-signal fixtures may not have the prerequisite
+  // inputs (e.g., missing goalSoulMovement for coherence).
+  convictionClarity?: import("./convictionClarity").ConvictionClarityReading;
+  goalSoulCoherence?: import("./goalSoulCoherence").GoalSoulCoherenceReading;
+  responsibilityIntegration?: import("./responsibilityIntegration").ResponsibilityIntegrationReading;
+  // CC-AIM-REBUILD-MOVEMENT-LIMITER Segment 2 — legacy Aim reading
+  // preserved for cohort comparison. Phase 3 will switch downstream
+  // consumers to the new Aim formula.
+  aimReadingLegacy?: import("./aim").AimReadingLegacy;
+  // CC-STRENGTH-MIGRATION-AND-STAKES-SPLIT §13 — canonical multiplicative
+  // Grip reading. score = defensiveGrip × StakesAmplifier (gated by the
+  // defensive-grip floor). Distinct from the legacy additive
+  // `grippingPull.score`, which is preserved for backward compatibility.
+  gripReading?: import("./gripDecomposition").GripReading;
+  // CC-SHAPE-AWARE-PROSE-ROUTING — three-profile canon classification
+  // (jasonType / cindyType / danielType / unmappedType). Routes prose
+  // template selection so non-architect shapes get appropriate
+  // appendix / Closing Read / gift labels / growth edges.
+  profileArchetype?: import("./profileArchetype").ArchetypeReading;
+  // CC-GRIP-TAXONOMY-REPLACEMENT — proprietary Grip Pattern reading.
+  // Replaces Foster's "Primal Question" framework in user-facing prose.
+  // The engine-internal Primal computation on `gripTaxonomy.primary`
+  // remains for cache stability + as a classifier input; this field is
+  // what renders.
+  gripPattern?: import("./gripPattern").GripPatternReading;
+  // CC-HANDS-CARD — 9th body card: Hands / Work. Existential Goal-axis
+  // expression with a dual-mode read (health register vs pressure
+  // register). Distinct from the Work Map vocational appendix.
+  handsCard?: import("./handsCard").HandsCardReading;
 };
 
 // CC-021a — Admin-surface types for the researcher UI. These describe API

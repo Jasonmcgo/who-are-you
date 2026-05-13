@@ -22,6 +22,16 @@ import type {
 import Ranking from "./components/Ranking";
 import QuestionShell from "./components/QuestionShell";
 import InnerConstitutionPage from "./components/InnerConstitutionPage";
+// CODEX-SYNTHESIS-3-RUNTIME-FALLBACK — augment constitution with LLM
+// Path master synthesis paragraph via the server-side API endpoint.
+// Cache hits pass through; cache misses fire one API call per fresh
+// shape.
+import { useLlmMasterSynthesis } from "../lib/synthesis3LlmClient";
+// CC-GRIP-TAXONOMY — sibling hook to useLlmMasterSynthesis. Fetches the
+// Grip section LLM paragraph from /api/grip/paragraph (server-only)
+// when the static cache misses. Pass-through for cached / low-
+// confidence shapes.
+import { useGripParagraph } from "../lib/gripTaxonomyLlmClient";
 import IdentityAndContextPage from "./components/IdentityAndContextPage";
 import { saveSession } from "../lib/saveSession";
 import type { DemographicAnswer } from "../lib/types";
@@ -557,13 +567,36 @@ export default function Home() {
   // reaches identity_context or result). It's needed during commitSave
   // (which fires from identity_context) so the engine runs at the
   // identity_context boundary, not at result.
+  //
+  // CC-071 — thread demographics into buildInnerConstitution so the
+  // Movement layer can derive a life-stage-gated guidance sentence.
+  // `submittedDemographics` is `DemographicAnswer[] | null`; the engine
+  // expects `DemographicSet | null` (the wrapper shape declared in
+  // lib/types.ts), so wrap before passing. When demographics aren't yet
+  // collected (the user is still in the test phase), pass `null`
+  // explicitly so the lifeStageGate falls back to 'unknown'.
   const constitution = useMemo(
     () =>
       phase === "identity_context" || phase === "result"
-        ? buildInnerConstitution(answers, metaSignals)
+        ? buildInnerConstitution(
+            answers,
+            metaSignals,
+            submittedDemographics
+              ? { answers: submittedDemographics }
+              : null
+          )
         : null,
-    [phase, answers, metaSignals]
+    [phase, answers, metaSignals, submittedDemographics]
   );
+  // CODEX-SYNTHESIS-3-RUNTIME-FALLBACK — augment with LLM Path master
+  // synthesis. Pass-through when the static cache already produced a
+  // paragraph; otherwise fetches from /api/synthesis3/master-paragraph
+  // (server-side) and re-renders when the response arrives.
+  const synthesisAugmented = useLlmMasterSynthesis(constitution);
+  // CC-GRIP-TAXONOMY — sibling augment for the Grip section. Fires in
+  // parallel with the path master synthesis fetch; both responses get
+  // spliced into the constitution as they arrive.
+  const augmentedConstitution = useGripParagraph(synthesisAugmented);
 
   function restart() {
     setCurrent(0);
@@ -665,9 +698,14 @@ export default function Home() {
   }
 
   if (phase === "result" && constitution) {
+    // CODEX-SYNTHESIS-3-RUNTIME-FALLBACK — pass the augmented
+    // constitution (which has the LLM Path master synthesis paragraph
+    // spliced in when available) so the renderer prefers the warm
+    // articulation over the mechanical fallback.
+    const renderConstitution = augmentedConstitution ?? constitution;
     return (
       <InnerConstitutionPage
-        constitution={constitution}
+        constitution={renderConstitution}
         confirmations={confirmations}
         setConfirmations={setConfirmations}
         explainOpen={explainOpen}

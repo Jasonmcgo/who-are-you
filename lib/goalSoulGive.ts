@@ -32,10 +32,13 @@
 
 import type {
   Answer,
+  GoalSoulAdjustedScores,
   GoalSoulEvidence,
   GoalSoulGiveOutput,
   GoalSoulQuadrant,
-  GoalSoulScores,
+  GoalSoulRawScores,
+  GrippingPull,
+  GrippingPullSignal,
   Signal,
   SignalId,
 } from "./types";
@@ -80,13 +83,132 @@ export const VULNERABILITY_WEIGHTS = {
   inversePenalty: 15, // subtracted, capped at this magnitude
 } as const;
 
+// ── CC-Q2 — Direct-measurement weights (Q-GS1 / Q-V1 / Q-GRIP1) ────────
+//
+// Q-GS1 / Q-V1 / Q-GRIP1 add direct measurement to the composites that
+// CC-067/CC-068/CC-077 derived from indirect signals. These constants
+// govern how strongly each direct signal lifts (or suppresses) its
+// composite. Values chosen so a single direct signal moves intensity by
+// "small but visible" amounts; full top-3 / top-2 ranking moves
+// composites by a meaningful but not dominating fraction. Per spec
+// Out-of-Scope §4 the asymmetric lift constants (GOAL_LIFT_BASE etc.)
+// stay canon-locked; the new signals add inputs to raw_goal / raw_soul /
+// vulnerability, not change the curve.
+export const DIRECT_GOAL_BONUS = {
+  // Q-GS1 direct goal-coded items.
+  goalCompletionTop1: 6,
+  goalCompletionTop3: 3,
+  durableCreationTop1: 5,
+  durableCreationTop3: 2,
+  // Q-V1 — explaining-not-naming reads as a mild Goal lift (logic register).
+  goalLogicExplanationTop1: 3,
+  goalLogicExplanationTop2: 1,
+} as const;
+
+export const DIRECT_SOUL_BONUS = {
+  // Q-GS1 direct soul-coded items.
+  soulPeopleTop1: 6,
+  soulPeopleTop3: 3,
+  soulCallingTop1: 6,
+  soulCallingTop3: 3,
+  creativeTruthTop1: 4,
+  creativeTruthTop3: 2,
+  // Q-GS1 durable_creation also lifts Soul (synthesis with Goal).
+  durableCreationTop1: 3,
+  durableCreationTop3: 1,
+  // Q-V1 strong direct lift — naming the beloved is the canonical Soul tell.
+  soulBelovedNamedTop1: 10,
+  soulBelovedNamedTop2: 6,
+} as const;
+
+export const DIRECT_VULNERABILITY_BONUS = {
+  // Q-V1 positive register.
+  vulnerabilityOpenUncertaintyTop1: 12,
+  vulnerabilityOpenUncertaintyTop2: 7,
+  sacredBeliefConnectionTop1: 8,
+  sacredBeliefConnectionTop2: 4,
+  // Naming-as-vulnerability — soul_beloved_named lifts Vulnerability mildly
+  // alongside its strong Soul lift.
+  soulBelovedNamedTop1: 5,
+  soulBelovedNamedTop2: 2,
+  // Q-V1 negative register (suppression).
+  vulnerabilityDeflectionTop1: -10,
+  vulnerabilityDeflectionTop2: -5,
+  performanceIdentityTop1: -6,
+  performanceIdentityTop2: -3,
+  goalLogicExplanationTop1: -3,
+  goalLogicExplanationTop2: -1,
+} as const;
+
+export const DIRECT_GRIPPING_PULL_BONUS = {
+  // Each Q-GRIP1 grips_* signal contributes per rank tier; total capped
+  // at `gripsCap` so a user gripping every option doesn't saturate.
+  gripsTop1: 8,
+  gripsTop2: 5,
+  gripsTop3: 3,
+  gripsRank4Plus: 1,
+  gripsCap: 25,
+  // Q-GS1 gripping_proof_signal — the proving-capability register feeds
+  // the Gripping cluster mildly.
+  grippingProofTop1: 5,
+  grippingProofTop2OrTop3: 2,
+  // Q-V1 performance_identity — points-at-output reads as a mild grip.
+  performanceIdentityTop1: 4,
+  performanceIdentityTop2: 2,
+} as const;
+
 // ── Threshold constants ─────────────────────────────────────────────────
 
 export const GOAL_HIGH_THRESHOLD = 50;
 export const SOUL_HIGH_THRESHOLD = 50;
+// CC-067 used VULNERABILITY_SUFFICIENT_THRESHOLD = 0 to gate quadrant
+// placement (NE Give vs Parallel Lives). CC-071 removes parallel_lives;
+// the asymmetric lift (below) handles the gating implicitly. Constant
+// kept for `grippingClusterFires` which still uses it as a "Vulnerability
+// net-negative" sentinel.
 export const VULNERABILITY_SUFFICIENT_THRESHOLD = 0;
 export const MIN_SIGNALS_FOR_OUTPUT = 8;
 export const HIGH_CONFIDENCE_SIGNAL_COUNT = 12;
+
+// ── CC-071 — Asymmetric lift constants (spec §7) ────────────────────────
+//
+// Vulnerability lifts and suppresses Goal and Soul ASYMMETRICALLY. Soul
+// gets a much larger lift coefficient than Goal — this encodes the canon
+// that Vulnerability gates the love-line more than it gates productive
+// motion. A high-output builder with thin Vulnerability keeps a strong
+// Goal score; their Soul score reflects the integration gap.
+//
+// Tunables. The 0.85/0.30 (Goal) and 0.60/0.80 (Soul) constants are
+// exported so downstream calibration CCs can re-validate them against
+// real cohort data; the asymmetry itself is canon-locked. At
+// vulnerability_composite = 0 (neutral), both lift factors equal 1 and
+// adjusted == raw (acceptance §AC-7).
+
+export const GOAL_LIFT_BASE = 0.85;
+export const GOAL_LIFT_RANGE = 0.30; // multiplied by vulnerability_normalized
+export const SOUL_LIFT_BASE = 0.60;
+export const SOUL_LIFT_RANGE = 0.80;
+
+// vulnerability_normalized = (vulnerability_composite + 50) / 100, clamped
+// to [0, 1]. Helper for both lift application and audit.
+export function normalizeVulnerability(vulnerability: number): number {
+  const raw = (vulnerability + 50) / 100;
+  return Math.max(0, Math.min(1, raw));
+}
+
+export function applyAsymmetricLift(
+  rawGoal: number,
+  rawSoul: number,
+  vulnerability: number
+): GoalSoulAdjustedScores {
+  const vNorm = normalizeVulnerability(vulnerability);
+  const goalLift = GOAL_LIFT_BASE + GOAL_LIFT_RANGE * vNorm;
+  const soulLift = SOUL_LIFT_BASE + SOUL_LIFT_RANGE * vNorm;
+  return {
+    goal: Math.round(Math.max(0, Math.min(100, rawGoal * goalLift))),
+    soul: Math.round(Math.max(0, Math.min(100, rawSoul * soulLift))),
+  };
+}
 
 // ── Helper: signal lookup by id ─────────────────────────────────────────
 
@@ -257,6 +379,52 @@ function computeGoalScore(
     drivers.push("Q-P1/P2: high conviction");
   }
 
+  // (9) CC-Q2 — Q-GS1 direct goal-coded signals.
+  const goalCompletionRank = rankOfSignalFromQuestion(
+    signals,
+    "goal_completion_signal",
+    "Q-GS1"
+  );
+  if (goalCompletionRank !== undefined) {
+    if (goalCompletionRank === 1) {
+      score += DIRECT_GOAL_BONUS.goalCompletionTop1;
+      drivers.push("Q-GS1: goal_completion_signal top-1");
+    } else if (goalCompletionRank <= 3) {
+      score += DIRECT_GOAL_BONUS.goalCompletionTop3;
+      drivers.push(`Q-GS1: goal_completion_signal rank ${goalCompletionRank}`);
+    }
+  }
+  const durableCreationGoalRank = rankOfSignalFromQuestion(
+    signals,
+    "durable_creation_signal",
+    "Q-GS1"
+  );
+  if (durableCreationGoalRank !== undefined) {
+    if (durableCreationGoalRank === 1) {
+      score += DIRECT_GOAL_BONUS.durableCreationTop1;
+      drivers.push("Q-GS1: durable_creation_signal top-1 (goal lift)");
+    } else if (durableCreationGoalRank <= 3) {
+      score += DIRECT_GOAL_BONUS.durableCreationTop3;
+      drivers.push(
+        `Q-GS1: durable_creation_signal rank ${durableCreationGoalRank} (goal lift)`
+      );
+    }
+  }
+  // (10) CC-Q2 — Q-V1 mild Goal lift on goal_logic_explanation. The
+  // explaining-not-naming register reads as logic-register Goal-coded.
+  const goalLogicRank = rankOfSignalFromQuestion(
+    signals,
+    "goal_logic_explanation",
+    "Q-V1"
+  );
+  if (goalLogicRank === 1) {
+    score += DIRECT_GOAL_BONUS.goalLogicExplanationTop1;
+    drivers.push("Q-V1: goal_logic_explanation top-1");
+  } else if (goalLogicRank === 2) {
+    score += DIRECT_GOAL_BONUS.goalLogicExplanationTop2;
+    drivers.push("Q-V1: goal_logic_explanation top-2");
+  }
+
   return { score: Math.round(Math.min(100, Math.max(0, score))), drivers };
 }
 
@@ -385,6 +553,74 @@ function computeSoulScore(
     );
   }
 
+  // (8) CC-Q2 — Q-GS1 direct soul-coded signals.
+  const soulPeopleRank = rankOfSignalFromQuestion(
+    signals,
+    "soul_people_signal",
+    "Q-GS1"
+  );
+  if (soulPeopleRank === 1) {
+    score += DIRECT_SOUL_BONUS.soulPeopleTop1;
+    drivers.push("Q-GS1: soul_people_signal top-1");
+  } else if (soulPeopleRank !== undefined && soulPeopleRank <= 3) {
+    score += DIRECT_SOUL_BONUS.soulPeopleTop3;
+    drivers.push(`Q-GS1: soul_people_signal rank ${soulPeopleRank}`);
+  }
+  const soulCallingRank = rankOfSignalFromQuestion(
+    signals,
+    "soul_calling_signal",
+    "Q-GS1"
+  );
+  if (soulCallingRank === 1) {
+    score += DIRECT_SOUL_BONUS.soulCallingTop1;
+    drivers.push("Q-GS1: soul_calling_signal top-1");
+  } else if (soulCallingRank !== undefined && soulCallingRank <= 3) {
+    score += DIRECT_SOUL_BONUS.soulCallingTop3;
+    drivers.push(`Q-GS1: soul_calling_signal rank ${soulCallingRank}`);
+  }
+  const creativeTruthRank = rankOfSignalFromQuestion(
+    signals,
+    "creative_truth_signal",
+    "Q-GS1"
+  );
+  if (creativeTruthRank === 1) {
+    score += DIRECT_SOUL_BONUS.creativeTruthTop1;
+    drivers.push("Q-GS1: creative_truth_signal top-1");
+  } else if (creativeTruthRank !== undefined && creativeTruthRank <= 3) {
+    score += DIRECT_SOUL_BONUS.creativeTruthTop3;
+    drivers.push(`Q-GS1: creative_truth_signal rank ${creativeTruthRank}`);
+  }
+  const durableCreationSoulRank = rankOfSignalFromQuestion(
+    signals,
+    "durable_creation_signal",
+    "Q-GS1"
+  );
+  if (durableCreationSoulRank === 1) {
+    score += DIRECT_SOUL_BONUS.durableCreationTop1;
+    drivers.push("Q-GS1: durable_creation_signal top-1 (soul lift)");
+  } else if (
+    durableCreationSoulRank !== undefined &&
+    durableCreationSoulRank <= 3
+  ) {
+    score += DIRECT_SOUL_BONUS.durableCreationTop3;
+    drivers.push(
+      `Q-GS1: durable_creation_signal rank ${durableCreationSoulRank} (soul lift)`
+    );
+  }
+  // (9) CC-Q2 — Q-V1 strong direct Soul lift on soul_beloved_named.
+  const belovedNamedRank = rankOfSignalFromQuestion(
+    signals,
+    "soul_beloved_named",
+    "Q-V1"
+  );
+  if (belovedNamedRank === 1) {
+    score += DIRECT_SOUL_BONUS.soulBelovedNamedTop1;
+    drivers.push("Q-V1: soul_beloved_named top-1");
+  } else if (belovedNamedRank === 2) {
+    score += DIRECT_SOUL_BONUS.soulBelovedNamedTop2;
+    drivers.push("Q-V1: soul_beloved_named top-2");
+  }
+
   return { score: Math.round(Math.min(100, Math.max(0, score))), drivers };
 }
 
@@ -496,6 +732,82 @@ function computeVulnerabilityScore(
     drivers.push(`Pressure-adaptation penalty: ${inversePresent.join(", ")}`);
   }
 
+  // (7) CC-Q2 — Q-V1 direct Vulnerability register signals.
+  const openUncertaintyRank = rankOfSignalFromQuestion(
+    signals,
+    "vulnerability_open_uncertainty",
+    "Q-V1"
+  );
+  if (openUncertaintyRank === 1) {
+    positive += DIRECT_VULNERABILITY_BONUS.vulnerabilityOpenUncertaintyTop1;
+    drivers.push("Q-V1: vulnerability_open_uncertainty top-1");
+  } else if (openUncertaintyRank === 2) {
+    positive += DIRECT_VULNERABILITY_BONUS.vulnerabilityOpenUncertaintyTop2;
+    drivers.push("Q-V1: vulnerability_open_uncertainty top-2");
+  }
+  const sacredBeliefRank = rankOfSignalFromQuestion(
+    signals,
+    "sacred_belief_connection",
+    "Q-V1"
+  );
+  if (sacredBeliefRank === 1) {
+    positive += DIRECT_VULNERABILITY_BONUS.sacredBeliefConnectionTop1;
+    drivers.push("Q-V1: sacred_belief_connection top-1");
+  } else if (sacredBeliefRank === 2) {
+    positive += DIRECT_VULNERABILITY_BONUS.sacredBeliefConnectionTop2;
+    drivers.push("Q-V1: sacred_belief_connection top-2");
+  }
+  // soul_beloved_named lifts Vulnerability mildly (naming is a vulnerability act).
+  const belovedNamedVRank = rankOfSignalFromQuestion(
+    signals,
+    "soul_beloved_named",
+    "Q-V1"
+  );
+  if (belovedNamedVRank === 1) {
+    positive += DIRECT_VULNERABILITY_BONUS.soulBelovedNamedTop1;
+    drivers.push("Q-V1: soul_beloved_named top-1 (vulnerability lift)");
+  } else if (belovedNamedVRank === 2) {
+    positive += DIRECT_VULNERABILITY_BONUS.soulBelovedNamedTop2;
+    drivers.push("Q-V1: soul_beloved_named top-2 (vulnerability lift)");
+  }
+  // Negative register — deflection / performance / explaining-not-naming.
+  const deflectionRank = rankOfSignalFromQuestion(
+    signals,
+    "vulnerability_deflection",
+    "Q-V1"
+  );
+  if (deflectionRank === 1) {
+    positive += DIRECT_VULNERABILITY_BONUS.vulnerabilityDeflectionTop1;
+    drivers.push("Q-V1: vulnerability_deflection top-1 (suppression)");
+  } else if (deflectionRank === 2) {
+    positive += DIRECT_VULNERABILITY_BONUS.vulnerabilityDeflectionTop2;
+    drivers.push("Q-V1: vulnerability_deflection top-2 (suppression)");
+  }
+  const perfIdentityRank = rankOfSignalFromQuestion(
+    signals,
+    "performance_identity",
+    "Q-V1"
+  );
+  if (perfIdentityRank === 1) {
+    positive += DIRECT_VULNERABILITY_BONUS.performanceIdentityTop1;
+    drivers.push("Q-V1: performance_identity top-1 (suppression)");
+  } else if (perfIdentityRank === 2) {
+    positive += DIRECT_VULNERABILITY_BONUS.performanceIdentityTop2;
+    drivers.push("Q-V1: performance_identity top-2 (suppression)");
+  }
+  const goalLogicVRank = rankOfSignalFromQuestion(
+    signals,
+    "goal_logic_explanation",
+    "Q-V1"
+  );
+  if (goalLogicVRank === 1) {
+    positive += DIRECT_VULNERABILITY_BONUS.goalLogicExplanationTop1;
+    drivers.push("Q-V1: goal_logic_explanation top-1 (mild suppression)");
+  } else if (goalLogicVRank === 2) {
+    positive += DIRECT_VULNERABILITY_BONUS.goalLogicExplanationTop2;
+    drivers.push("Q-V1: goal_logic_explanation top-2 (mild suppression)");
+  }
+
   // Re-center: positive sums to up to ~85; subtract penalty (≤15); subtract
   // 35 to slide the midpoint so that "neutral evidence" lands at 0. Clamp
   // to [-50, +50].
@@ -571,47 +883,260 @@ export function grippingClusterFires(
   return true;
 }
 
-// ── Quadrant placement ──────────────────────────────────────────────────
+// ── Quadrant placement (CC-071 — parallel_lives removed) ───────────────
+//
+// Reads ADJUSTED goal/soul (post-asymmetric-lift). The compartmentalized
+// high-G + high-S + thin-V case used to fork to a "Parallel Lives" branch;
+// with the asymmetric lift in place, low Vulnerability suppresses
+// adjusted_soul before this comparison reaches `soul_high`, so the user
+// lands in SE Goal-leaning instead of falsely scoring NE Giving. The math
+// captures the diagnostic; no separate label needed (spec §7, §9, §12.11).
 
 function placeQuadrant(
-  goalScore: number,
-  soulScore: number,
-  vulnerabilityScore: number,
+  adjustedGoal: number,
+  adjustedSoul: number,
   clusterFires: boolean,
   confidence: GoalSoulEvidence["confidence"]
 ): GoalSoulQuadrant {
   // Low-confidence sessions fall through to Neutral copy regardless of
-  // numeric quadrant placement (spec §AC-10).
+  // numeric quadrant placement (spec §AC-10 from CC-067).
   if (confidence === "low") return "neutral";
 
-  const goalHigh = goalScore >= GOAL_HIGH_THRESHOLD;
-  const soulHigh = soulScore >= SOUL_HIGH_THRESHOLD;
-  const vulnSufficient =
-    vulnerabilityScore >= VULNERABILITY_SUFFICIENT_THRESHOLD;
+  const goalHigh = adjustedGoal >= GOAL_HIGH_THRESHOLD;
+  const soulHigh = adjustedSoul >= SOUL_HIGH_THRESHOLD;
 
-  if (goalHigh && soulHigh && vulnSufficient) return "give";
-  if (goalHigh && soulHigh && !vulnSufficient) return "parallel_lives";
+  if (goalHigh && soulHigh) return "give";
   if (goalHigh && !soulHigh) return "striving";
   if (!goalHigh && soulHigh) return "longing";
   if (clusterFires) return "gripping";
   return "neutral";
 }
 
-// ── Closing prose templates (spec §10, polished CC-068) ─────────────────
+// ── CC-071 — Gripping Pull (spec §7, dashboard-visible) ─────────────────
 //
-// Six distinct templates. User-facing register: Work / Love / Give plus the
-// named regions Striving / Longing / Purpose. Engine vocabulary (Goal /
-// Soul / Vulnerability) NEVER appears. Engine-internal pattern names
-// ("Parallel Lives", "Defensive Builder", "Gripper", "Gripping" capitalized
-// as a label) do NOT appear either; the gripping quadrant uses "defensive
-// pressure" plus "a season rather than a shape" to soften the verdict.
-// Spec §10 register guidance: "the instrument" over "the model"; "giving"
-// over "generativity". Each template names a bridge — the work, the way,
-// the bridge, the completion, the next move, or the willingness — so the
-// closing reads as honest companionship rather than a verdict.
+// Independent of quadrant placement. Names the strength of the defensive-
+// cluster signals firing for this user (0–100), with a human-readable
+// signal list. A user can have moderate Gripping Pull (e.g., 30–50)
+// without being in the SW Gripping quadrant — they're not stuck, but the
+// cluster is partially active.
+//
+// Formula:
+//   25 × (Q-Stakes1 money | job | reputation in top-1)
+// + 15 × (Q-Stakes1 money | job | reputation in top-2 but not top-1)
+// + 10 × each pressure-adaptation signal firing (capped at 30)
+// + 25 × (vulnerability_composite < 0)
+// + 20 × (raw_soul < 35)
+// → clamped to [0, 100]
+
+export const GRIPPING_PULL_WEIGHTS = {
+  stakesTop1: 25,
+  stakesTop2NotTop1: 15,
+  pressureAdaptationPerSignal: 10,
+  pressureAdaptationCap: 30,
+  vulnerabilityNegative: 25,
+  thinSoul: 20,
+  thinSoulThreshold: 35, // raw_soul < this triggers the +20
+} as const;
+
+export function computeGrippingPull(
+  signals: Signal[],
+  vulnerabilityScore: number,
+  rawSoulScore: number
+): GrippingPull {
+  const firedSignals: GrippingPullSignal[] = [];
+  let score = 0;
+
+  // Stakes — the loss-aversion register. Top-1 weighs more than top-2.
+  const stakesIds: SignalId[] = [
+    "money_stakes_priority",
+    "job_stakes_priority",
+    "reputation_stakes_priority",
+  ];
+  const STAKES_HUMAN: Record<string, string> = {
+    money_stakes_priority: "Money/wealth stakes elevated",
+    job_stakes_priority: "Job/career stakes elevated",
+    reputation_stakes_priority: "Reputation stakes elevated",
+  };
+  // Find each top-N stakes signal individually so the named-signal list
+  // names the specific stake, not the generic category.
+  let stakesTop1Counted = false;
+  let stakesTop2Counted = false;
+  for (const id of stakesIds) {
+    if (
+      signals.some(
+        (s) =>
+          s.signal_id === id &&
+          s.rank === 1 &&
+          s.source_question_ids.includes("Q-Stakes1")
+      )
+    ) {
+      if (!stakesTop1Counted) {
+        score += GRIPPING_PULL_WEIGHTS.stakesTop1;
+        stakesTop1Counted = true;
+      }
+      firedSignals.push({ id, humanReadable: STAKES_HUMAN[id] });
+    } else if (
+      signals.some(
+        (s) =>
+          s.signal_id === id &&
+          s.rank === 2 &&
+          s.source_question_ids.includes("Q-Stakes1")
+      )
+    ) {
+      if (!stakesTop1Counted && !stakesTop2Counted) {
+        score += GRIPPING_PULL_WEIGHTS.stakesTop2NotTop1;
+        stakesTop2Counted = true;
+      }
+      firedSignals.push({ id, humanReadable: STAKES_HUMAN[id] });
+    }
+  }
+
+  // Pressure-adaptation cluster. Each firing signal contributes; total
+  // capped at 30.
+  const pressureMap: Array<{ id: SignalId; humanReadable: string }> = [
+    { id: "hides_belief", humanReadable: "Conviction concealment under pressure" },
+    {
+      id: "adapts_under_economic_pressure",
+      humanReadable: "Pressure adaptation under economic stress",
+    },
+    {
+      id: "adapts_under_social_pressure",
+      humanReadable: "Pressure adaptation under social stress",
+    },
+    { id: "chaos_exposure", humanReadable: "Formation in chaotic conditions" },
+  ];
+  let pressureContribution = 0;
+  for (const p of pressureMap) {
+    if (hasSignal(signals, p.id)) {
+      pressureContribution += GRIPPING_PULL_WEIGHTS.pressureAdaptationPerSignal;
+      firedSignals.push({ id: p.id, humanReadable: p.humanReadable });
+    }
+  }
+  score += Math.min(
+    GRIPPING_PULL_WEIGHTS.pressureAdaptationCap,
+    pressureContribution
+  );
+
+  // Vulnerability net-negative.
+  if (vulnerabilityScore < 0) {
+    score += GRIPPING_PULL_WEIGHTS.vulnerabilityNegative;
+    firedSignals.push({
+      id: "vulnerability_negative",
+      humanReadable: "Limited openness signal",
+    });
+  }
+
+  // Thin Soul-line (raw, not adjusted — the gap is what's measured here).
+  if (rawSoulScore < GRIPPING_PULL_WEIGHTS.thinSoulThreshold) {
+    score += GRIPPING_PULL_WEIGHTS.thinSoul;
+    firedSignals.push({
+      id: "raw_soul_thin",
+      humanReadable: "Thin love-line evidence",
+    });
+  }
+
+  // CC-Q2 — Q-GRIP1 direct grip-target signals. Each ranked grips_* signal
+  // contributes per rank tier; total Q-GRIP1 contribution capped at
+  // `gripsCap` so a user gripping every option doesn't saturate. The
+  // human-readable form names the specific grip ("Grips control under
+  // pressure", "Grips approval", etc.) so the dashboard surface is
+  // diagnostic, not just numeric.
+  const GRIPS_HUMAN: Record<string, string> = {
+    grips_control: "Grips control under pressure",
+    grips_security: "Grips money / security under pressure",
+    grips_reputation: "Grips reputation under pressure",
+    grips_certainty: "Grips being right under pressure",
+    grips_neededness: "Grips being needed under pressure",
+    grips_comfort: "Grips comfort or escape under pressure",
+    grips_old_plan: "Grips a plan that used to work under pressure",
+    grips_approval: "Grips approval of specific people under pressure",
+  };
+  let gripsContribution = 0;
+  for (const id of Object.keys(GRIPS_HUMAN) as SignalId[]) {
+    const r = rankOfSignalFromQuestion(signals, id, "Q-GRIP1");
+    if (r === undefined) continue;
+    let weight = 0;
+    if (r === 1) weight = DIRECT_GRIPPING_PULL_BONUS.gripsTop1;
+    else if (r === 2) weight = DIRECT_GRIPPING_PULL_BONUS.gripsTop2;
+    else if (r === 3) weight = DIRECT_GRIPPING_PULL_BONUS.gripsTop3;
+    else weight = DIRECT_GRIPPING_PULL_BONUS.gripsRank4Plus;
+    gripsContribution += weight;
+    // Surface only top-3 grips on the named signal list; deeper ranks
+    // contribute small numerical weight but stay off the dashboard label
+    // line so the user-facing list stays readable.
+    if (r <= 3) {
+      firedSignals.push({ id, humanReadable: GRIPS_HUMAN[id] });
+    }
+  }
+  score += Math.min(
+    DIRECT_GRIPPING_PULL_BONUS.gripsCap,
+    gripsContribution
+  );
+
+  // CC-Q2 — Q-GS1 gripping_proof_signal (proving-capability register).
+  const grippingProofRank = rankOfSignalFromQuestion(
+    signals,
+    "gripping_proof_signal",
+    "Q-GS1"
+  );
+  if (grippingProofRank === 1) {
+    score += DIRECT_GRIPPING_PULL_BONUS.grippingProofTop1;
+    firedSignals.push({
+      id: "gripping_proof_signal",
+      humanReadable: "Proving-capability register active",
+    });
+  } else if (grippingProofRank !== undefined && grippingProofRank <= 3) {
+    score += DIRECT_GRIPPING_PULL_BONUS.grippingProofTop2OrTop3;
+    firedSignals.push({
+      id: "gripping_proof_signal",
+      humanReadable: "Proving-capability register present",
+    });
+  }
+
+  // CC-Q2 — Q-V1 performance_identity. Pointing at output rather than
+  // naming the why reads as a mild grip on the performance register.
+  const perfIdentityGripRank = rankOfSignalFromQuestion(
+    signals,
+    "performance_identity",
+    "Q-V1"
+  );
+  if (perfIdentityGripRank === 1) {
+    score += DIRECT_GRIPPING_PULL_BONUS.performanceIdentityTop1;
+    firedSignals.push({
+      id: "performance_identity",
+      humanReadable: "Performance-identity register active",
+    });
+  } else if (perfIdentityGripRank === 2) {
+    score += DIRECT_GRIPPING_PULL_BONUS.performanceIdentityTop2;
+    firedSignals.push({
+      id: "performance_identity",
+      humanReadable: "Performance-identity register present",
+    });
+  }
+
+  return {
+    score: Math.max(0, Math.min(100, score)),
+    signals: firedSignals,
+  };
+}
+
+// ── Closing prose templates (spec §10, post-CC-071 reframe) ─────────────
+//
+// Five distinct templates (CC-071 removed `parallel_lives` per spec §9 /
+// §12.11 — the asymmetric lift now suppresses adjusted_soul, so the
+// compartmentalized case lands in the SE region with the dashboard's
+// Soul-score reading the integration gap).
+//
+// User-facing register: Work / Love / Give plus the named regions Giving
+// (NE) and Gripping (SW). SE and NW are described with the *Work-leaning*
+// / *Love-leaning* descriptors per spec §12.7 — *Striving* and *Longing*
+// remain engine-internal labels and never appear in user-facing prose
+// (CC-071 OOS §8). Engine vocabulary (Goal / Soul / Vulnerability) does not
+// appear anywhere in these templates; "the instrument" over "the model";
+// "giving" over "generativity"; each template names a bridge.
 //
 // Word count and bridge-phrase presence are enforced by the audit
-// (tests/audit/goalSoulGive.audit.ts); see acceptance §AC-2, §AC-9, §AC-14.
+// (tests/audit/goalSoulGive.audit.ts).
 
 const PROSE_TEMPLATES: Record<GoalSoulQuadrant, string> = {
   give:
@@ -621,24 +1146,27 @@ const PROSE_TEMPLATES: Record<GoalSoulQuadrant, string> = {
     "Whatever you're moving toward next, the conditions are here for it to mean what you want it to mean. " +
     "The work is to keep this shape honest as the seasons turn.",
 
-  // CC-068 wrap-compat — first sentence ("Your form is strong; your purpose
-  // is still forming.") and last sentence ("The next move is rarely to push
-  // harder — it is to find that anchor.") are intentionally written as
-  // self-contained register frames, so a future CC-C Defensive Builder
-  // kicker can prefix the opener or suffix the closer without breaking the
-  // read. The middle three sentences carry the load-bearing observation +
-  // bridge; do not edit those without a paired audit-fixture pass.
+  // CC-068 wrap-compat — first sentence and last sentence are written as
+  // self-contained register frames, so a future Defensive Builder kicker
+  // can prefix the opener or suffix the closer without breaking the read.
+  // The middle three sentences carry the load-bearing observation + bridge.
+  // CC-071 reframe — replaces "Striving is capable but unfinished" with
+  // "This is a Work-leaning shape, capable but unfinished" per spec §12.7
+  // (Striving remains engine-internal; the user-facing register is the
+  // Work-leaning descriptor).
   striving:
     "Your form is strong; your purpose is still forming. " +
     "The instrument sees consistent productive motion — building, solving, executing — without yet a clear love-line connecting it to what you protect. " +
-    "Striving is capable but unfinished, and the work is not more output. " +
+    "This is a Work-leaning shape: capable but unfinished, and the work is not more output. " +
     "The completion is to anchor the output in what you actually love: to let the people, the cause, or the calling that already claims you become the reason the building is happening at all. " +
     "The next move is rarely to push harder — it is to find that anchor.",
 
+  // CC-071 reframe — replaces "Longing is not weakness" with "This is a
+  // Love-leaning shape — love-line ahead of form" per spec §12.7.
   longing:
     "What you love is clear. The form is still forming. " +
     "The instrument sees deep relational and moral signal without yet the structure or motion that would let it land in the world for someone other than you. " +
-    "Longing is not weakness — it is love that hasn't yet been incarnated. " +
+    "This is a Love-leaning shape — love-line ahead of form, not weakness, but love that hasn't yet been incarnated. " +
     "The completion is form: the structure, habit, work, or commitment that lets what you love become real to a person other than yourself. " +
     "The next move is to give that love a body.",
 
@@ -648,12 +1176,6 @@ const PROSE_TEMPLATES: Record<GoalSoulQuadrant, string> = {
     "This may be a season rather than a shape — that posture rarely names a person; more often it names a moment they're inside. " +
     "The way out is rarely more holding. " +
     "The next move, when there is energy for it, is to find one place where a slightly more open hand produces less collapse, not more.",
-
-  parallel_lives:
-    "What you build and who you love both come through clearly — but the two appear to live in different rooms. " +
-    "The verbs are strong. The nouns are strong. They don't yet inhabit the same space. " +
-    "The bridge to giving isn't more building or more loving. " +
-    "The bridge is the willingness to let the two halves of your life see each other — to let what you love watch what you build, and what you build serve what you love.",
 
   neutral:
     "The signal here is quiet. " +
@@ -676,7 +1198,7 @@ export function computeGoalSoulGive(
   signals: Signal[],
   answers: Answer[]
 ): GoalSoulGiveOutput | undefined {
-  // Insufficiency guards (spec §AC-4).
+  // Insufficiency guards (CC-067 acceptance §AC-4).
   if (signals.length < MIN_SIGNALS_FOR_OUTPUT) return undefined;
   if (!hasE1Evidence(signals)) return undefined;
 
@@ -693,21 +1215,35 @@ export function computeGoalSoulGive(
   else if (totalDriverCount >= MIN_SIGNALS_FOR_OUTPUT) confidence = "medium";
   else confidence = "low";
 
-  const clusterFires = grippingClusterFires(signals, vulnerability.score);
-
-  const quadrant = placeQuadrant(
-    goal.score,
-    soul.score,
-    vulnerability.score,
-    clusterFires,
-    confidence
-  );
-
-  const scores: GoalSoulScores = {
+  // CC-071 — asymmetric lift. Quadrant placement reads ADJUSTED scores;
+  // raw scores are preserved for audit/debug (acceptance §AC-1, §AC-11).
+  const rawScores: GoalSoulRawScores = {
     goal: goal.score,
     soul: soul.score,
     vulnerability: vulnerability.score,
   };
+  const adjustedScores = applyAsymmetricLift(
+    rawScores.goal,
+    rawScores.soul,
+    rawScores.vulnerability
+  );
+
+  const clusterFires = grippingClusterFires(signals, vulnerability.score);
+
+  const quadrant = placeQuadrant(
+    adjustedScores.goal,
+    adjustedScores.soul,
+    clusterFires,
+    confidence
+  );
+
+  // CC-071 — Gripping Pull is computed alongside the quadrant. Always
+  // present; score may be 0 with empty signal list.
+  const grippingPull = computeGrippingPull(
+    signals,
+    rawScores.vulnerability,
+    rawScores.soul
+  );
 
   const evidence: GoalSoulEvidence = {
     goalDrivers: goal.drivers,
@@ -718,9 +1254,11 @@ export function computeGoalSoulGive(
   };
 
   return {
-    scores,
+    rawScores,
+    adjustedScores,
     quadrant,
     evidence,
     prose: generateProse(quadrant),
+    grippingPull,
   };
 }

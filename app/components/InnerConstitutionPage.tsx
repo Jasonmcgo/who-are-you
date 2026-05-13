@@ -26,15 +26,22 @@ import TensionCard from "./TensionCard";
 import MbtiDisclosure from "./MbtiDisclosure";
 import MirrorSection from "./MirrorSection";
 import MapSection from "./MapSection";
-import OceanBars from "./OceanBars";
 import UseCasesSection from "./UseCasesSection";
 import WorkMap from "./WorkMap";
 import LoveMap from "./LoveMap";
 import { getTopCompassValues, valueListPhrase } from "../../lib/identityEngine";
 import {
   buildFilename,
+  composeDispositionSummaryLine,
   renderMirrorAsMarkdown,
 } from "../../lib/renderMirror";
+import { generateTrajectoryChartSvgFromConstitution } from "../../lib/trajectoryChart";
+import {
+  composeOceanProse,
+  renderOceanDashboardSVG,
+} from "../../lib/oceanDashboard";
+import { composeReportCallouts } from "../../lib/composeReportCallouts";
+import { composeClosingReadProse } from "../../lib/identityEngine";
 
 type Confirmation = {
   status: TensionStatus;
@@ -226,6 +233,36 @@ export default function InnerConstitutionPage({
   );
 
   const cross = constitution.cross_card;
+  // CC-SYNTHESIS-1A Addition 3 — composeClosingReadProse handles the
+  // pre-1A defensive-builder kicker append AND the new two-tier closing-
+  // phrase substitution. Single source of truth shared with the
+  // markdown render path.
+  const closingReadProseRaw = composeClosingReadProse(constitution);
+  const closingReadProse =
+    closingReadProseRaw.length > 0 ? closingReadProseRaw : null;
+  const movement = constitution.goalSoulMovement;
+  const movementDashboard = movement?.dashboard;
+
+  // CC-PROSE-1B Layer 5C — Final Line callout. composeReportCallouts
+  // returns a non-null finalLine only when the mechanical -ing →
+  // imperative transformation yields a clean carry-away line for the
+  // shape; null surfaces the gap honestly (no fabrication).
+  const reportCallouts = composeReportCallouts(constitution);
+  // CC-TRAJECTORY-VISUALIZATION — four-element chart replaces the
+  // legacy two-element chart (renderGoalSoulDashboardSVG). The new chart
+  // reads movementLimiter + Aim-tolerance + Grip-drag fields from the
+  // constitution to render usable trajectory, tolerance cone, and Grip
+  // drag marker alongside the original potential trajectory line.
+  const movementSvg = movementDashboard
+    ? generateTrajectoryChartSvgFromConstitution(constitution)
+    : null;
+  const oceanMix = constitution.ocean?.dispositionSignalMix;
+  const oceanProse =
+    oceanMix && oceanMix.intensities
+      ? composeOceanProse(oceanMix, constitution.goalSoulGive)
+      : null;
+  const oceanSvg =
+    oceanMix && oceanMix.intensities ? renderOceanDashboardSVG(oceanMix) : null;
 
   return (
     <main
@@ -285,29 +322,403 @@ export default function InnerConstitutionPage({
 
         <SectionRule />
 
-        {/* CC-037 — Disposition Map. Big-5 OCEAN distribution derived from
-            existing signals (no new questions). Page-level section between
-            Mirror and Map, NOT a ShapeCard. Renders only when the engine
-            produced an ocean output (thin-signal sessions skip). */}
-        {constitution.ocean ? (
+        {closingReadProse ? (
           <>
             <section
               className="flex flex-col"
-              aria-labelledby="disposition-heading"
               style={{ gap: 14, paddingTop: 12, paddingBottom: 12 }}
             >
-              <p
-                id="disposition-heading"
-                className="font-mono uppercase"
+              <SectionLabel>Closing Read</SectionLabel>
+              <SectionParagraph text={closingReadProse} />
+            </section>
+            <SectionRule />
+          </>
+        ) : null}
+
+        {movement && movement.prose.length > 0 ? (
+          <>
+            <section
+              className="flex flex-col"
+              style={{ gap: 14, paddingTop: 12, paddingBottom: 12 }}
+            >
+              <SectionLabel>Movement</SectionLabel>
+              {movementDashboard ? (
+                <div
+                  className="font-serif"
+                  style={{
+                    border: "1px solid var(--rule-soft)",
+                    borderRadius: 6,
+                    padding: "14px 16px",
+                    color: "var(--ink)",
+                    fontSize: 14.5,
+                    lineHeight: 1.6,
+                  }}
+                >
+                  <dl
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "max-content 1fr",
+                      columnGap: 12,
+                      rowGap: 6,
+                      margin: 0,
+                    }}
+                  >
+                    <dt style={{ fontWeight: 700 }}>Goal</dt>
+                    <dd style={{ margin: 0 }}>
+                      {movementDashboard.goalScore} / 100
+                    </dd>
+                    <dt style={{ fontWeight: 700 }}>Soul</dt>
+                    <dd style={{ margin: 0 }}>
+                      {movementDashboard.soulScore} / 100
+                    </dd>
+                    {/* CC-CRISIS-PATH-PROSE — Direction line is suppressed
+                        for crisis-class users (the trajectory framework
+                        doesn't apply). */}
+                    {constitution.coherenceReading?.pathClass !== "crisis" ? (
+                      <>
+                        <dt style={{ fontWeight: 700 }}>Direction</dt>
+                        <dd style={{ margin: 0 }}>
+                          {Math.round(movementDashboard.direction.angle)}° (
+                          {movementDashboard.direction.descriptor})
+                        </dd>
+                      </>
+                    ) : null}
+                    {/* CC-MOMENTUM-HONESTY — lead with Usable Movement
+                        (what the user can actually use after Grip drag
+                        and Aim governance), with Potential as secondary
+                        context. */}
+                    <dt style={{ fontWeight: 700 }}>Movement</dt>
+                    <dd style={{ margin: 0 }}>
+                      {movementDashboard.movementStrength.length === 0 ? (
+                        "0 — the line has not yet been drawn"
+                      ) : movementDashboard.movementLimiter ? (
+                        <>
+                          Usable{" "}
+                          {movementDashboard.movementLimiter.usableMovement.toFixed(
+                            1
+                          )}{" "}
+                          / 100 ({movementDashboard.movementLimiter.usableDescriptor})
+                          <div style={{ fontSize: "0.85em", opacity: 0.75 }}>
+                            Potential{" "}
+                            {movementDashboard.movementLimiter.potentialMovement.toFixed(
+                              1
+                            )}{" "}
+                            (-{movementDashboard.movementLimiter.dragPercent}% drag)
+                          </div>
+                        </>
+                      ) : (
+                        `${movementDashboard.movementStrength.length.toFixed(
+                          1
+                        )} / 100 (${
+                          movementDashboard.movementStrength.descriptor
+                        })`
+                      )}
+                    </dd>
+                    {/* CC-SYNTHESIS-1A Addition 2 — Four-Quadrant
+                        Movement label (Drift / Work without Presence /
+                        Love without Form / Giving / Presence) replaces
+                        the prior `quadrantLabel` two-state. */}
+                    {constitution.movementQuadrant ? (
+                      <>
+                        <dt style={{ fontWeight: 700 }}>Quadrant</dt>
+                        <dd style={{ margin: 0 }}>
+                          {constitution.movementQuadrant.label}
+                        </dd>
+                      </>
+                    ) : null}
+                    {/* CC-AIM-CALIBRATION — Aim composite displayed
+                        alongside Grip for parallelism. Both 0-100 axes. */}
+                    {constitution.aimReading ? (
+                      <>
+                        <dt style={{ fontWeight: 700 }}>Aim</dt>
+                        <dd style={{ margin: 0 }}>
+                          {constitution.aimReading.score.toFixed(1)} / 100
+                        </dd>
+                      </>
+                    ) : null}
+                    {/* CC-AIM-CALIBRATION — renamed from "Gripping Pull"
+                        to "Grip" for parallelism with the new Aim line.
+                        CC-GRIP-WIRING-AND-FLOOR-CALIBRATION — when the
+                        §13 stakes amplifier fired (amp > 1.05), surface
+                        both defensive and composed; otherwise show
+                        single canonical value. */}
+                    <dt style={{ fontWeight: 700 }}>Grip</dt>
+                    <dd style={{ margin: 0 }}>
+                      {constitution.gripReading &&
+                      constitution.gripReading.components.amplifier > 1.05 ? (
+                        <>
+                          {constitution.gripReading.components.defensiveGrip.toFixed(
+                            1
+                          )}{" "}
+                          defensive ·{" "}
+                          {constitution.gripReading.score.toFixed(1)} with
+                          stakes
+                        </>
+                      ) : constitution.gripReading ? (
+                        `${constitution.gripReading.score.toFixed(1)} / 100`
+                      ) : (
+                        `${movementDashboard.grippingPull.score} / 100`
+                      )}
+                      {movementDashboard.grippingPull.signals.length > 0 ? (
+                        <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                          {movementDashboard.grippingPull.signals.map((sig) => (
+                            <li key={sig.id}>{sig.humanReadable}</li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </dd>
+                    {/* CC-SYNTHESIS-1A Addition 1 — Risk Form 2x2 line.
+                        CC-SYNTHESIS-1-FINISH Section D — suppressed when
+                        movementStrength.length === 0.
+                        CC-AIM-CALIBRATION — prefer the Aim-based reading
+                        when available; falls back to the legacy compliance-
+                        bucket reading. */}
+                    {/* CC-CRISIS-PATH-PROSE — Risk Form line suppressed
+                        for crisis-class users; Movement hedge replaces
+                        the trajectory framing. */}
+                    {constitution.coherenceReading?.pathClass !== "crisis" &&
+                    (constitution.riskFormFromAim ?? constitution.riskForm) &&
+                    movementDashboard.movementStrength.length > 0 ? (
+                      <>
+                        <dt style={{ fontWeight: 700 }}>Risk Form</dt>
+                        <dd style={{ margin: 0 }}>
+                          {(constitution.riskFormFromAim ?? constitution.riskForm)!.letter}{" "}
+                          (
+                          {constitution.riskFormFromAim
+                            ? `Aim ${constitution.aimReading?.score.toFixed(0) ?? "?"}`
+                            : `Risk-bucket ${constitution.riskForm!.riskBucketPct}%`}
+                          , Grip{" "}
+                          {(constitution.riskFormFromAim ?? constitution.riskForm)!.gripScore}/100)
+                        </dd>
+                      </>
+                    ) : null}
+                  </dl>
+                  {constitution.coherenceReading?.pathClass === "crisis" ? (
+                    <p
+                      className="font-serif italic"
+                      style={{
+                        fontSize: 14,
+                        color: "var(--ink-soft)",
+                        lineHeight: 1.55,
+                        marginTop: 10,
+                        marginBottom: 0,
+                      }}
+                    >
+                      The trajectory framework the report normally uses doesn&apos;t fully apply to this read. See the Path/Gait section for what the read is naming.
+                    </p>
+                  ) : null}
+                  {constitution.coherenceReading?.pathClass !== "crisis" &&
+                  (constitution.riskFormFromAim ?? constitution.riskForm) &&
+                  movementDashboard.movementStrength.length > 0 ? (
+                    <p
+                      className="font-serif italic"
+                      style={{
+                        fontSize: 14,
+                        color: "var(--ink-soft)",
+                        lineHeight: 1.55,
+                        marginTop: 10,
+                        marginBottom: 0,
+                      }}
+                    >
+                      {(constitution.riskFormFromAim ?? constitution.riskForm)!.prose}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+              {movementSvg ? (
+                <div
+                  style={{
+                    width: "100%",
+                    maxWidth: 400,
+                    aspectRatio: "1 / 1",
+                  }}
+                  dangerouslySetInnerHTML={{ __html: movementSvg }}
+                />
+              ) : null}
+              {movement.prose.length > 0 ? (
+                <SectionParagraph text={movement.prose} />
+              ) : null}
+            </section>
+            <SectionRule />
+          </>
+        ) : null}
+
+        {/* CC-GRIP-TAXONOMY / CC-GRIP-CALIBRATION — Your Grip section.
+            Renders between Movement and Disposition Signal Mix when the
+            engine's calibrated Primal cluster has prose mode "rendered"
+            (full three-concept block) or "hedged" (short paragraph).
+            Section omitted entirely when prose mode is "omitted" (low-
+            confidence / zero-grip / ambiguous shapes). LLM-articulated
+            prose (cached or runtime-fetched via useGripParagraph)
+            preferred; engine fallback when LLM unavailable. */}
+        {constitution.gripTaxonomy &&
+        constitution.gripTaxonomy.primary &&
+        constitution.gripTaxonomy.proseMode !== "omitted" ? (
+          <>
+            <section
+              className="flex flex-col"
+              style={{ gap: 14, paddingTop: 12, paddingBottom: 12 }}
+            >
+              <SectionLabel>Your Grip</SectionLabel>
+              <div
                 style={{
-                  fontSize: 11,
-                  letterSpacing: "0.12em",
-                  color: "var(--ink-mute)",
-                  margin: 0,
+                  borderLeft: "3px solid var(--umber)",
+                  background: "var(--umber-wash)",
+                  padding: "14px 18px",
+                  borderRadius: 2,
                 }}
               >
-                Disposition Map
-              </p>
+                {constitution.gripParagraphLlm ? (
+                  <p
+                    className="font-serif italic"
+                    style={{
+                      fontSize: 15.5,
+                      color: "var(--ink)",
+                      lineHeight: 1.65,
+                      margin: 0,
+                      whiteSpace: "pre-line",
+                    }}
+                  >
+                    {/* CC-GRIP-TAXONOMY-REPLACEMENT — scrub residual
+                        Foster vocab from cached LLM prose. */}
+                    {[
+                      "Am I safe?",
+                      "Am I secure?",
+                      "Am I wanted?",
+                      "Am I loved?",
+                      "Am I successful?",
+                      "Am I good enough?",
+                      "Do I have purpose?",
+                      "Primal Question",
+                    ].reduce(
+                      (acc, p) =>
+                        acc.split(p).join(
+                          constitution.gripPattern?.underlyingQuestion ??
+                            "this same question"
+                        ),
+                      constitution.gripParagraphLlm
+                    )}
+                  </p>
+                ) : constitution.gripTaxonomy.proseMode === "hedged" ? (
+                  <p
+                    className="font-serif italic"
+                    style={{
+                      fontSize: 15.5,
+                      color: "var(--ink)",
+                      lineHeight: 1.65,
+                      margin: 0,
+                    }}
+                  >
+                    The pressure register reads quietly here. The surface clue is{" "}
+                    {constitution.gripTaxonomy.surfaceGrip.toLowerCase()};
+                    the underlying recognition may be{" "}
+                    {constitution.gripPattern?.underlyingQuestion ??
+                      "the question this pressure is asking under the surface"}{" "}
+                    — but the signal is thin enough that the question is
+                    worth noticing rather than governing.
+                  </p>
+                ) : (
+                  <dl
+                    className="font-serif"
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "max-content 1fr",
+                      columnGap: 14,
+                      rowGap: 8,
+                      margin: 0,
+                      fontSize: 15.5,
+                      color: "var(--ink)",
+                      lineHeight: 1.55,
+                    }}
+                  >
+                    <dt style={{ fontWeight: 700 }}>Surface Grip</dt>
+                    <dd style={{ margin: 0 }}>
+                      {constitution.gripTaxonomy.surfaceGrip}.
+                    </dd>
+                    <dt style={{ fontWeight: 700 }}>Grip Pattern</dt>
+                    <dd style={{ margin: 0 }}>
+                      {constitution.gripPattern?.renderedLabel ?? "Grip Pattern"}
+                    </dd>
+                    <dt style={{ fontWeight: 700 }}>Underlying Question</dt>
+                    <dd style={{ margin: 0, fontStyle: "italic" }}>
+                      {constitution.gripPattern?.underlyingQuestion ??
+                        "What is this pressure asking of me that I have not yet named?"}
+                    </dd>
+                    <dt style={{ fontWeight: 700 }}>Distorted Strategy</dt>
+                    <dd style={{ margin: 0 }}>
+                      {constitution.gripTaxonomy.distortedStrategy?.text ??
+                        "Under pressure, the question can start to drive instead of inform."}
+                    </dd>
+                    <dt style={{ fontWeight: 700 }}>Healthy Gift</dt>
+                    <dd style={{ margin: 0 }}>
+                      {constitution.gripTaxonomy.healthyGift}
+                    </dd>
+                  </dl>
+                )}
+              </div>
+              <dl
+                className="font-serif"
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "max-content 1fr",
+                  columnGap: 12,
+                  rowGap: 6,
+                  margin: 0,
+                  fontSize: 14,
+                  color: "var(--ink)",
+                }}
+              >
+                <dt style={{ fontWeight: 700 }}>Grip Pattern</dt>
+                <dd style={{ margin: 0 }}>
+                  {constitution.gripPattern?.renderedLabel ??
+                    "Grip Pattern (not yet classified)"}
+                </dd>
+                <dt style={{ fontWeight: 700 }}>Underlying Question</dt>
+                <dd style={{ margin: 0, fontStyle: "italic" }}>
+                  {constitution.gripPattern?.underlyingQuestion ??
+                    "What is this pressure asking of me that I have not yet named?"}
+                </dd>
+                {constitution.gripTaxonomy.contributingGrips.length > 0 ? (
+                  <>
+                    <dt style={{ fontWeight: 700 }}>Contributing grips</dt>
+                    <dd style={{ margin: 0 }}>
+                      {constitution.gripTaxonomy.contributingGrips.join(", ")}
+                    </dd>
+                  </>
+                ) : null}
+                {constitution.gripTaxonomy.subRegister ? (
+                  <>
+                    <dt style={{ fontWeight: 700 }}>Sub-register</dt>
+                    <dd style={{ margin: 0 }}>
+                      {constitution.gripTaxonomy.subRegister}
+                    </dd>
+                  </>
+                ) : null}
+                <dt style={{ fontWeight: 700 }}>Confidence</dt>
+                <dd style={{ margin: 0 }}>
+                  {constitution.gripPattern?.confidence ??
+                    constitution.gripTaxonomy.confidence}
+                </dd>
+              </dl>
+            </section>
+            <SectionRule />
+          </>
+        ) : null}
+
+        {/* CC-074 — Disposition Signal Mix. React parity for CC-072's
+            markdown render: independent trait intensities, prose in
+            dominance order, and internal SVG bar chart.
+            CC-DISPOSITION-COLLAPSE-DEFAULT — user-mode default-collapses
+            the full panel behind a <details> disclosure with a plain-
+            language summary line visible above. Markdown export honors
+            the same shape (renderMirror.ts emits matching markup). */}
+        {oceanMix && oceanMix.intensities ? (
+          <>
+            <section
+              className="flex flex-col"
+              style={{ gap: 14, paddingTop: 12, paddingBottom: 12 }}
+            >
+              <SectionLabel>Disposition Signal Mix</SectionLabel>
               <p
                 className="font-serif italic"
                 style={{
@@ -317,33 +728,55 @@ export default function InnerConstitutionPage({
                   lineHeight: 1.5,
                 }}
               >
-                Disposition tendencies, derived from how you answered other questions in this instrument. No single answer determines a tendency; the model reads patterns across the full question footprint.
+                {composeDispositionSummaryLine(oceanMix)}
               </p>
-              <OceanBars distribution={constitution.ocean.distribution} />
-              <p
-                className="font-serif"
-                style={{
-                  fontSize: 15.5,
-                  color: "var(--ink)",
-                  lineHeight: 1.65,
-                  margin: 0,
-                }}
-              >
-                {constitution.ocean.prose}
-              </p>
-              <p
-                className="font-mono"
-                style={{
-                  fontSize: 10,
-                  letterSpacing: "0.08em",
-                  color: "var(--ink-mute)",
-                  fontStyle: "italic",
-                  margin: 0,
-                  lineHeight: 1.5,
-                }}
-              >
-                Emotional Reactivity is shown as an estimate — the instrument measures it through proxy signals (formation history, current-context load, pressure-adaptation behavior) rather than directly.
-              </p>
+              <details>
+                <summary
+                  style={{
+                    cursor: "pointer",
+                    fontSize: 13,
+                    color: "var(--ink-mute)",
+                    paddingTop: 4,
+                  }}
+                >
+                  View the full disposition signal panel
+                </summary>
+                <div
+                  className="flex flex-col"
+                  style={{ gap: 14, paddingTop: 12 }}
+                >
+                  {oceanProse ? (
+                    <>
+                      <p
+                        className="font-serif italic"
+                        style={{
+                          fontSize: 14,
+                          color: "var(--ink-soft)",
+                          margin: 0,
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        {oceanProse.disclaimer}
+                      </p>
+                      {oceanProse.paragraphs.map((paragraph, index) => (
+                        <SectionParagraph
+                          key={`${oceanMix.dominance.ranked[index]}-${index}`}
+                          text={paragraph.replace(/\*/g, "")}
+                        />
+                      ))}
+                    </>
+                  ) : null}
+                  {oceanSvg ? (
+                    <div
+                      style={{
+                        width: "100%",
+                        maxWidth: 480,
+                      }}
+                      dangerouslySetInnerHTML={{ __html: oceanSvg }}
+                    />
+                  ) : null}
+                </div>
+              </details>
             </section>
             <SectionRule />
           </>
@@ -353,7 +786,7 @@ export default function InnerConstitutionPage({
             distribution + OCEAN + Q-E1 + Compass + Q-Ambition1 + Path
             agency aspiration into 1–2 work registers the user is
             structurally aligned to. Page-level section between Disposition
-            Map and Map; not a ShapeCard. Renders only when the engine
+            Signal Mix and Map; not a ShapeCard. Renders only when the engine
             produced a workMap output (no register fired above the
             threshold floor → silently omits). */}
         {constitution.workMap && constitution.workMap.matches.length > 0 ? (
@@ -480,17 +913,11 @@ export default function InnerConstitutionPage({
             insertion + Path/Weather demographic interpolation. */}
         <MapSection constitution={constitution} demographics={demographics} />
 
-        {/* Remaining synthesis — Growth Path, Conflict Translation, Mirror-Types Seed */}
-        <section
-          className="flex flex-col"
-          style={{ gap: 14, paddingTop: 12, paddingBottom: 12 }}
-        >
-          <SectionLabel>Growth Path</SectionLabel>
-          <SectionParagraph text={cross.growthPath} />
-        </section>
-
-        <SectionRule />
-
+        {/* CC-SYNTHESIS-1-FINISH Section A — Growth Path section removed
+            (duplicated Path · Gait opening in compressed form). Section
+            F's Path master synthesis paragraph absorbs Growth Path's
+            job. The engine still produces `cross_card.growthPath` for
+            backward compatibility; only the React emit is removed. */}
         <section
           className="flex flex-col"
           style={{ gap: 14, paddingTop: 12, paddingBottom: 12 }}
@@ -694,7 +1121,77 @@ export default function InnerConstitutionPage({
         )}
 
         <SectionRule />
-        <UseCasesSection />
+        <UseCasesSection archetype={constitution.profileArchetype?.primary} />
+
+        {/* CC-PROSE-1B Layer 5C — Final Line callout. Closing-of-the-
+            closing, mechanically recombined from shapeDescriptor +
+            connector + imperative-cast structuralY. Skipped when
+            composeReportCallouts returns null (gap surfaced honestly). */}
+        {reportCallouts.finalLine ? (
+          <>
+            <SectionRule />
+            <section
+              className="flex flex-col"
+              style={{ gap: 14, paddingTop: 12, paddingBottom: 12 }}
+            >
+              <div
+                style={{
+                  borderLeft: "3px solid var(--umber)",
+                  background: "var(--umber-wash)",
+                  padding: "14px 18px",
+                  borderRadius: 2,
+                }}
+              >
+                <p
+                  className="font-serif italic"
+                  style={{
+                    fontSize: 15.5,
+                    color: "var(--ink)",
+                    lineHeight: 1.65,
+                    margin: 0,
+                  }}
+                >
+                  {reportCallouts.finalLine}
+                </p>
+              </div>
+            </section>
+          </>
+        ) : null}
+
+        {/* CC-CRISIS-PATH-PROSE — elevated standing reminder for
+            crisis-class users. Sits above the page footer so readers
+            carry the mirror-not-clinician framing past whichever
+            section landed hardest. */}
+        {constitution.coherenceReading?.pathClass === "crisis" ? (
+          <>
+            <SectionRule />
+            <section
+              className="flex flex-col"
+              style={{ gap: 10, paddingTop: 12, paddingBottom: 12 }}
+            >
+              <div
+                style={{
+                  borderLeft: "3px solid var(--umber)",
+                  background: "var(--umber-wash)",
+                  padding: "14px 18px",
+                  borderRadius: 2,
+                }}
+              >
+                <p
+                  className="font-serif italic"
+                  style={{
+                    fontSize: 14.5,
+                    color: "var(--ink)",
+                    lineHeight: 1.65,
+                    margin: 0,
+                  }}
+                >
+                  This report is a mirror, not a clinical assessment. If anything in it lands hard, please talk with a therapist or someone who knows you well. Some kinds of weight need company to carry.
+                </p>
+              </div>
+            </section>
+          </>
+        ) : null}
 
         {/* Page footer */}
         <SectionRule />

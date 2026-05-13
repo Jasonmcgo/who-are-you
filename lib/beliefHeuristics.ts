@@ -432,9 +432,13 @@ function qi2CitationLine(
   const verb = name ? "ranked" : "ranked";
   const offeredCount = summary.topAvailable.length;
   const offeredCountWord = offeredCount === 6 ? "six" : `${offeredCount}`;
+  // CC-SMALL-FIXES-BUNDLE Fix 4 — the empty-topAvailable branch must
+  // NOT include a leading "the": call sites prepend "Of the" / "any of
+  // the", which used to produce "Of the the" / "any of the the"
+  // (double article). Drop the leading "the " from this branch.
   const offered = summary.topAvailable.length > 0
     ? `${offeredCountWord} trust sources ${youSubject} ${verb} highest`
-    : `the trust sources ${youSubject} ${verb} highest`;
+    : `trust sources ${youSubject} ${verb} highest`;
   const offeredAside =
     summary.topAvailable.length > 0
       ? ` — ${joinList(summary.topAvailable)} —`
@@ -500,9 +504,12 @@ function qi3CitationLine(
       : offeredCount === 6
       ? "six"
       : `${offeredCount}`;
+  // CC-SMALL-FIXES-BUNDLE Fix 4 — drop the leading "the" here for the
+  // same reason as qi2CitationLine above (call sites prepend "Of the" /
+  // "any of the").
   const offered = summary.topAvailable.length > 0
     ? `${offeredCountWord} stakes ${youSubject} ${verb} highest`
-    : `the concrete stakes ${youSubject} ${verb} highest`;
+    : `concrete stakes ${youSubject} ${verb} highest`;
   const offeredAside =
     summary.topAvailable.length > 0
       ? ` — ${joinList(summary.topAvailable)} —`

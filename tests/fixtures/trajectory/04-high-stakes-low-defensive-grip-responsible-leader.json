@@ -1,0 +1,48 @@
+{
+  "label": "High Stakes / Low DefensiveGrip Responsible Leader (CC-TRAJECTORY-TEST-FIXTURES Addition 4)",
+  "_source": "Synthesized persona — early-60s CEO / nonprofit director / community elder with real fiduciary stakes — dependents, employees, reputation in trust. High conviction expression under risk; rich chosen-trust network (mentor + outside_expert prominent, own_counsel not isolated); zero defensive-pressure signals (no hides_belief, no adapts_under_economic_pressure, no adapts_under_social_pressure, no chaos_exposure). Stewardship-band age. Designed to test that StakesLoad ≠ DefensiveGrip — heavy stakes do not auto-inflate Grip when defensive cluster is absent (canon §13, Fixture 4).",
+  "answers": [
+    { "question_id": "Q-E1-outward", "card_id": "sacred", "question_text": "outward energy", "type": "ranking", "order": ["building", "solving", "restoring"] },
+    { "question_id": "Q-E1-inward",  "card_id": "sacred", "question_text": "inward energy",  "type": "ranking", "order": ["learning", "caring", "enjoying"] },
+    { "question_id": "Q-A1", "card_id": "agency", "question_text": "spend most of your time", "type": "forced", "response": "Building or creating" },
+    { "question_id": "Q-A2", "card_id": "agency", "question_text": "where energy goes",       "type": "forced", "response": "Building or creating something new" },
+    { "question_id": "Q-3C1", "card_id": "role", "question_text": "drive priority",       "type": "ranking", "order": ["coverage", "cost", "compliance"] },
+    { "question_id": "Q-3C2", "card_id": "role", "question_text": "what you protect first in practice", "type": "ranking", "order": ["coverage_priority", "goal_priority", "reputation_priority", "cost_priority", "recovery_priority", "compliance_priority"] },
+    { "question_id": "Q-Ambition1", "card_id": "role", "question_text": "what does the win look like", "type": "ranking", "order": ["legacy", "success", "wealth", "fame"] },
+    { "question_id": "Q-Stakes1", "card_id": "sacred", "question_text": "concrete stakes", "type": "ranking", "order": ["money", "job", "reputation", "close_relationships", "health"] },
+    { "question_id": "Q-S1", "card_id": "sacred", "question_text": "qualities of self", "type": "ranking", "order": ["honor", "truth", "freedom", "peace", "loyalty", "stability"] },
+    { "question_id": "Q-S2", "card_id": "sacred", "question_text": "claims on you", "type": "ranking", "order": ["justice", "family", "faith", "knowledge", "mercy", "compassion"] },
+    { "question_id": "Q-C4", "card_id": "conviction", "question_text": "where responsibility sits", "type": "ranking", "order": ["individual", "authority", "system", "nature", "supernatural"] },
+    { "question_id": "Q-X4-relational", "card_id": "context", "question_text": "relational trust", "type": "ranking", "order": ["partner", "family", "friend"] },
+    { "question_id": "Q-X4-chosen",     "card_id": "context", "question_text": "chosen trust",     "type": "ranking", "order": ["mentor", "outside_expert", "own_counsel"] },
+    { "question_id": "Q-S3-close", "card_id": "sacred", "question_text": "close-circle money", "type": "ranking", "order": ["family", "yourself", "friends"] },
+    { "question_id": "Q-S3-wider", "card_id": "sacred", "question_text": "wider-circle money", "type": "ranking", "order": ["nonprofits_religious", "companies", "social"] },
+    { "question_id": "Q-T1", "card_id": "temperament", "question_text": "hard problem",      "type": "ranking", "order": ["ni", "ne", "se", "si"] },
+    { "question_id": "Q-T2", "card_id": "temperament", "question_text": "new environment",   "type": "ranking", "order": ["ni", "si", "ne", "se"] },
+    { "question_id": "Q-T3", "card_id": "temperament", "question_text": "learning new",      "type": "ranking", "order": ["si", "ni", "ne", "se"] },
+    { "question_id": "Q-T4", "card_id": "temperament", "question_text": "complex situation", "type": "ranking", "order": ["ni", "si", "ne", "se"] },
+    { "question_id": "Q-T5", "card_id": "temperament", "question_text": "plan not working",  "type": "ranking", "order": ["te", "ti", "fe", "fi"] },
+    { "question_id": "Q-T6", "card_id": "temperament", "question_text": "respected disagrees","type": "ranking", "order": ["te", "fi", "ti", "fe"] },
+    { "question_id": "Q-T7", "card_id": "temperament", "question_text": "hard call",         "type": "ranking", "order": ["te", "fi", "ti", "fe"] },
+    { "question_id": "Q-T8", "card_id": "temperament", "question_text": "someone struggling","type": "ranking", "order": ["te", "fe", "fi", "ti"] },
+    { "question_id": "Q-P1", "card_id": "pressure", "question_text": "expressing belief that costs relationships", "type": "forced", "response": "Say it directly" },
+    { "question_id": "Q-P2", "card_id": "pressure", "question_text": "belief at job risk", "type": "forced", "response": "Accept the risk" },
+    { "question_id": "Q-F1", "card_id": "formation", "question_text": "authority figures", "type": "forced", "response": "Trustworthy and protective" },
+    { "question_id": "Q-F2", "card_id": "formation", "question_text": "childhood environment", "type": "forced", "response": "Stable and predictable" },
+    { "question_id": "Q-X1", "card_id": "context", "question_text": "current life", "type": "forced", "response": "Busy but controlled" },
+    { "question_id": "Q-X2", "card_id": "context", "question_text": "people depend on you", "type": "forced", "response": "A lot" },
+    { "question_id": "Q-I1", "card_id": "conviction", "question_text": "belief you'd bear cost to keep", "type": "freeform", "response": "I believe leadership is fiduciary — the people who depend on me, the institution I steward, the work that outlives me — these are real obligations, not figures of speech. I will bear personal cost in standing, comfort, or income before I will hand the wheel to expediency. The cost of being known to break faith with what I carry is higher than any short-run loss." },
+    { "question_id": "Q-O1", "card_id": "temperament", "question_text": "openness subtype", "type": "ranking", "order": ["intellectual", "experiential", "perspective", "low_novelty_preference", "aesthetic", "emotional"] },
+    { "question_id": "Q-O2", "card_id": "temperament", "question_text": "direct ER", "type": "ranking", "order": ["low_reactivity_focus", "hidden_reactivity", "detached_reactivity", "overwhelmed_functioning", "anxious_reactivity", "anger_reactivity", "avoidant_reactivity"] },
+    { "question_id": "Q-GS1", "card_id": "sacred", "question_text": "what makes a successful effort feel worth it", "type": "ranking", "order": ["durable_creation", "goal_completion", "soul_calling", "soul_people", "security_freedom", "creative_truth", "gripping_proof"] },
+    { "question_id": "Q-V1", "card_id": "conviction", "question_text": "why your work really matters", "type": "ranking", "order": ["sacred_belief_connection", "goal_logic_explanation", "soul_beloved_named", "performance_identity", "vulnerability_open_uncertainty", "vulnerability_deflection"] },
+    { "question_id": "Q-GRIP1", "card_id": "pressure", "question_text": "what you grip under pressure", "type": "ranking", "order": ["grips_certainty", "grips_control", "grips_old_plan", "grips_reputation", "grips_security", "grips_neededness", "grips_comfort", "grips_approval"] },
+    { "question_id": "Q-L1", "card_id": "sacred", "question_text": "how love becomes visible", "type": "ranking", "order": ["protection", "co_construction", "presence", "problem_solving", "verbal_expression", "shared_experience", "quiet_sacrifice"] }
+  ],
+  "demographics": {
+    "answers": [
+      { "field_id": "age", "state": "specified", "value": "1960s" }
+    ]
+  },
+  "expected": {}
+}

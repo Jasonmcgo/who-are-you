@@ -1,0 +1,16 @@
+{
+  "label": "Thin signal pool: many traits under-detected; bands report low/under-detected honestly",
+  "answers": [
+    { "question_id": "Q-E1-inward",  "card_id": "sacred", "question_text": "inward energy",  "type": "ranking", "order": ["enjoying", "learning", "caring"] },
+    { "question_id": "Q-A1", "card_id": "agency", "question_text": "spend most of your time", "type": "forced", "response": "Reacting to demands" },
+    { "question_id": "Q-3C1",       "card_id": "role",   "question_text": "drive priority",       "type": "ranking", "order": ["coverage", "compliance", "cost"] },
+    { "question_id": "Q-S1", "card_id": "sacred", "question_text": "qualities of self", "type": "ranking", "order": ["honor", "freedom", "truth", "peace", "loyalty", "stability"] },
+    { "question_id": "Q-S2", "card_id": "sacred", "question_text": "claims on you", "type": "ranking", "order": ["knowledge", "justice", "family", "faith", "compassion", "mercy"] }
+  ],
+  "demographics": null,
+  "expected": {
+    "_cc_q1_note": "CC-Q1 — Q-O1 / Q-O2 deliberately omitted to preserve the thin-signal-pool test path. proxyOnly remains true (no direct ER measurement; signal density below threshold).",
+    "emotionalReactivityProxyOnly": true,
+    "noPersonalityVerdict": true
+  }
+}

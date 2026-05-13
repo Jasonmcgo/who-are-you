@@ -10,9 +10,25 @@ import type {
 } from "../../lib/types";
 import KeystoneReflection from "./KeystoneReflection";
 import {
-  generateSimpleSummary,
+  composeExecutiveRead,
+  getSimpleSummaryParts,
   getFunctionPairRegister,
+  getTopCompassValues,
+  COMPASS_LABEL,
 } from "../../lib/identityEngine";
+import {
+  readCachedKeystoneRewrite,
+  type KeystoneRewriteInputs,
+} from "../../lib/keystoneRewriteLlm";
+import {
+  summarizeQI2Selections,
+  summarizeQI3Selections,
+} from "../../lib/beliefHeuristics";
+// CC-SYNTHESIS-1-FINISH Section A — composeReportCallouts is no longer
+// consumed by MirrorSection (5A and 5B callouts removed; 5C lives in
+// InnerConstitutionPage). Import dropped.
+import CoreSignalMap from "./CoreSignalMap";
+import TopGiftsGrowthEdgesTable from "./TopGiftsGrowthEdgesTable";
 
 type Props = {
   mirror: MirrorOutput;
@@ -96,6 +112,30 @@ function DropCapParagraph({ text }: { text: string }) {
   );
 }
 
+// CC-PROSE-1B Layer 5 — shared callout block for Layer 5A / 5B (and the
+// Executive Read above; CC-PROSE-1A introduced this visual treatment).
+// Same border + tint + padding as the Executive Read so all four callout
+// surfaces in the report read consistently.
+function CalloutBlock({ text }: { text: string }) {
+  return (
+    <div
+      style={{
+        borderLeft: "3px solid var(--umber)",
+        background: "var(--umber-wash)",
+        padding: "14px 18px",
+        borderRadius: 2,
+      }}
+    >
+      <p
+        className="font-serif italic text-[15px] md:text-[15.5px]"
+        style={{ color: "var(--ink)", lineHeight: 1.65, margin: 0 }}
+      >
+        {text}
+      </p>
+    </div>
+  );
+}
+
 function NumberedList({
   items,
 }: {
@@ -146,12 +186,60 @@ export default function MirrorSection({
   // its name-threading; Core Pattern, What Others May Experience, and When
   // the Load Gets Heavy now stay in the original "you / your" voice.
 
-  // CC-022b Item 5 — Simple Summary section. Generated at render time
-  // from the InnerConstitution + demographics; placed at the end of the
-  // Mirror per the spec's integration directive.
-  const simpleSummary = constitution
-    ? generateSimpleSummary(constitution, demographics)
+  // CC-PROSE-1B — Synthesis composer parts so Layer 5B (Most Useful
+  // Line) can interleave between the parallel-line tercet and the
+  // closing thesis sentence without duplicating gift/danger content.
+  const summaryParts = constitution
+    ? getSimpleSummaryParts(constitution)
     : null;
+
+  // CC-PROSE-1 Layer 1 — Executive Read. 2-sentence distillation lifted
+  // from existing Synthesis composer (gift/danger + thesis). Renders
+  // between the masthead block and "How to Read This."
+  const executiveRead = constitution
+    ? composeExecutiveRead(constitution)
+    : null;
+
+  // CC-SYNTHESIS-1-FINISH Section A — Layer 5A and 5B callouts removed
+  // from the Mirror render (verbatim duplicates of Executive Read). The
+  // 5C Final Line callout is rendered by InnerConstitutionPage at end
+  // of report. composeReportCallouts no longer consumed here.
+
+  // CC-PROSE-1B Layer 6 — Lens-flavor product_safe_sentence. Pre-1B this
+  // line rendered between Top Gifts and Top Growth Edges; 1B repositions
+  // it BELOW the unified table and BEFORE the Layer 5A One-Sentence
+  // Summary callout. Composer (getFunctionPairRegister) is unchanged.
+  const lensFlavor =
+    constitution && mirror.topGifts.length > 0
+      ? getFunctionPairRegister(constitution.lens_stack)?.product_safe_sentence ??
+        null
+      : null;
+
+  // CC-KEYSTONE-RENDER — read the LLM Keystone rewrite from cache when
+  // belief is present + engine inputs derivable. Cache miss falls through
+  // (KeystoneReflection renders the legacy metadata+prose path).
+  const keystoneRewriteProse: string | null = (() => {
+    if (!belief || !constitution) return null;
+    const topCompassRefs = getTopCompassValues(constitution.signals);
+    const topCompassValueLabels = topCompassRefs
+      .map((r) => COMPASS_LABEL[r.signal_id] ?? r.signal_id)
+      .filter((s) => s.length > 0);
+    const qi2 = answers ? summarizeQI2Selections(answers) : null;
+    const qi3 = answers ? summarizeQI3Selections(answers) : null;
+    const inputs: KeystoneRewriteInputs = {
+      archetype: constitution.profileArchetype?.primary ?? "unmappedType",
+      beliefText: belief.belief_text,
+      valueDomain: belief.value_domain,
+      topCompassValueLabels,
+      costSurfaceLabels: qi3?.selectedLabels ?? [],
+      costSurfaceNoneSelected: qi3?.noneSelected ?? false,
+      correctionChannelLabels: qi2?.selectedLabels ?? [],
+      correctionChannelNoneSelected: qi2?.noneSelected ?? false,
+      convictionTemperature: belief.conviction_temperature,
+      epistemicPosture: belief.epistemic_posture,
+    };
+    return readCachedKeystoneRewrite(inputs);
+  })();
 
   return (
     <section className="flex flex-col" style={{ gap: 0 }}>
@@ -181,6 +269,40 @@ export default function MirrorSection({
         ) : null}
         {mbtiSlot ? <div style={{ paddingTop: 12 }}>{mbtiSlot}</div> : null}
       </div>
+
+      {/* 1c. CC-PROSE-1 — Executive Read. 2-sentence distillation
+          (gift/danger + thesis), lifted from the existing Synthesis
+          composer. Sits between the masthead block and "How to Read
+          This." Second-person register; engine canon phrases preserved
+          verbatim. Silent (skipped entirely) when constitution is
+          unavailable.
+
+          CC-PROSE-1A Fix 1 — wrapped in a callout block (left umber
+          border + warm umber-wash tint) so the distillation reads as
+          a summary callout, visually distinct from the italic
+          section-body paragraphs around it (How-to-Read, Mirror body,
+          Synthesis). Mirrors the markdown blockquote rendering. */}
+      {executiveRead && executiveRead.length > 0 ? (
+        <>
+          <HairlineRule />
+          <div className="flex flex-col" style={{ gap: 12 }}>
+            <SectionLabel>Executive Read</SectionLabel>
+            <CalloutBlock text={executiveRead} />
+          </div>
+        </>
+      ) : null}
+
+      {/* CC-PROSE-1B Layer 4 — Core Signal Map. 12-cell at-a-glance grid
+          immediately after the Executive Read, before "How to Read This." */}
+      {constitution ? (
+        <>
+          <HairlineRule />
+          <div className="flex flex-col" style={{ gap: 12 }}>
+            <SectionLabel>Core Signal Map</SectionLabel>
+            <CoreSignalMap constitution={constitution} />
+          </div>
+        </>
+      ) : null}
 
       <HairlineRule />
 
@@ -212,39 +334,30 @@ export default function MirrorSection({
 
       <HairlineRule />
 
-      {/* 3. Top 3 Gifts */}
-      <div className="flex flex-col" style={{ gap: 16 }}>
-        <SectionLabel>Your Top 3 Gifts</SectionLabel>
-        <NumberedList items={mirror.topGifts} />
-        {/* CC-038-prose — register analog elaboration. Surfaces the user's
-            canonical aux-pair register (NeTi → "the prober", NiFe → "the
-            seer", etc.) via the locked product_safe_sentence template
-            ("Your Lens has a [analog] quality: you appear to ..."). The
-            register reads as elaboration of the gifts above, not a new
-            section. Non-canonical Lens stacks (e.g., Si dominant + Ne
-            auxiliary) gracefully omit the line — getFunctionPairRegister
-            returns undefined and the conditional render handles absence. */}
-        {(() => {
-          if (!constitution) return null;
-          const register = getFunctionPairRegister(constitution.lens_stack);
-          if (!register) return null;
-          return (
-            <p
-              className="font-serif italic text-[15px] md:text-[15.5px]"
-              style={{ color: "var(--ink-soft)", lineHeight: 1.65, margin: 0 }}
-            >
-              {register.product_safe_sentence}
-            </p>
-          );
-        })()}
-      </div>
+      {/* CC-PROSE-1B Layer 6 — Top Gifts and Growth Edges unified table.
+          Replaces the prior separate "Top 3 Gifts" and "Top 3 Growth
+          Edges" lists with one 3-row × 3-column table. Pairing matches
+          generateSimpleSummary's parallel-line close: gift[i] ↔ trap[i].
 
-      <HairlineRule />
-
-      {/* 4. Top 3 Growth Edges (renamed from Traps in CC-025) */}
+          The Lens-flavor product_safe_sentence (which pre-1B sat
+          between the two list sections) repositions to BELOW the table
+          and BEFORE the Layer 5A One-Sentence Summary callout. */}
       <div className="flex flex-col" style={{ gap: 16 }}>
-        <SectionLabel>Your Top 3 Growth Edges</SectionLabel>
-        <NumberedList items={mirror.topTraps} />
+        <SectionLabel>Your Top Gifts and Growth Edges</SectionLabel>
+        <TopGiftsGrowthEdgesTable
+          gifts={mirror.topGifts}
+          traps={mirror.topTraps}
+        />
+        {lensFlavor ? (
+          <p
+            className="font-serif italic text-[15px] md:text-[15.5px]"
+            style={{ color: "var(--ink-soft)", lineHeight: 1.65, margin: 0 }}
+          >
+            {lensFlavor}
+          </p>
+        ) : null}
+        {/* CC-SYNTHESIS-1-FINISH Section A — Layer 5A summary callout
+            removed (verbatim duplicate of Executive Read sentence 3). */}
       </div>
 
       <HairlineRule />
@@ -283,15 +396,18 @@ export default function MirrorSection({
             valueListPhrase={beliefValueListPhrase ?? "what you protect"}
             answers={answers}
             demographics={demographics}
+            keystoneRewriteProse={keystoneRewriteProse}
           />
         </>
       ) : null}
 
-      {/* 9. CC-022b Item 5 — Simple Summary closing section. Synthesizes
-          the eight cards + closes with three structured patterns:
-          "To keep X without Y" lines, gift/danger compression, and
-          "not X, but Y" thesis. */}
-      {simpleSummary ? (
+      {/* 9. CC-022b Item 5 — Synthesis closing section. CC-PROSE-1B Layer
+          5B inserts the Most Useful Line callout between the parallel-
+          line tercet and the closing thesis sentence (ordering: intro →
+          tercet → 5B callout → thesis). The 5B content is identical to
+          generateSimpleSummary's pre-1B "Your gift is X. Your danger is
+          Y." line, just promoted to a callout block. */}
+      {summaryParts ? (
         <>
           <HairlineRule />
           <div className="flex flex-col" style={{ gap: 12 }}>
@@ -307,16 +423,30 @@ export default function MirrorSection({
             >
               one cross-card read, with the parallel-line close.
             </p>
-            <div
+            <p
               className="font-serif text-[15.5px] md:text-[16px]"
-              style={{
-                color: "var(--ink)",
-                lineHeight: 1.7,
-                whiteSpace: "pre-line",
-              }}
+              style={{ color: "var(--ink)", lineHeight: 1.7, margin: 0 }}
             >
-              {simpleSummary}
-            </div>
+              {summaryParts.intro}
+            </p>
+            {summaryParts.tercet ? (
+              <p
+                className="font-serif text-[15.5px] md:text-[16px]"
+                style={{
+                  color: "var(--ink)",
+                  lineHeight: 1.7,
+                  margin: 0,
+                  whiteSpace: "pre-line",
+                }}
+              >
+                {summaryParts.tercet}
+              </p>
+            ) : null}
+            {/* CC-SYNTHESIS-1-FINISH Section A — Layer 5B Most Useful
+                Line callout + Synthesis closing thesis sentence both
+                removed (verbatim duplicates of Executive Read). The
+                Synthesis section now closes on the parallel-line tercet
+                — its unique content. */}
           </div>
         </>
       ) : null}

@@ -1,0 +1,24 @@
+{
+  "label": "Crisis class — Am I safe? grip with movement collapse (Goal 12 + Soul 8). The withdrawal shape: defensive baseline gripping with both axes below 20.",
+  "synthetic": true,
+  "primalCluster": {
+    "primary": "Am I safe?",
+    "confidence": "high",
+    "contributingGrips": ["Grips control under pressure", "Grips comfort or escape under pressure"],
+    "scores": {
+      "Am I safe?": 1.5,
+      "Am I secure?": 0.5,
+      "Am I loved?": 0,
+      "Am I wanted?": 0,
+      "Am I successful?": 0,
+      "Am I good enough?": 0,
+      "Do I have purpose?": 0
+    }
+  },
+  "goalScore": 12,
+  "soulScore": 8,
+  "expected": {
+    "pathClass": "crisis",
+    "crisisFlavor": "withdrawal"
+  }
+}

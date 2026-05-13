@@ -1,0 +1,25 @@
+{
+  "label": "Crisis class — Goal-pinned/Soul-collapsed (Goal 100 + Soul 5). The workaholic shape: maximum output but the relational/soul-line has collapsed under the work. Output is being delivered as the answer to the wrong question.",
+  "synthetic": true,
+  "primalCluster": {
+    "primary": "Am I good enough?",
+    "confidence": "high",
+    "contributingGrips": ["Grips being right under pressure", "Performance-identity register active"],
+    "scores": {
+      "Am I safe?": 0,
+      "Am I secure?": 0,
+      "Am I loved?": 0,
+      "Am I wanted?": 0,
+      "Am I successful?": 0.5,
+      "Am I good enough?": 1.5,
+      "Do I have purpose?": 0
+    }
+  },
+  "goalScore": 100,
+  "soulScore": 5,
+  "expected": {
+    "pathClass": "crisis",
+    "crisisFlavor": "working-without-presence",
+    "appliedOverride": true
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "label": "High Conscientiousness profile: discipline-and-structure register dominant",
+  "answers": [
+    { "question_id": "Q-E1-outward", "card_id": "sacred", "question_text": "outward energy", "type": "ranking", "order": ["solving", "restoring", "building"] },
+    { "question_id": "Q-E1-inward",  "card_id": "sacred", "question_text": "inward energy",  "type": "ranking", "order": ["learning", "caring", "enjoying"] },
+    { "question_id": "Q-A1", "card_id": "agency", "question_text": "spend most of your time", "type": "forced", "response": "Maintaining responsibilities" },
+    { "question_id": "Q-A2", "card_id": "agency", "question_text": "where energy goes",       "type": "forced", "response": "Restoring order and stability" },
+    { "question_id": "Q-3C1",       "card_id": "role",   "question_text": "drive priority",       "type": "ranking", "order": ["compliance", "cost", "coverage"] },
+    { "question_id": "Q-Ambition1", "card_id": "role",   "question_text": "what does the win look like", "type": "ranking", "order": ["success", "wealth", "legacy", "fame"] },
+    { "question_id": "Q-Stakes1", "card_id": "sacred", "question_text": "concrete stakes", "type": "ranking", "order": ["job", "health", "money", "reputation", "close_relationships"] },
+    { "question_id": "Q-S1", "card_id": "sacred", "question_text": "qualities of self", "type": "ranking", "order": ["stability", "honor", "truth", "loyalty", "freedom", "peace"] },
+    { "question_id": "Q-S2", "card_id": "sacred", "question_text": "claims on you", "type": "ranking", "order": ["family", "justice", "knowledge", "faith", "compassion", "mercy"] },
+    { "question_id": "Q-T5", "card_id": "temperament", "question_text": "plan not working", "type": "ranking", "order": ["te", "ti", "fi", "fe"] },
+    { "question_id": "Q-P2", "card_id": "pressure", "question_text": "belief at job risk", "type": "forced", "response": "Accept the risk" },
+    { "question_id": "Q-O1", "card_id": "temperament", "question_text": "openness subtype", "type": "ranking", "order": ["low_novelty_preference", "intellectual", "experiential", "perspective", "aesthetic", "emotional"] },
+    { "question_id": "Q-O2", "card_id": "temperament", "question_text": "direct ER", "type": "ranking", "order": ["low_reactivity_focus", "anxious_reactivity", "detached_reactivity", "hidden_reactivity", "overwhelmed_functioning", "anger_reactivity", "avoidant_reactivity"] }
+  ],
+  "demographics": null,
+  "expected": {
+    "_cc_q1_note": "CC-Q1 added Q-O1 (low_novelty top — high-C preference for tested/familiar/proven) and Q-O2 (low_reactivity_focus #1 + anxious #2; remaining N items at low ranks). proxyOnly flips to false; A disambiguation still suppressed because A intensity stays below 60.",
+    "agreeablenessDisambiguationPresent": false,
+    "emotionalReactivityProxyOnly": false,
+    "noPersonalityVerdict": true
+  }
+}

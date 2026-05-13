@@ -1,0 +1,218 @@
+{
+  "ocean/01-architectural-openness.json": {
+    "### Lens — Eyes": "6d7b0a7adc1e7078",
+    "### Compass — Heart": "06be9f70a584c4de",
+    "### Trust — Ears": "56e9493aebea1e27",
+    "### Gravity — Spine": "f9cfa043e41068e8",
+    "### Conviction — Voice": "c26588f151794774",
+    "### Weather — Nervous System": "9127b0d14f4bd15c",
+    "### Fire — Immune Response": "ebaf8885c33d7844"
+  },
+  "ocean/02-high-conscientiousness.json": {
+    "### Lens — Eyes": "8febbc08b008842e",
+    "### Compass — Heart": "53c74aa3613afecc",
+    "### Trust — Ears": "b45a1ea7a4666953",
+    "### Gravity — Spine": "f9cfa043e41068e8",
+    "### Conviction — Voice": "b4ec2fb1e74700e0",
+    "### Weather — Nervous System": "9127b0d14f4bd15c",
+    "### Fire — Immune Response": "294ec22fe2df5952"
+  },
+  "ocean/03-low-extraversion-high-soul.json": {
+    "### Lens — Eyes": "b6ee2c6f50190e56",
+    "### Compass — Heart": "430a1a2b139172ab",
+    "### Trust — Ears": "d79e1f3addf898aa",
+    "### Gravity — Spine": "f9cfa043e41068e8",
+    "### Conviction — Voice": "2414584fb6db6101",
+    "### Weather — Nervous System": "9127b0d14f4bd15c",
+    "### Fire — Immune Response": "ddc77f36dd2f2215"
+  },
+  "ocean/04-high-agreeableness-loyalty.json": {
+    "### Lens — Eyes": "8febbc08b008842e",
+    "### Compass — Heart": "505eb6cae6a6df7f",
+    "### Trust — Ears": "030d213e6d843ba3",
+    "### Gravity — Spine": "f9cfa043e41068e8",
+    "### Conviction — Voice": "9c76aa21e64d458d",
+    "### Weather — Nervous System": "9127b0d14f4bd15c",
+    "### Fire — Immune Response": "ebaf8885c33d7844"
+  },
+  "ocean/05-low-emotional-reactivity-proxy.json": {
+    "### Lens — Eyes": "6d7b0a7adc1e7078",
+    "### Compass — Heart": "6e8aae77e6459115",
+    "### Trust — Ears": "b37961f0bfb0fd76",
+    "### Gravity — Spine": "f9cfa043e41068e8",
+    "### Conviction — Voice": "eb2df19ca0e590d9",
+    "### Weather — Nervous System": "2765e1eafc06f864",
+    "### Fire — Immune Response": "ebaf8885c33d7844"
+  },
+  "ocean/06-thin-signal-under-detected.json": {
+    "### Lens — Eyes": "6f5d928f77f12584",
+    "### Compass — Heart": "4b7a34d7f2648089",
+    "### Trust — Ears": "b45a1ea7a4666953",
+    "### Gravity — Spine": "f9cfa043e41068e8",
+    "### Conviction — Voice": "4929aabc2f52179a",
+    "### Weather — Nervous System": "9127b0d14f4bd15c",
+    "### Fire — Immune Response": "fc995c208ba48003"
+  },
+  "ocean/07-jason-real-session.json": {
+    "### Lens — Eyes": "6d7b0a7adc1e7078",
+    "### Compass — Heart": "b8d09a01d312ee36",
+    "### Trust — Ears": "946aaae77695d653",
+    "### Gravity — Spine": "f9cfa043e41068e8",
+    "### Conviction — Voice": "6854db9dff28eb06",
+    "### Weather — Nervous System": "19fe2635cde61306",
+    "### Fire — Immune Response": "ebaf8885c33d7844"
+  },
+  "ocean/24-si-precedent-keeper.json": {
+    "### Lens — Eyes": "fa1840e299389d39",
+    "### Compass — Heart": "1ee1a7603d5f39ae",
+    "### Trust — Ears": "fcdaf2a90728a3fd",
+    "### Gravity — Spine": "e754fac635359355",
+    "### Conviction — Voice": "3623fbc4dbf5c352",
+    "### Weather — Nervous System": "00dba09ffa770f02",
+    "### Fire — Immune Response": "a67486f97235752c"
+  },
+  "ocean/25-ti-coherence-prober.json": {
+    "### Lens — Eyes": "67b0df7e4d602fd1",
+    "### Compass — Heart": "cce85c4413701895",
+    "### Trust — Ears": "21619602c332f182",
+    "### Gravity — Spine": "f741566df2fab2a9",
+    "### Conviction — Voice": "333ef74603c0f7aa",
+    "### Weather — Nervous System": "ff126e133cdd815d",
+    "### Fire — Immune Response": "7e6a5c187030cd6c"
+  },
+  "ocean/26-fi-inner-truth-anchor.json": {
+    "### Lens — Eyes": "7ff01d4fad81f622",
+    "### Compass — Heart": "cecf66deb8b90d60",
+    "### Trust — Ears": "0e53ca4a03c574d7",
+    "### Gravity — Spine": "24a1f9a6e326584a",
+    "### Conviction — Voice": "d57b2507ddde3de2",
+    "### Weather — Nervous System": "479a251e5cb1e883",
+    "### Fire — Immune Response": "7e3754c295a62fde"
+  },
+  "ocean/27-fe-room-reader-attuned.json": {
+    "### Lens — Eyes": "3a3f9736eb500eef",
+    "### Compass — Heart": "324a54b39d30877e",
+    "### Trust — Ears": "fd2adfdbab954fdb",
+    "### Gravity — Spine": "622502cf42e2bb55",
+    "### Conviction — Voice": "dc08845324de2f60",
+    "### Weather — Nervous System": "2c77489ac49f3844",
+    "### Fire — Immune Response": "7995c4248c4aa6f7"
+  },
+  "goal-soul-give/01-generative.json": {
+    "### Lens — Eyes": "f79d1a9409db7766",
+    "### Compass — Heart": "00c283ec28f76908",
+    "### Trust — Ears": "7ac7986d755d7621",
+    "### Gravity — Spine": "9c8481f80d29c2fd",
+    "### Conviction — Voice": "56bc82d0b2ca9fcc",
+    "### Weather — Nervous System": "9127b0d14f4bd15c",
+    "### Fire — Immune Response": "ebaf8885c33d7844"
+  },
+  "goal-soul-give/02-compartmentalized.json": {
+    "### Lens — Eyes": "f79d1a9409db7766",
+    "### Compass — Heart": "00c283ec28f76908",
+    "### Trust — Ears": "05c0f00e22aedaa7",
+    "### Gravity — Spine": "9c8481f80d29c2fd",
+    "### Conviction — Voice": "fbf94e2f18e6ced3",
+    "### Weather — Nervous System": "9127b0d14f4bd15c",
+    "### Fire — Immune Response": "ec4273ba5ba0f3fb"
+  },
+  "goal-soul-give/03-striving.json": {
+    "### Lens — Eyes": "ea73bcfceae15c30",
+    "### Compass — Heart": "9a487f7043dc95e5",
+    "### Trust — Ears": "0784e3b1b6e46547",
+    "### Gravity — Spine": "9c8481f80d29c2fd",
+    "### Conviction — Voice": "f11d529697abbb3e",
+    "### Weather — Nervous System": "9127b0d14f4bd15c",
+    "### Fire — Immune Response": "7e6a5c187030cd6c"
+  },
+  "goal-soul-give/04-longing.json": {
+    "### Lens — Eyes": "b6ee2c6f50190e56",
+    "### Compass — Heart": "430a1a2b139172ab",
+    "### Trust — Ears": "d79e1f3addf898aa",
+    "### Gravity — Spine": "f9cfa043e41068e8",
+    "### Conviction — Voice": "9e1a4ab7fc129ac7",
+    "### Weather — Nervous System": "9127b0d14f4bd15c",
+    "### Fire — Immune Response": "ddc77f36dd2f2215"
+  },
+  "goal-soul-give/05-steward-not-gripper.json": {
+    "### Lens — Eyes": "8febbc08b008842e",
+    "### Compass — Heart": "62778adfe5eee31d",
+    "### Trust — Ears": "d9788077235dc7e7",
+    "### Gravity — Spine": "f9cfa043e41068e8",
+    "### Conviction — Voice": "ca7b6a475d1050e3",
+    "### Weather — Nervous System": "9127b0d14f4bd15c",
+    "### Fire — Immune Response": "ebaf8885c33d7844"
+  },
+  "goal-soul-give/06-neutral.json": {
+    "### Lens — Eyes": "6f5d928f77f12584",
+    "### Compass — Heart": "4b7a34d7f2648089",
+    "### Trust — Ears": "b45a1ea7a4666953",
+    "### Gravity — Spine": "f9cfa043e41068e8",
+    "### Conviction — Voice": "4929aabc2f52179a",
+    "### Weather — Nervous System": "9127b0d14f4bd15c",
+    "### Fire — Immune Response": "fc995c208ba48003"
+  },
+  "goal-soul-give/07-true-gripping.json": {
+    "### Lens — Eyes": "6d7b0a7adc1e7078",
+    "### Compass — Heart": "4b7a34d7f2648089",
+    "### Trust — Ears": "c48d879e92d2f96f",
+    "### Gravity — Spine": "f9cfa043e41068e8",
+    "### Conviction — Voice": "877b08df8d227ac3",
+    "### Weather — Nervous System": "9127b0d14f4bd15c",
+    "### Fire — Immune Response": "a912441f493e4435"
+  },
+  "goal-soul-give/08-early-career-striving.json": {
+    "### Lens — Eyes": "ea73bcfceae15c30",
+    "### Compass — Heart": "9a487f7043dc95e5",
+    "### Trust — Ears": "0784e3b1b6e46547",
+    "### Gravity — Spine": "9c8481f80d29c2fd",
+    "### Conviction — Voice": "e015ccee9838a9c2",
+    "### Weather — Nervous System": "9127b0d14f4bd15c",
+    "### Fire — Immune Response": "7e6a5c187030cd6c"
+  },
+  "goal-soul-give/09-mid-career-balance.json": {
+    "### Lens — Eyes": "f79d1a9409db7766",
+    "### Compass — Heart": "00c283ec28f76908",
+    "### Trust — Ears": "7ac7986d755d7621",
+    "### Gravity — Spine": "9c8481f80d29c2fd",
+    "### Conviction — Voice": "bf51ce572a565534",
+    "### Weather — Nervous System": "9127b0d14f4bd15c",
+    "### Fire — Immune Response": "ebaf8885c33d7844"
+  },
+  "goal-soul-give/10-entrepreneur-striving.json": {
+    "### Lens — Eyes": "ea73bcfceae15c30",
+    "### Compass — Heart": "9a487f7043dc95e5",
+    "### Trust — Ears": "0784e3b1b6e46547",
+    "### Gravity — Spine": "9c8481f80d29c2fd",
+    "### Conviction — Voice": "6ff0bd9b098c760c",
+    "### Weather — Nervous System": "9127b0d14f4bd15c",
+    "### Fire — Immune Response": "7e6a5c187030cd6c"
+  },
+  "goal-soul-give/11-retirement-longing.json": {
+    "### Lens — Eyes": "b6ee2c6f50190e56",
+    "### Compass — Heart": "430a1a2b139172ab",
+    "### Trust — Ears": "d79e1f3addf898aa",
+    "### Gravity — Spine": "f9cfa043e41068e8",
+    "### Conviction — Voice": "5ec602bd1cac2ef4",
+    "### Weather — Nervous System": "9127b0d14f4bd15c",
+    "### Fire — Immune Response": "ddc77f36dd2f2215"
+  },
+  "goal-soul-give/12-productive-ne-default-pair.json": {
+    "### Lens — Eyes": "f5b3f79a5eb43010",
+    "### Compass — Heart": "27873eac7862a4d1",
+    "### Trust — Ears": "b5a74e5ce8c51543",
+    "### Gravity — Spine": "f8aa4f7028a65bfc",
+    "### Conviction — Voice": "020f12abed828da8",
+    "### Weather — Nervous System": "9127b0d14f4bd15c",
+    "### Fire — Immune Response": "7e6a5c187030cd6c"
+  },
+  "goal-soul-give/13-drive-inverted-case.json": {
+    "### Lens — Eyes": "8febbc08b008842e",
+    "### Compass — Heart": "c8a2afefdfbcb1d9",
+    "### Trust — Ears": "41f76b3ed7d4a4f4",
+    "### Gravity — Spine": "f9cfa043e41068e8",
+    "### Conviction — Voice": "51a793255d269e66",
+    "### Weather — Nervous System": "9127b0d14f4bd15c",
+    "### Fire — Immune Response": "72f2b6a9a2224364"
+  }
+}

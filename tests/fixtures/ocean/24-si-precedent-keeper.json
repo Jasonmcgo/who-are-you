@@ -1,0 +1,49 @@
+{
+  "label": "Si-dominant precedent-keeper (CC-FIXTURES-SI-TI-FI-FE Addition 1)",
+  "_source": "Synthesized persona — 60-something woman, 35 years in archival / community-history work; raised mostly by grandparents after parents divorced when she was 8; the family-keeper. Believes in the form of things — steady, tested ways of doing — and feels alarm when communities forget what they used to know. Si dominant + Fe auxiliary (ISFJ stack); chaos_exposure formation; Family / Honor / Stability / Faith protective Compass; Authority + System gravity attribution. Designed to fire si_tradition_built_from_chaos pattern.",
+  "answers": [
+    { "question_id": "Q-E1-outward", "card_id": "sacred", "question_text": "outward energy", "type": "ranking", "order": ["restoring", "caring", "building"] },
+    { "question_id": "Q-E1-inward",  "card_id": "sacred", "question_text": "inward energy",  "type": "ranking", "order": ["caring", "learning", "enjoying"] },
+    { "question_id": "Q-A1", "card_id": "agency", "question_text": "spend most of your time", "type": "forced", "response": "Maintaining responsibilities" },
+    { "question_id": "Q-A2", "card_id": "agency", "question_text": "where energy goes",       "type": "forced", "response": "Restoring order and stability" },
+    { "question_id": "Q-3C1",       "card_id": "role",   "question_text": "drive priority",       "type": "ranking", "order": ["coverage", "compliance", "cost"] },
+    { "question_id": "Q-3C2",       "card_id": "role",   "question_text": "what you protect first in practice", "type": "ranking", "order": ["coverage_priority", "compliance_priority", "recovery_priority", "goal_priority", "cost_priority", "reputation_priority"] },
+    { "question_id": "Q-Ambition1", "card_id": "role",   "question_text": "what does the win look like", "type": "ranking", "order": ["legacy", "success", "wealth", "fame"] },
+    { "question_id": "Q-Stakes1", "card_id": "sacred", "question_text": "concrete stakes", "type": "ranking", "order": ["close_relationships", "health", "reputation", "money", "job"] },
+    { "question_id": "Q-S1", "card_id": "sacred", "question_text": "qualities of self", "type": "ranking", "order": ["stability", "honor", "loyalty", "peace", "truth", "freedom"] },
+    { "question_id": "Q-S2", "card_id": "sacred", "question_text": "claims on you", "type": "ranking", "order": ["family", "faith", "mercy", "compassion", "justice", "knowledge"] },
+    { "question_id": "Q-C4", "card_id": "conviction", "question_text": "where responsibility sits", "type": "ranking", "order": ["authority", "system", "individual", "nature", "supernatural"] },
+    { "question_id": "Q-X4-relational", "card_id": "context", "question_text": "relational trust", "type": "ranking", "order": ["family", "partner", "friend"] },
+    { "question_id": "Q-X4-chosen",     "card_id": "context", "question_text": "chosen trust",     "type": "ranking", "order": ["mentor", "own_counsel", "outside_expert"] },
+    { "question_id": "Q-S3-close", "card_id": "sacred", "question_text": "close-circle money", "type": "ranking", "order": ["family", "friends", "yourself"] },
+    { "question_id": "Q-S3-wider", "card_id": "sacred", "question_text": "wider-circle money", "type": "ranking", "order": ["nonprofits_religious", "social", "companies"] },
+    { "question_id": "Q-T1", "card_id": "temperament", "question_text": "hard problem",      "type": "ranking", "order": ["si", "ni", "se", "ne"] },
+    { "question_id": "Q-T2", "card_id": "temperament", "question_text": "new environment",   "type": "ranking", "order": ["si", "ne", "ni", "se"] },
+    { "question_id": "Q-T3", "card_id": "temperament", "question_text": "learning new",      "type": "ranking", "order": ["si", "ni", "se", "ne"] },
+    { "question_id": "Q-T4", "card_id": "temperament", "question_text": "complex situation", "type": "ranking", "order": ["si", "ni", "ne", "se"] },
+    { "question_id": "Q-T5", "card_id": "temperament", "question_text": "plan not working",  "type": "ranking", "order": ["fe", "ti", "te", "fi"] },
+    { "question_id": "Q-T6", "card_id": "temperament", "question_text": "respected disagrees","type": "ranking", "order": ["fe", "fi", "te", "ti"] },
+    { "question_id": "Q-T7", "card_id": "temperament", "question_text": "hard call",         "type": "ranking", "order": ["fe", "fi", "ti", "te"] },
+    { "question_id": "Q-T8", "card_id": "temperament", "question_text": "someone struggling","type": "ranking", "order": ["fe", "fi", "ti", "te"] },
+    { "question_id": "Q-P1", "card_id": "pressure", "question_text": "expressing belief that costs relationships", "type": "forced", "response": "Express it carefully" },
+    { "question_id": "Q-P2", "card_id": "pressure", "question_text": "belief at job risk", "type": "forced", "response": "Don't volunteer it" },
+    { "question_id": "Q-F1", "card_id": "formation", "question_text": "authority figures", "type": "forced", "response": "Necessary but flawed" },
+    { "question_id": "Q-F2", "card_id": "formation", "question_text": "childhood environment", "type": "forced", "response": "Uncertain or chaotic" },
+    { "question_id": "Q-X1", "card_id": "context", "question_text": "current life", "type": "forced", "response": "Stable and manageable" },
+    { "question_id": "Q-X2", "card_id": "context", "question_text": "people depend on you", "type": "forced", "response": "A lot" },
+    { "question_id": "Q-I1", "card_id": "conviction", "question_text": "belief you'd bear cost to keep", "type": "freeform", "response": "I believe the things that have been tested across generations — the steady ways of caring for one another, the small rituals that keep memory alive — are not optional. When communities forget what they used to know, something breaks that's hard to put back. I would carry the inconvenience of remembering even when others stop." },
+    { "question_id": "Q-O1", "card_id": "temperament", "question_text": "openness subtype", "type": "ranking", "order": ["aesthetic", "low_novelty_preference", "emotional", "intellectual", "experiential", "perspective"] },
+    { "question_id": "Q-O2", "card_id": "temperament", "question_text": "direct ER", "type": "ranking", "order": ["hidden_reactivity", "low_reactivity_focus", "anxious_reactivity", "detached_reactivity", "overwhelmed_functioning", "anger_reactivity", "avoidant_reactivity"] },
+    { "question_id": "Q-GS1", "card_id": "sacred", "question_text": "what makes a successful effort feel worth it", "type": "ranking", "order": ["soul_people", "durable_creation", "soul_calling", "creative_truth", "goal_completion", "security_freedom", "gripping_proof"] },
+    { "question_id": "Q-V1", "card_id": "conviction", "question_text": "why your work really matters", "type": "ranking", "order": ["soul_beloved_named", "sacred_belief_connection", "vulnerability_open_uncertainty", "goal_logic_explanation", "performance_identity", "vulnerability_deflection"] },
+    { "question_id": "Q-GRIP1", "card_id": "pressure", "question_text": "what you grip under pressure", "type": "ranking", "order": ["grips_old_plan", "grips_neededness", "grips_security", "grips_approval", "grips_certainty", "grips_control", "grips_comfort", "grips_reputation"] },
+    { "question_id": "Q-L1", "card_id": "sacred", "question_text": "how love becomes visible", "type": "ranking", "order": ["presence", "quiet_sacrifice", "problem_solving", "co_construction", "protection", "shared_experience", "verbal_expression"] }
+  ],
+  "demographics": {
+    "answers": [
+      { "field_id": "age", "state": "specified", "value": "1960s" },
+      { "field_id": "profession", "state": "specified", "value": "knowledge" }
+    ]
+  },
+  "expected": {}
+}

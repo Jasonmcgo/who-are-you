@@ -22,6 +22,12 @@ type Props = {
   // CC-022b Item 1 — passed through to generateBeliefContextProse so the
   // citation prose can substitute the user's name where appropriate.
   demographics?: DemographicSet | null;
+  // CC-KEYSTONE-RENDER — when present, the user-facing surface shows the
+  // LLM-rendered interpretive prose in place of the engine metadata
+  // bullets + generic posture prose. Engine metadata (TagRows for value
+  // domain / wording temperature / openness to revision) relocates to a
+  // collapsible "Engine metadata" disclosure that defaults closed.
+  keystoneRewriteProse?: string | null;
 };
 
 // ── Per-tag option lists (for the "Different" dropdown) ──────────────────
@@ -320,7 +326,12 @@ export default function KeystoneReflection({
   valueListPhrase,
   answers,
   demographics,
+  keystoneRewriteProse,
 }: Props) {
+  // CC-KEYSTONE-RENDER — engine metadata disclosure default-closed in
+  // user mode. Only relevant when LLM prose is present; otherwise the
+  // metadata still renders inline (cache-miss fallback).
+  const [showEngineMetadata, setShowEngineMetadata] = useState(false);
   // CC-017 — local state for user overrides on the three structured-source
   // dimensions. The engine's derived value seeds the state; the user can pick
   // a different value via the Different dropdown. No confirmation flags on
@@ -390,84 +401,227 @@ export default function KeystoneReflection({
         </p>
       </header>
 
-      {editableBelief.belief_text ? (
-        <VerbatimBlock text={editableBelief.belief_text} />
-      ) : null}
+      {/* CC-KEYSTONE-RENDER — user mode (LLM cache hit) shows the
+          interpretive prose only. The prose opens with the verbatim
+          quote so the standalone VerbatimBlock is suppressed to avoid
+          duplication. Engine metadata TagRows relocate to a collapsible
+          disclosure that defaults closed. Cache miss falls through to
+          the legacy display (VerbatimBlock + inline TagRows + prose). */}
+      {keystoneRewriteProse ? (
+        <>
+          <KeystoneProseBlock prose={keystoneRewriteProse} />
+          {editableBelief.belief_text ? (
+            <details
+              style={{
+                borderTop: "1px solid var(--rule-soft)",
+                paddingTop: 12,
+              }}
+              open={showEngineMetadata}
+              onToggle={(e) =>
+                setShowEngineMetadata(
+                  (e.currentTarget as HTMLDetailsElement).open
+                )
+              }
+            >
+              <summary
+                className="font-mono uppercase"
+                style={{
+                  fontSize: 10,
+                  letterSpacing: "0.12em",
+                  color: "var(--ink-mute)",
+                  cursor: "pointer",
+                  listStyle: "none",
+                }}
+              >
+                Engine metadata
+              </summary>
+              <div
+                className="flex flex-col"
+                style={{
+                  gap: 0,
+                  background: "var(--paper-warm)",
+                  borderRadius: 8,
+                  padding: "14px 16px",
+                  border: "1px solid var(--rule-soft)",
+                  marginTop: 10,
+                }}
+              >
+                <p
+                  className="font-mono uppercase"
+                  style={{
+                    fontSize: 10,
+                    letterSpacing: "0.12em",
+                    color: "var(--ink-mute)",
+                    margin: 0,
+                    paddingBottom: 10,
+                    borderBottom: "1px solid var(--rule)",
+                  }}
+                >
+                  The model proposes — you confirm
+                </p>
+                <TagRow
+                  label="Likely value"
+                  currentValue={editableValueDomain}
+                  currentLabel={VALUE_LABEL_FROM_TAG[editableValueDomain]}
+                  options={VALUE_DOMAIN_OPTIONS}
+                  userConfirmed={valueDomainConfirmed}
+                  onConfirm={() => setValueDomainConfirmed(true)}
+                  onChange={(v) => {
+                    setEditableValueDomain(v);
+                    setValueDomainConfirmed(true);
+                  }}
+                />
+                <TagRow
+                  label="Wording temperature"
+                  currentValue={editableTemperature}
+                  currentLabel={TEMPERATURE_LABEL_FROM_TAG[editableTemperature]}
+                  options={TEMPERATURE_OPTIONS}
+                  userConfirmed={temperatureConfirmed}
+                  onConfirm={() => setTemperatureConfirmed(true)}
+                  onChange={(v) => {
+                    setEditableTemperature(v);
+                    setTemperatureConfirmed(true);
+                  }}
+                />
+                <TagRow
+                  label="Openness to revision"
+                  currentValue={editablePosture}
+                  currentLabel={POSTURE_LABEL_FROM_TAG[editablePosture]}
+                  options={POSTURE_OPTIONS}
+                  userConfirmed={postureConfirmed}
+                  onConfirm={() => setPostureConfirmed(true)}
+                  onChange={(v) => {
+                    setEditablePosture(v);
+                    setPostureConfirmed(true);
+                  }}
+                />
+              </div>
+            </details>
+          ) : null}
+        </>
+      ) : (
+        <>
+          {editableBelief.belief_text ? (
+            <VerbatimBlock text={editableBelief.belief_text} />
+          ) : null}
 
-      {editableBelief.belief_text ? (
-        <div
-          className="flex flex-col"
-          style={{
-            gap: 0,
-            background: "var(--paper-warm)",
-            borderRadius: 8,
-            padding: "14px 16px",
-            border: "1px solid var(--rule-soft)",
-          }}
-        >
+          {editableBelief.belief_text ? (
+            <div
+              className="flex flex-col"
+              style={{
+                gap: 0,
+                background: "var(--paper-warm)",
+                borderRadius: 8,
+                padding: "14px 16px",
+                border: "1px solid var(--rule-soft)",
+              }}
+            >
+              <p
+                className="font-mono uppercase"
+                style={{
+                  fontSize: 10,
+                  letterSpacing: "0.12em",
+                  color: "var(--ink-mute)",
+                  margin: 0,
+                  paddingBottom: 10,
+                  borderBottom: "1px solid var(--rule)",
+                }}
+              >
+                The model proposes — you confirm
+              </p>
+              <TagRow
+                label="Likely value"
+                currentValue={editableValueDomain}
+                currentLabel={VALUE_LABEL_FROM_TAG[editableValueDomain]}
+                options={VALUE_DOMAIN_OPTIONS}
+                userConfirmed={valueDomainConfirmed}
+                onConfirm={() => setValueDomainConfirmed(true)}
+                onChange={(v) => {
+                  setEditableValueDomain(v);
+                  setValueDomainConfirmed(true);
+                }}
+              />
+              <TagRow
+                label="Wording temperature"
+                currentValue={editableTemperature}
+                currentLabel={TEMPERATURE_LABEL_FROM_TAG[editableTemperature]}
+                options={TEMPERATURE_OPTIONS}
+                userConfirmed={temperatureConfirmed}
+                onConfirm={() => setTemperatureConfirmed(true)}
+                onChange={(v) => {
+                  setEditableTemperature(v);
+                  setTemperatureConfirmed(true);
+                }}
+              />
+              <TagRow
+                label="Openness to revision"
+                currentValue={editablePosture}
+                currentLabel={POSTURE_LABEL_FROM_TAG[editablePosture]}
+                options={POSTURE_OPTIONS}
+                userConfirmed={postureConfirmed}
+                onConfirm={() => setPostureConfirmed(true)}
+                onChange={(v) => {
+                  setEditablePosture(v);
+                  setPostureConfirmed(true);
+                }}
+              />
+            </div>
+          ) : null}
+
           <p
-            className="font-mono uppercase"
+            className="font-serif"
             style={{
-              fontSize: 10,
-              letterSpacing: "0.12em",
-              color: "var(--ink-mute)",
+              fontSize: 15.5,
+              color: "var(--ink)",
+              lineHeight: 1.65,
               margin: 0,
-              paddingBottom: 10,
-              borderBottom: "1px solid var(--rule)",
             }}
           >
-            The model proposes — you confirm
+            {contextualProse}
           </p>
-          <TagRow
-            label="Likely value"
-            currentValue={editableValueDomain}
-            currentLabel={VALUE_LABEL_FROM_TAG[editableValueDomain]}
-            options={VALUE_DOMAIN_OPTIONS}
-            userConfirmed={valueDomainConfirmed}
-            onConfirm={() => setValueDomainConfirmed(true)}
-            onChange={(v) => {
-              setEditableValueDomain(v);
-              setValueDomainConfirmed(true);
-            }}
-          />
-          <TagRow
-            label="Wording temperature"
-            currentValue={editableTemperature}
-            currentLabel={TEMPERATURE_LABEL_FROM_TAG[editableTemperature]}
-            options={TEMPERATURE_OPTIONS}
-            userConfirmed={temperatureConfirmed}
-            onConfirm={() => setTemperatureConfirmed(true)}
-            onChange={(v) => {
-              setEditableTemperature(v);
-              setTemperatureConfirmed(true);
-            }}
-          />
-          <TagRow
-            label="Openness to revision"
-            currentValue={editablePosture}
-            currentLabel={POSTURE_LABEL_FROM_TAG[editablePosture]}
-            options={POSTURE_OPTIONS}
-            userConfirmed={postureConfirmed}
-            onConfirm={() => setPostureConfirmed(true)}
-            onChange={(v) => {
-              setEditablePosture(v);
-              setPostureConfirmed(true);
-            }}
-          />
-        </div>
-      ) : null}
-
-      <p
-        className="font-serif"
-        style={{
-          fontSize: 15.5,
-          color: "var(--ink)",
-          lineHeight: 1.65,
-          margin: 0,
-        }}
-      >
-        {contextualProse}
-      </p>
+        </>
+      )}
     </section>
+  );
+}
+
+// CC-KEYSTONE-RENDER — render the LLM-rewritten Keystone prose. The
+// markdown body opens with a "> ..." blockquote (verbatim user belief)
+// followed by paragraphs. Split on the blockquote so the quote renders
+// in the same styled VerbatimBlock as the cache-miss path; the rest
+// renders as standard serif paragraphs.
+function KeystoneProseBlock({ prose }: { prose: string }) {
+  const lines = prose.trim().split(/\r?\n/);
+  const quoteLines: string[] = [];
+  let i = 0;
+  while (i < lines.length && lines[i].startsWith(">")) {
+    quoteLines.push(lines[i].replace(/^>\s?/, ""));
+    i++;
+  }
+  while (i < lines.length && lines[i].trim() === "") i++;
+  const remaining = lines.slice(i).join("\n").trim();
+  const paragraphs = remaining
+    .split(/\n{2,}/)
+    .map((p) => p.replace(/\n/g, " ").trim())
+    .filter((p) => p.length > 0);
+  const quote = quoteLines.join("\n").trim();
+  return (
+    <div className="flex flex-col" style={{ gap: 14 }}>
+      {quote ? <VerbatimBlock text={quote} /> : null}
+      {paragraphs.map((p, idx) => (
+        <p
+          key={idx}
+          className="font-serif"
+          style={{
+            fontSize: 15.5,
+            color: "var(--ink)",
+            lineHeight: 1.65,
+            margin: 0,
+          }}
+        >
+          {p}
+        </p>
+      ))}
+    </div>
   );
 }

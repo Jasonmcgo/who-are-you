@@ -1,0 +1,1419 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The 50° Life — Who Are You?</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,300..700;1,8..60,300..700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+<style>
+  :root{
+    --paper:#f6f2ea;
+    --paper-warm:#efe9dd;
+    --paper-deep:#e6dece;
+    --ink:#1a1713;
+    --ink-soft:#433d33;
+    --ink-mute:#807566;
+    --ink-faint:#b8ad9c;
+    --rule:rgba(26,23,19,.14);
+    --rule-soft:rgba(26,23,19,.08);
+    --umber:#8a4a1f;
+    --umber-soft:#a8653a;
+    --umber-wash:rgba(138,74,31,.08);
+    --serif:"Source Serif 4","Iowan Old Style","Palatino",Georgia,serif;
+    --mono:"JetBrains Mono","IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+
+  *,*::before,*::after{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--serif);
+    font-feature-settings:"ss01","onum";
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+    line-height:1.5;
+    overflow-x:hidden;
+  }
+
+  .kicker{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.16em;
+    text-transform:uppercase;
+    color:var(--ink-mute);
+    font-weight:500;
+  }
+
+  a{color:inherit;text-decoration:none;}
+
+  .wrap{
+    max-width:1180px;
+    margin:0 auto;
+    padding:0 56px;
+  }
+  @media (max-width:720px){ .wrap{ padding:0 24px; } }
+
+  /* ─────────────────────────────────────────────────────────────── */
+  /* HEADER */
+  /* ─────────────────────────────────────────────────────────────── */
+  header.top{
+    padding:28px 0 0;
+  }
+  .top-row{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    gap:24px;
+  }
+  .mark{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:18px;
+    letter-spacing:.01em;
+  }
+  .mark .deg{ color:var(--umber); }
+  .top-meta{
+    display:flex;
+    gap:32px;
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--ink-mute);
+  }
+  @media (max-width:720px){ .top-meta{display:none;} }
+
+  /* ─────────────────────────────────────────────────────────────── */
+  /* HERO */
+  /* ─────────────────────────────────────────────────────────────── */
+  .hero{
+    position:relative;
+    padding:80px 0 96px;
+  }
+  .hero-grid{
+    display:grid;
+    grid-template-columns:1.05fr .95fr;
+    gap:64px;
+    align-items:center;
+  }
+  @media (max-width:980px){
+    .hero-grid{ grid-template-columns:1fr; gap:32px; }
+  }
+  .hero h1{
+    font-family:var(--serif);
+    font-weight:300;
+    font-size:clamp(56px, 9vw, 132px);
+    line-height:.92;
+    letter-spacing:-0.02em;
+    margin:24px 0 16px;
+    font-variation-settings:"opsz" 60;
+  }
+  .hero h1 .deg{
+    color:var(--umber);
+    font-style:italic;
+    font-weight:400;
+  }
+  .hero .lede{
+    font-family:var(--serif);
+    font-size:22px;
+    line-height:1.45;
+    color:var(--ink-soft);
+    max-width:520px;
+    margin:0 0 36px;
+    font-weight:380;
+  }
+  .hero .lede em{
+    color:var(--ink);
+    font-style:italic;
+  }
+
+  .cta-row{
+    display:flex;
+    gap:14px;
+    flex-wrap:wrap;
+    margin-top:8px;
+  }
+  .btn{
+    font-family:var(--mono);
+    font-size:12px;
+    font-weight:500;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    padding:18px 26px;
+    border-radius:0;
+    cursor:pointer;
+    border:1px solid transparent;
+    transition:background .15s,color .15s,border-color .15s;
+    display:inline-flex;
+    align-items:center;
+    gap:10px;
+  }
+  .btn .arrow{ font-family:var(--serif); font-size:18px; line-height:1; transform:translateY(-1px); }
+  .btn-primary{
+    background:var(--ink);
+    color:var(--paper);
+    border-color:var(--ink);
+  }
+  .btn-primary:hover{ background:var(--umber); border-color:var(--umber); }
+  .btn-ghost{
+    background:transparent;
+    color:var(--ink);
+    border-color:var(--ink);
+  }
+  .btn-ghost:hover{ background:var(--ink); color:var(--paper); }
+
+  /* Hero arc — large 50° illustration */
+  .hero-arc{
+    position:relative;
+    aspect-ratio:1/1;
+    max-width:520px;
+    margin-left:auto;
+  }
+  @media (max-width:980px){ .hero-arc{ margin:0 auto; max-width:420px; } }
+
+  /* ─────────────────────────────────────────────────────────────── */
+  /* SECTION RHYTHM */
+  /* ─────────────────────────────────────────────────────────────── */
+  section{ padding:96px 0; }
+  section + section{ border-top:1px solid var(--rule-soft); }
+
+  .section-head{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    margin-bottom:56px;
+  }
+  .section-head h2{
+    font-family:var(--serif);
+    font-weight:400;
+    font-size:clamp(36px, 5vw, 64px);
+    line-height:1.04;
+    letter-spacing:-0.015em;
+    margin:0;
+    max-width:780px;
+  }
+  .section-head h2 em{ color:var(--umber); font-style:italic; }
+  .section-head .sub{
+    font-family:var(--serif);
+    font-size:18px;
+    color:var(--ink-soft);
+    max-width:620px;
+    line-height:1.5;
+    margin:8px 0 0;
+  }
+
+  /* ─────────────────────────────────────────────────────────────── */
+  /* LEAD VOICE */
+  /* ─────────────────────────────────────────────────────────────── */
+  .lead-voice{
+    background:var(--paper-warm);
+    margin:0 -100vw;
+    padding-left:100vw;
+    padding-right:100vw;
+  }
+  .lead-voice-inner{
+    max-width:760px;
+    margin:0 auto;
+    padding:120px 56px;
+  }
+  @media (max-width:720px){ .lead-voice-inner{ padding:80px 24px; } }
+  .lead-voice p{
+    font-family:var(--serif);
+    font-size:24px;
+    line-height:1.5;
+    color:var(--ink);
+    margin:0 0 28px;
+    font-weight:380;
+    text-wrap:pretty;
+  }
+  .lead-voice p.lift{
+    font-size:32px;
+    line-height:1.32;
+    font-weight:400;
+    text-wrap:balance;
+  }
+  .lead-voice p em{ font-style:italic; color:var(--ink-soft); }
+  .lead-voice .pull{
+    font-size:36px;
+    line-height:1.25;
+    font-weight:400;
+    border-left:2px solid var(--umber);
+    padding-left:28px;
+    margin:48px 0;
+    color:var(--ink);
+    font-style:italic;
+    text-wrap:balance;
+  }
+  .lead-voice .pull strong{ color:var(--umber); font-style:normal; font-weight:500; }
+
+  /* ─────────────────────────────────────────────────────────────── */
+  /* TRAJECTORY DIAGRAM */
+  /* ─────────────────────────────────────────────────────────────── */
+  .arcs{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:8px;
+    align-items:stretch;
+  }
+  @media (max-width:880px){ .arcs{ grid-template-columns:1fr; gap:32px; } }
+  .arc-card{
+    padding:36px 28px 32px;
+    display:flex;
+    flex-direction:column;
+    gap:24px;
+    border:1px solid var(--rule-soft);
+    background:var(--paper);
+    position:relative;
+  }
+  .arc-card.is-fifty{
+    background:var(--paper-warm);
+    border-color:var(--rule);
+  }
+  .arc-card .arc-deg{
+    font-family:var(--serif);
+    font-size:64px;
+    font-weight:300;
+    letter-spacing:-0.02em;
+    line-height:1;
+    color:var(--ink);
+    font-variation-settings:"opsz" 60;
+  }
+  .arc-card.is-fifty .arc-deg{ color:var(--umber); }
+  .arc-card .arc-svg{
+    aspect-ratio:1.5/1;
+    width:100%;
+  }
+  .arc-card h3{
+    font-family:var(--serif);
+    font-size:22px;
+    font-weight:500;
+    letter-spacing:-0.01em;
+    margin:0;
+    line-height:1.2;
+  }
+  .arc-card p{
+    font-family:var(--serif);
+    font-size:15.5px;
+    line-height:1.55;
+    color:var(--ink-soft);
+    margin:0;
+  }
+  .arc-card .arc-tag{
+    font-family:var(--mono);
+    font-size:10.5px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--ink-mute);
+  }
+  .arc-card.is-fifty .arc-tag{ color:var(--umber); }
+
+  /* ─────────────────────────────────────────────────────────────── */
+  /* FOUR FORCES */
+  /* ─────────────────────────────────────────────────────────────── */
+  .forces{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:1px;
+    background:var(--rule);
+    border:1px solid var(--rule);
+  }
+  @media (max-width:980px){ .forces{ grid-template-columns:repeat(2,1fr); } }
+  @media (max-width:560px){ .forces{ grid-template-columns:1fr; } }
+  .force{
+    background:var(--paper);
+    padding:36px 28px;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+  }
+  .force .force-num{
+    font-family:var(--mono);
+    font-size:10.5px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--ink-mute);
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+  }
+  .force .force-num .axis{ color:var(--umber); }
+  .force h3{
+    font-family:var(--serif);
+    font-size:40px;
+    font-weight:300;
+    letter-spacing:-0.02em;
+    margin:0;
+    line-height:1;
+    font-variation-settings:"opsz" 60;
+  }
+  .force h3 .line{
+    display:block;
+    font-size:14px;
+    font-weight:500;
+    color:var(--ink-mute);
+    font-family:var(--mono);
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    margin-top:10px;
+    font-variation-settings:normal;
+  }
+  .force p{
+    font-family:var(--serif);
+    font-size:15.5px;
+    line-height:1.55;
+    color:var(--ink-soft);
+    margin:0;
+  }
+  .force .ask{
+    font-style:italic;
+    color:var(--ink);
+    padding-top:14px;
+    border-top:1px solid var(--rule-soft);
+    margin-top:auto;
+  }
+
+  .primal-questions{
+    margin-top:40px;
+    background:var(--paper-warm);
+    padding:32px 36px;
+    border-left:2px solid var(--umber);
+  }
+  .primal-questions .pq-head{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--umber);
+    margin-bottom:18px;
+  }
+  .primal-questions ul{
+    list-style:none;
+    padding:0;
+    margin:0;
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:8px 32px;
+  }
+  @media (max-width:560px){ .primal-questions ul{ grid-template-columns:1fr; } }
+  .primal-questions li{
+    font-family:var(--serif);
+    font-size:18px;
+    font-style:italic;
+    color:var(--ink);
+    padding:6px 0;
+  }
+  .primal-questions li::before{
+    content:"";
+    display:inline-block;
+    width:8px;
+    height:1px;
+    background:var(--umber);
+    vertical-align:middle;
+    margin-right:14px;
+  }
+
+  /* ─────────────────────────────────────────────────────────────── */
+  /* BODY CARDS */
+  /* ─────────────────────────────────────────────────────────────── */
+  .body-cards{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:1px;
+    background:var(--rule);
+    border:1px solid var(--rule);
+  }
+  @media (max-width:980px){ .body-cards{ grid-template-columns:repeat(2,1fr); } }
+  @media (max-width:560px){ .body-cards{ grid-template-columns:1fr; } }
+  .bcard{
+    background:var(--paper);
+    padding:28px 24px 28px;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+  }
+  .bcard .bcard-svg{
+    width:84px;
+    height:84px;
+  }
+  .bcard .bcard-svg svg{ width:100%; height:100%; }
+  .bcard .bcard-head{
+    display:flex;
+    align-items:baseline;
+    gap:12px;
+  }
+  .bcard h4{
+    font-family:var(--serif);
+    font-size:26px;
+    font-weight:500;
+    letter-spacing:-0.01em;
+    margin:0;
+    line-height:1;
+  }
+  .bcard .body-part{
+    font-family:var(--mono);
+    font-size:10.5px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--umber);
+  }
+  .bcard p{
+    font-family:var(--serif);
+    font-size:15.5px;
+    line-height:1.5;
+    color:var(--ink-soft);
+    margin:0;
+  }
+  .bcard .num{
+    font-family:var(--mono);
+    font-size:10.5px;
+    letter-spacing:.14em;
+    color:var(--ink-faint);
+  }
+  .body-cards-note{
+    font-family:var(--serif);
+    font-style:italic;
+    color:var(--ink-mute);
+    font-size:16px;
+    margin-top:32px;
+    max-width:560px;
+  }
+
+  /* ─────────────────────────────────────────────────────────────── */
+  /* VIGNETTES CAROUSEL */
+  /* ─────────────────────────────────────────────────────────────── */
+  .vignettes-wrap{
+    margin:0 calc(-1 * ((100vw - 1180px) / 2 + 56px));
+    padding:0 calc((100vw - 1180px) / 2 + 56px);
+  }
+  @media (max-width:1292px){
+    .vignettes-wrap{ margin:0 -56px; padding:0 56px; }
+  }
+  @media (max-width:720px){
+    .vignettes-wrap{ margin:0 -24px; padding:0 24px; }
+  }
+  .vignettes{
+    display:flex;
+    gap:24px;
+    overflow-x:auto;
+    scroll-snap-type:x mandatory;
+    padding-bottom:8px;
+    padding-top:4px;
+    scrollbar-width:thin;
+    scrollbar-color:var(--ink-faint) transparent;
+  }
+  .vignettes::-webkit-scrollbar{ height:6px; }
+  .vignettes::-webkit-scrollbar-track{ background:transparent; }
+  .vignettes::-webkit-scrollbar-thumb{ background:var(--ink-faint); border-radius:3px; }
+
+  .vignette{
+    flex:0 0 360px;
+    scroll-snap-align:start;
+    background:var(--paper-warm);
+    padding:32px 28px 28px;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    border:1px solid var(--rule-soft);
+  }
+  .vignette:hover{ background:var(--paper-deep); transition:background .2s; }
+  .vignette .v-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+  }
+  .vignette .v-num{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.14em;
+    color:var(--ink-mute);
+  }
+  .vignette .v-label-tag{
+    font-family:var(--mono);
+    font-size:10.5px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--umber);
+    text-align:right;
+  }
+  .vignette h4{
+    font-family:var(--serif);
+    font-size:26px;
+    font-weight:500;
+    letter-spacing:-0.01em;
+    margin:0;
+    line-height:1.18;
+    text-wrap:balance;
+  }
+  .vignette .v-result{
+    font-family:var(--mono);
+    font-size:11.5px;
+    line-height:1.55;
+    color:var(--ink-soft);
+    padding:12px 0;
+    border-top:1px solid var(--rule-soft);
+    border-bottom:1px solid var(--rule-soft);
+  }
+  .vignette .v-result strong{
+    color:var(--ink);
+    font-weight:600;
+  }
+  .vignette .v-question{
+    font-family:var(--serif);
+    font-style:italic;
+    font-size:17px;
+    color:var(--ink);
+    line-height:1.4;
+  }
+  .vignette .v-growth-label{
+    font-family:var(--mono);
+    font-size:10.5px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--ink-mute);
+    margin-top:auto;
+  }
+  .vignette .v-growth{
+    font-family:var(--serif);
+    font-size:15.5px;
+    line-height:1.5;
+    color:var(--ink-soft);
+    margin:0;
+  }
+
+  .carousel-meta{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-top:28px;
+    padding-top:20px;
+    border-top:1px solid var(--rule-soft);
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--ink-mute);
+  }
+  .carousel-meta .hint{
+    display:flex; align-items:center; gap:8px;
+  }
+  .carousel-meta .hint svg{ width:16px; height:16px; }
+
+  /* ─────────────────────────────────────────────────────────────── */
+  /* OUTCOMES */
+  /* ─────────────────────────────────────────────────────────────── */
+  .outcomes{
+    display:grid;
+    grid-template-columns:repeat(5,1fr);
+    gap:24px;
+  }
+  @media (max-width:980px){ .outcomes{ grid-template-columns:repeat(2,1fr); } }
+  @media (max-width:560px){ .outcomes{ grid-template-columns:1fr; } }
+  .outcome{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .outcome .o-num{
+    font-family:var(--mono);
+    font-size:10.5px;
+    letter-spacing:.14em;
+    color:var(--ink-faint);
+  }
+  .outcome h4{
+    font-family:var(--serif);
+    font-size:32px;
+    font-weight:300;
+    letter-spacing:-0.015em;
+    margin:0 0 4px;
+    color:var(--umber);
+    line-height:1;
+    font-variation-settings:"opsz" 60;
+  }
+  .outcome p{
+    font-family:var(--serif);
+    font-size:15.5px;
+    line-height:1.55;
+    color:var(--ink-soft);
+    margin:0;
+  }
+
+  /* ─────────────────────────────────────────────────────────────── */
+  /* CLOSING + CTA */
+  /* ─────────────────────────────────────────────────────────────── */
+  .closing{
+    text-align:center;
+    padding:140px 0;
+    background:var(--paper-warm);
+    margin:0 -100vw;
+    padding-left:100vw;
+    padding-right:100vw;
+  }
+  .closing-inner{
+    max-width:760px;
+    margin:0 auto;
+  }
+  .closing .you{
+    font-family:var(--serif);
+    font-size:20px;
+    line-height:1.5;
+    color:var(--ink-soft);
+    max-width:540px;
+    margin:0 auto 36px;
+    text-wrap:balance;
+  }
+  .closing h2{
+    font-family:var(--serif);
+    font-weight:300;
+    font-size:clamp(40px, 6vw, 88px);
+    line-height:1.05;
+    letter-spacing:-0.02em;
+    margin:0 0 24px;
+    font-variation-settings:"opsz" 60;
+    text-wrap:balance;
+  }
+  .closing h2 .deg{ color:var(--umber); font-style:italic; }
+  .closing .triad{
+    font-family:var(--serif);
+    font-size:28px;
+    line-height:1.35;
+    font-style:italic;
+    color:var(--ink);
+    margin:48px 0 56px;
+  }
+  .closing .triad span{ display:inline-block; }
+  .closing .triad .sep{
+    display:inline-block;
+    width:24px;
+    height:1px;
+    background:var(--umber);
+    vertical-align:middle;
+    margin:0 18px 6px;
+  }
+
+  /* ─────────────────────────────────────────────────────────────── */
+  /* FOOTER */
+  /* ─────────────────────────────────────────────────────────────── */
+  footer{
+    padding:48px 0 56px;
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--ink-mute);
+  }
+  .foot-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:24px;
+    flex-wrap:wrap;
+  }
+  .foot-row a:hover{ color:var(--umber); }
+
+  /* svg arc colors */
+  .arc-line{ stroke:var(--ink); stroke-width:1.4; fill:none; stroke-linecap:round; }
+  .arc-line.faint{ stroke:var(--ink-faint); }
+  .arc-line.umber{ stroke:var(--umber); stroke-width:2.4; }
+  .arc-ground{ stroke:var(--ink-faint); stroke-width:1; }
+  .arc-tick{ stroke:var(--ink-mute); stroke-width:1; }
+  .arc-dot{ fill:var(--ink); }
+  .arc-dot.umber{ fill:var(--umber); }
+  .arc-fill{ fill:var(--umber-wash); }
+
+  /* ───── small utility ───── */
+  .num-stencil{
+    font-family:var(--mono);
+    font-size:10.5px;
+    letter-spacing:.14em;
+    color:var(--ink-faint);
+  }
+</style>
+</head>
+<body>
+
+<!-- ───────────────────────── HEADER ───────────────────────── -->
+<header class="top">
+  <div class="wrap">
+    <div class="top-row">
+      <div class="mark">Who Are You<span class="deg">?</span></div>
+      <div class="top-meta">
+        <span>The 50° Life</span>
+        <span>50 Questions</span>
+        <span>One Trajectory</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ───────────────────────── HERO ───────────────────────── -->
+<section class="hero" data-screen-label="01 Hero">
+  <div class="wrap">
+    <div class="hero-grid">
+      <div>
+        <div class="kicker">A book of self · 50 questions</div>
+        <h1>The <span class="deg">50°</span><br/>Life.</h1>
+        <p class="lede">50 questions. One trajectory. A clearer answer to <em>why you're here</em>, and the next honest step.</p>
+        <div class="cta-row">
+          <a href="#" class="btn btn-primary">Begin the 50 Questions <span class="arrow">→</span></a>
+          <a href="#vignettes" class="btn btn-ghost">Give it to someone you love</a>
+        </div>
+      </div>
+
+      <!-- Hero 50° arc — the visual centerpiece -->
+      <div class="hero-arc">
+        <svg viewBox="0 0 520 520" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" aria-label="50 degree trajectory">
+          <!-- ground line -->
+          <line x1="60" y1="440" x2="500" y2="440" class="arc-ground"/>
+          <!-- ticks on ground -->
+          <g class="arc-tick">
+            <line x1="100" y1="440" x2="100" y2="446"/>
+            <line x1="180" y1="440" x2="180" y2="446"/>
+            <line x1="260" y1="440" x2="260" y2="446"/>
+            <line x1="340" y1="440" x2="340" y2="446"/>
+            <line x1="420" y1="440" x2="420" y2="446"/>
+          </g>
+          <!-- horizon reference (faint) -->
+          <line x1="80" y1="440" x2="480" y2="440" class="arc-line faint" stroke-dasharray="2 6"/>
+
+          <!-- 90° reference: rises from horizontal to vertical -->
+          <path d="M 80 440 C 240 440, 240 90, 240 50" class="arc-line faint" fill="none" stroke-dasharray="2 4"/>
+          <text x="218" y="42" font-family="JetBrains Mono" font-size="11" fill="#b8ad9c">90°</text>
+
+          <!-- 20° reference: rises gently to 20° from horizontal -->
+          <path d="M 80 440 C 220 440, 320 370, 430 360" class="arc-line faint" fill="none" stroke-dasharray="2 4"/>
+          <text x="438" y="358" font-family="JetBrains Mono" font-size="11" fill="#b8ad9c">20°</text>
+
+          <!-- the 50° trajectory: starts along Goal axis, rises to 50° -->
+          <!-- cubic Bezier: P0(80,440) horizontal tangent, ends at (380, 90) tangent at 50° -->
+          <path d="M 80 440 C 220 440, 270 220, 380 90" class="arc-line umber" fill="none"/>
+          <!-- fill of cone (subtle) — between ground and the 50° trajectory -->
+          <path d="M 80 440 C 220 440, 270 220, 380 90 L 480 440 L 80 440 Z" class="arc-fill"/>
+
+          <!-- 50° label -->
+          <text x="388" y="86" font-family="Source Serif 4" font-size="54" font-weight="300" fill="#8a4a1f" font-style="italic">50°</text>
+
+          <!-- origin dot -->
+          <circle cx="80" cy="440" r="5" class="arc-dot"/>
+          <!-- end arrow at the 50° tangent -->
+          <g transform="translate(380 90) rotate(-50)">
+            <line x1="-10" y1="0" x2="0" y2="0" class="arc-line umber" stroke-linecap="round"/>
+            <polygon points="0,-6 10,0 0,6" fill="#8a4a1f"/>
+          </g>
+
+          <!-- axis labels -->
+          <text x="80" y="468" font-family="JetBrains Mono" font-size="10" fill="#807566" letter-spacing="1.6">ORIGIN</text>
+          <text x="468" y="468" font-family="JetBrains Mono" font-size="10" fill="#807566" letter-spacing="1.6" text-anchor="end">GOAL  →</text>
+          <text x="40" y="60" font-family="JetBrains Mono" font-size="10" fill="#807566" letter-spacing="1.6">↑ SOUL</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────────────── LEAD VOICE ───────────────────────── -->
+<section class="lead-voice" data-screen-label="02 Lead Voice">
+  <div class="lead-voice-inner">
+    <p class="lift">Most people are not failing because they lack talent. They are failing because their energy, love, work, fear, and purpose are not aimed in the same direction.</p>
+
+    <p>Some live at <strong>90°</strong>: impressive, intense, elevated — but not moving forward.</p>
+    <p>Some live at <strong>20°</strong>: practical, productive, always moving — but slowly drifting toward a life they never meant to choose.</p>
+
+    <div class="pull">
+      The <strong>50° Life</strong> is the life of integrated trajectory — enough Goal to build something real, enough Soul to make it worth building, enough Aim to hold the line wisely, and enough freedom from Grip to move without fear driving the wheel.
+    </div>
+
+    <p>The goal is not perfection. The goal is <em>movement with meaning.</em></p>
+  </div>
+</section>
+
+<!-- ───────────────────────── TRAJECTORY DIAGRAM ───────────────────────── -->
+<section data-screen-label="03 Trajectory">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="kicker">§ 01 · The Trajectory</span>
+      <h2>It isn't <em>your score</em>. It's the angle you're moving at.</h2>
+      <p class="sub">Goal and Soul form a bounded vector — your potential movement. Aim and Grip shape how much of that movement is usable, and how steadily you can hold a line.</p>
+    </div>
+
+    <div class="arcs">
+      <!-- LOW ARC, 20° -->
+      <article class="arc-card">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;">
+          <span class="arc-deg">20°</span>
+          <span class="arc-tag">Low Arc</span>
+        </div>
+        <svg class="arc-svg" viewBox="0 0 300 200" xmlns="http://www.w3.org/2000/svg">
+          <line x1="30" y1="170" x2="280" y2="170" class="arc-ground"/>
+          <!-- 20° trajectory: horizontal start, rising gently to 20° -->
+          <path d="M 30 170 C 130 170, 190 130, 270 100" class="arc-line" fill="none"/>
+          <circle cx="30" cy="170" r="3.5" class="arc-dot"/>
+          <g transform="translate(270 100) rotate(-20)">
+            <polygon points="0,-4 8,0 0,4" fill="#1a1713"/>
+          </g>
+          <!-- 50° dashed reference -->
+          <path d="M 30 170 C 110 170, 140 80, 200 20" class="arc-line faint" fill="none" stroke-dasharray="2 4"/>
+        </svg>
+        <h3>Productive, but drifting</h3>
+        <p>Goal without enough Soul. Disciplined, moving quickly — but the life can become too narrow. You win the race and wonder why the finish line feels empty.</p>
+      </article>
+
+      <!-- 50° (THE ONE) -->
+      <article class="arc-card is-fifty">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;">
+          <span class="arc-deg">50°</span>
+          <span class="arc-tag">The 50° Life</span>
+        </div>
+        <svg class="arc-svg" viewBox="0 0 300 200" xmlns="http://www.w3.org/2000/svg">
+          <line x1="30" y1="170" x2="280" y2="170" class="arc-ground"/>
+          <!-- 50° trajectory: horizontal start along Goal, rising to 50° -->
+          <path d="M 30 170 C 110 170, 140 80, 200 20" class="arc-line umber" fill="none"/>
+          <!-- subtle cone -->
+          <path d="M 30 170 C 110 170, 140 80, 200 20 L 280 170 L 30 170 Z" class="arc-fill"/>
+          <circle cx="30" cy="170" r="3.5" class="arc-dot umber"/>
+          <g transform="translate(200 20) rotate(-50)">
+            <polygon points="0,-5 9,0 0,5" fill="#8a4a1f"/>
+          </g>
+          <!-- 20° and 90° refs -->
+          <path d="M 30 170 C 130 170, 190 130, 270 100" class="arc-line faint" fill="none" stroke-dasharray="2 4"/>
+          <path d="M 30 170 C 130 170, 130 20, 130 -10" class="arc-line faint" fill="none" stroke-dasharray="2 4"/>
+        </svg>
+        <h3>Integrated trajectory</h3>
+        <p>Goal and Soul moving together; Aim holding the line; Grip loosened. The life begins to travel in the direction your deepest self can recognize.</p>
+      </article>
+
+      <!-- 90° -->
+      <article class="arc-card">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;">
+          <span class="arc-deg">90°</span>
+          <span class="arc-tag">High Arc</span>
+        </div>
+        <svg class="arc-svg" viewBox="0 0 300 200" xmlns="http://www.w3.org/2000/svg">
+          <line x1="30" y1="170" x2="280" y2="170" class="arc-ground"/>
+          <!-- 90° trajectory: bends from horizontal up to vertical -->
+          <path d="M 30 170 C 130 170, 130 40, 130 0" class="arc-line" fill="none"/>
+          <circle cx="30" cy="170" r="3.5" class="arc-dot"/>
+          <polygon points="126,0 130,-12 134,0" fill="#1a1713"/>
+          <!-- 50° dashed reference -->
+          <path d="M 30 170 C 110 170, 140 80, 200 20" class="arc-line faint" fill="none" stroke-dasharray="2 4"/>
+        </svg>
+        <h3>Vertical longing</h3>
+        <p>Soul without enough Goal. You feel deeply, care deeply, long for what matters — but struggle to give it form. You see the life you want, but do not build the road toward it.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────────────── FOUR FORCES ───────────────────────── -->
+<section data-screen-label="04 Four Forces">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="kicker">§ 02 · The Four Forces</span>
+      <h2>Goal, Soul, Aim, Grip — four lines that decide your <em>angle</em>.</h2>
+      <p class="sub">Two outward forces (what you build and what you love), one governance (how wisely you move), and one drag (what fear or pressure is steering instead).</p>
+    </div>
+
+    <div class="forces">
+      <div class="force">
+        <div class="force-num"><span>01</span><span class="axis">→ Outward</span></div>
+        <h3>Goal <span class="line">Your Work Line</span></h3>
+        <p>The part of you that builds, solves, carries responsibility, creates form, pursues excellence, and turns intention into reality.</p>
+        <div class="ask">What are you trying to make, repair, steward, or accomplish?</div>
+      </div>
+
+      <div class="force">
+        <div class="force-num"><span>02</span><span class="axis">↑ Depth</span></div>
+        <h3>Soul <span class="line">Your Love Line</span></h3>
+        <p>The part of you that loves, grieves, gives, protects, notices, belongs, believes — what should matter, even when it is not efficient.</p>
+        <div class="ask">What makes the work worth doing?</div>
+      </div>
+
+      <div class="force">
+        <div class="force-num"><span>03</span><span class="axis">∠ Governance</span></div>
+        <h3>Aim <span class="line">Your Wisdom Line</span></h3>
+        <p>Wise risk, discernment, restraint, timing, judgment. Aim narrows your tolerance cone — not timid rule-following; not fear.</p>
+        <div class="ask">Can you move with force without becoming reckless, rigid, or scattered?</div>
+      </div>
+
+      <div class="force">
+        <div class="force-num"><span>04</span><span class="axis">← Drag</span></div>
+        <h3>Grip <span class="line">What Pulls You Off Course</span></h3>
+        <p>Defensive patterns that reduce usable energy. Where fear, overcontrol, shame, scarcity, or pressure start steering the life.</p>
+        <div class="ask">What starts driving you when you stop feeling free?</div>
+      </div>
+    </div>
+
+    <!-- Primal Questions — Grip's inner voice -->
+    <div class="primal-questions">
+      <div class="pq-head">Grip's voices · the 7 primal questions</div>
+      <ul>
+        <li>Am I safe?</li>
+        <li>Am I successful?</li>
+        <li>Am I secure?</li>
+        <li>Am I good enough?</li>
+        <li>Am I loved?</li>
+        <li>Do I have purpose?</li>
+        <li>Am I wanted?</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────────────── BODY CARDS ───────────────────────── -->
+<section data-screen-label="05 Body Cards">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="kicker">§ 03 · The 8 Body Cards</span>
+      <h2>The depth tools that explain <em>why</em> the trajectory looks the way it does.</h2>
+      <p class="sub">The trajectory map is the front door. These eight body cards — each anchored to a part of the body — go underneath, explaining the angle.</p>
+    </div>
+
+    <div class="body-cards">
+      <!-- Lens · Eyes -->
+      <div class="bcard">
+        <div class="bcard-svg">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" fill="none" stroke="#1a1713" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M40 160 C 90 100, 230 100, 280 160"></path>
+            <path d="M40 160 C 90 220, 230 220, 280 160"></path>
+            <path d="M50 154 L42 148 M70 130 L66 122 M250 130 L254 122 M270 154 L278 148" stroke-width="2"></path>
+            <circle cx="160" cy="160" r="46"></circle>
+            <g stroke-width="1.6">
+              <line x1="160" y1="118" x2="160" y2="132"></line>
+              <line x1="160" y1="188" x2="160" y2="202"></line>
+              <line x1="118" y1="160" x2="132" y2="160"></line>
+              <line x1="188" y1="160" x2="202" y2="160"></line>
+            </g>
+            <circle cx="160" cy="160" r="16" fill="#1a1713" stroke="none"></circle>
+            <circle cx="160" cy="160" r="24" stroke-width="1.2" opacity="0.55"></circle>
+            <circle cx="160" cy="160" r="32" stroke-width="1" opacity="0.35"></circle>
+            <circle cx="154" cy="154" r="3" fill="#f6f2ea" stroke="none"></circle>
+          </svg>
+        </div>
+        <div class="bcard-head"><span class="num">01</span><span class="body-part">Eyes</span></div>
+        <h4>Lens</h4>
+        <p>How you read reality — what you see first, what you trust before evidence arrives.</p>
+      </div>
+
+      <!-- Heart · the Compass -->
+      <div class="bcard">
+        <div class="bcard-svg">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" fill="none" stroke="#1a1713" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M160 268 C 130 248, 88 224, 70 188 C 52 152, 64 110, 96 96 C 122 84, 144 96, 156 116 C 158 96, 168 80, 188 76 C 220 72, 252 100, 250 142 C 248 188, 200 232, 160 268 Z"></path>
+            <g transform="translate(160 170)">
+              <circle r="58" stroke-width="1.8"></circle>
+              <circle r="44" stroke-width="1" opacity="0.5"></circle>
+              <path d="M0 -58 L8 0 L0 58 L-8 0 Z"></path>
+              <path d="M-58 0 L0 -8 L58 0 L0 8 Z" stroke-width="1.6" opacity="0.7"></path>
+              <path d="M0 -52 L6 0 L-6 0 Z" fill="#8a4a1f" stroke="#8a4a1f"></path>
+              <circle r="3.5" fill="#1a1713" stroke="none"></circle>
+            </g>
+          </svg>
+        </div>
+        <div class="bcard-head"><span class="num">02</span><span class="body-part">Heart</span></div>
+        <h4>Compass</h4>
+        <p>What you protect as sacred. The thing in you that points home when nothing else can.</p>
+      </div>
+
+      <!-- Conviction · Voice -->
+      <div class="bcard">
+        <div class="bcard-svg">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" fill="none" stroke="#1a1713" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M110 60 C 108 100, 102 132, 98 168 C 94 208, 102 240, 120 264"></path>
+            <path d="M210 60 C 212 100, 218 132, 222 168 C 226 208, 218 240, 200 264"></path>
+            <path d="M110 60 C 130 50, 190 50, 210 60" stroke-width="1.8" opacity="0.7"></path>
+            <path d="M148 130 C 146 142, 146 156, 152 168 L 168 168 C 174 156, 174 142, 172 130 C 170 118, 162 112, 160 112 C 158 112, 150 118, 148 130 Z"></path>
+            <ellipse cx="160" cy="186" rx="18" ry="6" stroke-width="1.8"></ellipse>
+            <g stroke-width="2.2" stroke-linecap="round">
+              <path d="M196 130 Q 220 144 218 168"></path>
+              <path d="M214 116 Q 246 140 244 172" stroke-width="1.8" opacity="0.75"></path>
+              <path d="M124 130 Q 100 144 102 168"></path>
+              <path d="M106 116 Q 74 140 76 172" stroke-width="1.8" opacity="0.75"></path>
+            </g>
+          </svg>
+        </div>
+        <div class="bcard-head"><span class="num">03</span><span class="body-part">Voice</span></div>
+        <h4>Speak</h4>
+        <p>What truth costs you to say — and what you say anyway when the cost arrives.</p>
+      </div>
+
+      <!-- Gravity · Spine -->
+      <div class="bcard">
+        <div class="bcard-svg">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" fill="none" stroke="#1a1713" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="60" y1="84" x2="260" y2="84" stroke-width="3.5"></line>
+            <g fill="#8a4a1f" stroke="#8a4a1f">
+              <path d="M50 84 L70 84 L66 102 L54 102 Z"></path>
+              <path d="M250 84 L270 84 L266 102 L254 102 Z"></path>
+            </g>
+            <g>
+              <ellipse cx="160" cy="100" rx="14" ry="7"></ellipse>
+              <line x1="160" y1="107" x2="160" y2="116" stroke-width="2"></line>
+              <ellipse cx="160" cy="124" rx="15" ry="7.5"></ellipse>
+              <line x1="160" y1="131.5" x2="160" y2="140" stroke-width="2"></line>
+              <ellipse cx="160" cy="148" rx="16" ry="8"></ellipse>
+              <line x1="160" y1="156" x2="160" y2="165" stroke-width="2"></line>
+              <ellipse cx="160" cy="173" rx="17" ry="8.5"></ellipse>
+              <line x1="160" y1="181.5" x2="160" y2="190" stroke-width="2"></line>
+              <ellipse cx="160" cy="198" rx="18" ry="9"></ellipse>
+              <line x1="160" y1="207" x2="160" y2="216" stroke-width="2"></line>
+              <ellipse cx="160" cy="224" rx="19" ry="9.5"></ellipse>
+              <line x1="160" y1="233.5" x2="160" y2="242" stroke-width="2"></line>
+              <ellipse cx="160" cy="250" rx="20" ry="10"></ellipse>
+              <line x1="160" y1="260" x2="160" y2="268" stroke-width="2"></line>
+            </g>
+          </svg>
+        </div>
+        <div class="bcard-head"><span class="num">04</span><span class="body-part">Spine</span></div>
+        <h4>Gravity</h4>
+        <p>How you carry responsibility and causality. What you refuse to trade away, even under pressure.</p>
+      </div>
+
+      <!-- Trust · Ears -->
+      <div class="bcard">
+        <div class="bcard-svg">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" fill="none" stroke="#1a1713" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M210 80 C 250 92, 264 130, 260 168 C 256 206, 240 232, 218 248 C 200 262, 184 268, 172 268 C 160 268, 152 262, 152 252 C 152 244, 158 238, 168 234"></path>
+            <path d="M212 110 C 232 120, 240 148, 236 178 C 232 208, 218 226, 200 234 C 188 240, 178 240, 174 232" stroke-width="2"></path>
+            <path d="M180 188 C 174 188, 168 194, 168 204 C 168 212, 174 218, 180 218" stroke-width="2"></path>
+            <path d="M168 234 C 158 244, 152 254, 158 264 C 164 272, 178 268, 184 260" stroke-width="2"></path>
+            <g stroke-width="2" stroke-linecap="round" stroke="#8a4a1f">
+              <path d="M120 168 Q 132 168 144 168" stroke-width="2.4"></path>
+              <path d="M96 168 Q 112 148 128 144" stroke-width="2" opacity="0.85"></path>
+              <path d="M76 168 Q 100 132 124 124" stroke-width="1.6" opacity="0.6"></path>
+              <path d="M58 168 Q 88 116 122 104" stroke-width="1.2" opacity="0.4"></path>
+            </g>
+          </svg>
+        </div>
+        <div class="bcard-head"><span class="num">05</span><span class="body-part">Ears</span></div>
+        <h4>Listen</h4>
+        <p>Who or what gets authority in your life. Whose voice you trust before you have proof.</p>
+      </div>
+
+      <!-- Weather · Nervous system -->
+      <div class="bcard">
+        <div class="bcard-svg">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" fill="none" stroke="#1a1713" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M160 296 L 160 220" stroke-width="3"></path>
+            <path d="M160 220 C 150 200, 130 188, 112 178"></path>
+            <path d="M160 220 C 170 200, 190 188, 208 178"></path>
+            <path d="M112 178 C 96 168, 84 152, 76 132" stroke-width="2"></path>
+            <path d="M112 178 C 104 162, 92 154, 78 152" stroke-width="2"></path>
+            <path d="M208 178 C 224 168, 236 152, 244 132" stroke-width="2"></path>
+            <path d="M208 178 C 216 162, 228 154, 242 152" stroke-width="2"></path>
+            <g stroke-width="1.6">
+              <path d="M76 132 C 70 120, 60 110, 52 102"></path>
+              <path d="M76 132 C 80 118, 76 106, 70 96"></path>
+              <path d="M76 132 C 88 124, 92 114, 92 102"></path>
+              <path d="M78 152 C 64 154, 54 148, 46 140"></path>
+              <path d="M244 132 C 250 120, 260 110, 268 102"></path>
+              <path d="M244 132 C 240 118, 244 106, 250 96"></path>
+              <path d="M244 132 C 232 124, 228 114, 228 102"></path>
+              <path d="M242 152 C 256 154, 266 148, 274 140"></path>
+            </g>
+            <g>
+              <circle cx="160" cy="220" r="6" fill="#8a4a1f" stroke="#8a4a1f"></circle>
+              <circle cx="148" cy="212" r="3" fill="#8a4a1f" stroke="#8a4a1f"></circle>
+              <circle cx="172" cy="212" r="3" fill="#8a4a1f" stroke="#8a4a1f"></circle>
+              <circle cx="160" cy="234" r="3" fill="#8a4a1f" stroke="#8a4a1f"></circle>
+            </g>
+            <line x1="148" y1="296" x2="172" y2="296" stroke-width="2"></line>
+          </svg>
+        </div>
+        <div class="bcard-head"><span class="num">06</span><span class="body-part">Nervous System</span></div>
+        <h4>Weather</h4>
+        <p>What current conditions are pulling on your movement — the season inside you right now.</p>
+      </div>
+
+      <!-- Fire · Immune response -->
+      <div class="bcard">
+        <div class="bcard-svg">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" fill="none" stroke="#1a1713" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M160 296 L 160 200" stroke-width="3"></path>
+            <circle cx="160" cy="200" r="6" fill="#1a1713" stroke="none"></circle>
+            <path d="M160 200 C 148 184, 124 168, 100 156" stroke-width="3"></path>
+            <path d="M160 200 C 172 184, 196 168, 220 156" stroke-width="3"></path>
+            <g stroke-width="2">
+              <path d="M100 156 L 88 144"></path>
+              <path d="M100 156 L 96 138"></path>
+              <path d="M220 156 L 232 144"></path>
+              <path d="M220 156 L 224 138"></path>
+            </g>
+            <ellipse cx="160" cy="200" rx="116" ry="100" stroke-width="1.6" opacity="0.45"></ellipse>
+            <g>
+              <path d="M160 196 C 144 176, 144 156, 160 132 C 176 156, 176 176, 160 196 Z" fill="#8a4a1f" fill-opacity="0.18" stroke="#8a4a1f" stroke-width="2.2"></path>
+              <path d="M160 188 C 152 174, 152 162, 160 148 C 168 162, 168 174, 160 188 Z" stroke="#1a1713" stroke-width="1.8"></path>
+            </g>
+          </svg>
+        </div>
+        <div class="bcard-head"><span class="num">07</span><span class="body-part">Immune Response</span></div>
+        <h4>Fire</h4>
+        <p>What happens to you under pressure. What you defend, attack, or burn for when forced.</p>
+      </div>
+
+      <!-- Path · Gait -->
+      <div class="bcard">
+        <div class="bcard-svg">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" fill="none" stroke="#1a1713" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="40" y1="290" x2="280" y2="290" stroke-width="1" opacity="0.2"></line>
+            <g transform="translate(96 240) rotate(-6)">
+              <path d="M0 0 C -16 -6, -22 -28, -16 -52 C -10 -72, 6 -76, 18 -68 C 28 -60, 30 -40, 22 -16 C 18 -4, 10 4, 0 0 Z" stroke-width="2.5"></path>
+              <ellipse cx="22" cy="-78" rx="6" ry="5" stroke-width="2"></ellipse>
+              <ellipse cx="10" cy="-86" rx="5" ry="4" stroke-width="1.8"></ellipse>
+              <ellipse cx="-2" cy="-90" rx="4.5" ry="3.5" stroke-width="1.6"></ellipse>
+              <ellipse cx="-12" cy="-90" rx="4" ry="3" stroke-width="1.4"></ellipse>
+              <ellipse cx="-22" cy="-86" rx="3.5" ry="2.5" stroke-width="1.2"></ellipse>
+            </g>
+            <g transform="translate(180 188) rotate(6) scale(0.82)">
+              <path d="M0 0 C 16 -6, 22 -28, 16 -52 C 10 -72, -6 -76, -18 -68 C -28 -60, -30 -40, -22 -16 C -18 -4, -10 4, 0 0 Z" stroke-width="2.2"></path>
+              <ellipse cx="-22" cy="-78" rx="6" ry="5" stroke-width="1.8"></ellipse>
+              <ellipse cx="-10" cy="-86" rx="5" ry="4" stroke-width="1.6"></ellipse>
+            </g>
+            <g transform="translate(110 132) rotate(-4) scale(0.66)" opacity="0.7">
+              <path d="M0 0 C -16 -6, -22 -28, -16 -52 C -10 -72, 6 -76, 18 -68 C 28 -60, 30 -40, 22 -16 C 18 -4, 10 4, 0 0 Z" stroke-width="2"></path>
+              <ellipse cx="22" cy="-78" rx="6" ry="5" stroke-width="1.6"></ellipse>
+            </g>
+            <g transform="translate(190 86) rotate(4) scale(0.5)" opacity="0.45">
+              <path d="M0 0 C 16 -6, 22 -28, 16 -52 C 10 -72, -6 -76, -18 -68 C -28 -60, -30 -40, -22 -16 C -18 -4, -10 4, 0 0 Z" stroke-width="1.8"></path>
+            </g>
+          </svg>
+        </div>
+        <div class="bcard-head"><span class="num">08</span><span class="body-part">Gait</span></div>
+        <h4>Path</h4>
+        <p>How you return to purpose. The shape of the walk that keeps you faithful over time.</p>
+      </div>
+    </div>
+
+    <p class="body-cards-note">The body cards aren't the front door. They're the depth you walk into <em>after</em> the trajectory shows you where you stand.</p>
+  </div>
+</section>
+
+<!-- ───────────────────────── VIGNETTES ───────────────────────── -->
+<section data-screen-label="06 Recognition" id="vignettes">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="kicker">§ 04 · Reader Recognition</span>
+      <h2>Ten <em>life patterns.</em> Which one is you, or someone you love?</h2>
+      <p class="sub">Not personality types. Not diagnoses. Patterns of trajectory — so you can recognize yourself, a spouse, a child, a founder, a pastor, a boss, or a best friend, and see the next honest step.</p>
+    </div>
+
+    <div class="vignettes-wrap">
+      <div class="vignettes" id="vignette-scroll">
+
+        <!-- 01 -->
+        <article class="vignette">
+          <div class="v-head">
+            <span class="v-num">01 · The Builder</span>
+            <span class="v-label-tag">Work Without Presence</span>
+          </div>
+          <h4>The Builder Who Forgot to Be Present</h4>
+          <div class="v-result"><strong>Goal</strong> high · <strong>Soul</strong> moderate–low · <strong>Aim</strong> moderate–high · <strong>Grip</strong> success / good-enough</div>
+          <div class="v-question">"Am I successful enough? Am I good enough?"</div>
+          <span class="v-growth-label">Growth path</span>
+          <p class="v-growth">Does not need less ambition. Needs ambition reconnected to love. The path is not to stop building; it is to remember who and what the building is for.</p>
+        </article>
+
+        <!-- 02 -->
+        <article class="vignette">
+          <div class="v-head">
+            <span class="v-num">02 · The Caring One</span>
+            <span class="v-label-tag">Love Without Form</span>
+          </div>
+          <h4>The Caring One Who Never Builds the Form</h4>
+          <div class="v-result"><strong>Goal</strong> low–moderate · <strong>Soul</strong> high · <strong>Aim</strong> low–moderate · <strong>Grip</strong> loved / wanted / safe</div>
+          <div class="v-question">"Am I loved? Am I wanted?"</div>
+          <span class="v-growth-label">Growth path</span>
+          <p class="v-growth">Does not need to care less. Needs to give care a form — boundaries, rhythms, commitments, action. Love becomes stronger when it has a shape.</p>
+        </article>
+
+        <!-- 03 -->
+        <article class="vignette">
+          <div class="v-head">
+            <span class="v-num">03 · The Visionary</span>
+            <span class="v-label-tag">Vertical Longing</span>
+          </div>
+          <h4>The Visionary Who Shoots Straight Up</h4>
+          <div class="v-result"><strong>Goal</strong> moderate · <strong>Soul</strong> very high · <strong>Aim</strong> low · <strong>Grip</strong> purpose</div>
+          <div class="v-question">"Do I have purpose?"</div>
+          <span class="v-growth-label">Growth path</span>
+          <p class="v-growth">Does not need less meaning. Needs meaning translated into movement. Choose one faithful road, not ten possible heavens.</p>
+        </article>
+
+        <!-- 04 -->
+        <article class="vignette">
+          <div class="v-head">
+            <span class="v-num">04 · The Practical Achiever</span>
+            <span class="v-label-tag">Low Arc Achievement</span>
+          </div>
+          <h4>The Practical Achiever Who Ends Up Somewhere Else</h4>
+          <div class="v-result"><strong>Goal</strong> high · <strong>Soul</strong> low–moderate · <strong>Aim</strong> low · <strong>Grip</strong> secure / successful</div>
+          <div class="v-question">"Am I secure? Am I successful?"</div>
+          <span class="v-growth-label">Growth path</span>
+          <p class="v-growth">Does not need to abandon responsibility. Needs responsibility re-aimed toward what is sacred. Stop mistaking motion for direction.</p>
+        </article>
+
+        <!-- 05 -->
+        <article class="vignette">
+          <div class="v-head">
+            <span class="v-num">05 · The Wise Steward</span>
+            <span class="v-label-tag">Open-Handed Aim</span>
+          </div>
+          <h4>The Wise Steward</h4>
+          <div class="v-result"><strong>Goal</strong> moderate–high · <strong>Soul</strong> moderate–high · <strong>Aim</strong> high · <strong>Grip</strong> low</div>
+          <div class="v-question">Not dominant. The grip is present but not driving.</div>
+          <span class="v-growth-label">Growth path</span>
+          <p class="v-growth">Work is not to become louder. It is to remain faithful, open-handed, and precise. Built for long obedience, not short spectacle.</p>
+        </article>
+
+        <!-- 06 -->
+        <article class="vignette">
+          <div class="v-head">
+            <span class="v-num">06 · The White-Knuckled Leader</span>
+            <span class="v-label-tag">White-Knuckled Aim</span>
+          </div>
+          <h4>The White-Knuckled Leader</h4>
+          <div class="v-result"><strong>Goal</strong> high · <strong>Soul</strong> moderate–high · <strong>Aim</strong> high · <strong>Grip</strong> high</div>
+          <div class="v-question">"Am I safe? Am I good enough? Will this matter?"</div>
+          <span class="v-growth-label">Growth path</span>
+          <p class="v-growth">Does not need to become careless. Needs to release the belief that control is the same as faithfulness. Keep the Aim and loosen the Grip.</p>
+        </article>
+
+        <!-- 07 -->
+        <article class="vignette">
+          <div class="v-head">
+            <span class="v-num">07 · The Free Spirit</span>
+            <span class="v-label-tag">Ungoverned Movement</span>
+          </div>
+          <h4>The Free Spirit Who Confuses Freedom With Direction</h4>
+          <div class="v-result"><strong>Goal</strong> low–moderate · <strong>Soul</strong> moderate · <strong>Aim</strong> low · <strong>Grip</strong> low</div>
+          <div class="v-question">"What if choosing one path costs me all the others?"</div>
+          <span class="v-growth-label">Growth path</span>
+          <p class="v-growth">Does not need to lose freedom. Needs a chosen road worthy of their freedom. Commitment is not the enemy of aliveness; it is what gives aliveness a destination.</p>
+        </article>
+
+        <!-- 08 -->
+        <article class="vignette">
+          <div class="v-head">
+            <span class="v-num">08 · The Gripped Protector</span>
+            <span class="v-label-tag">Grip-Governed</span>
+          </div>
+          <h4>The Gripped Protector</h4>
+          <div class="v-result"><strong>Goal</strong> low–moderate · <strong>Soul</strong> moderate · <strong>Aim</strong> low–moderate · <strong>Grip</strong> high</div>
+          <div class="v-question">"Am I safe? Am I secure? Am I wanted?"</div>
+          <span class="v-growth-label">Growth path</span>
+          <p class="v-growth">Does not need to be shamed into courage. Needs enough truth and enough safety to move again. Protection is good, but fear is a poor architect.</p>
+        </article>
+
+        <!-- 09 -->
+        <article class="vignette">
+          <div class="v-head">
+            <span class="v-num">09 · The Purpose-Driven Builder</span>
+            <span class="v-label-tag">Goal-Led Presence</span>
+          </div>
+          <h4>The Purpose-Driven Builder</h4>
+          <div class="v-result"><strong>Goal</strong> high · <strong>Soul</strong> high · <strong>Aim</strong> moderate–high · <strong>Grip</strong> moderate</div>
+          <div class="v-question">"Do I have purpose? Will this actually matter?"</div>
+          <span class="v-growth-label">Growth path</span>
+          <p class="v-growth">Does not need less purpose. Needs purpose without panic. Keep building, but stop letting urgency impersonate calling.</p>
+        </article>
+
+        <!-- 10 -->
+        <article class="vignette">
+          <div class="v-head">
+            <span class="v-num">10 · The Integrated Giver</span>
+            <span class="v-label-tag">Giving / Presence</span>
+          </div>
+          <h4>The Fully Integrated Giver</h4>
+          <div class="v-result"><strong>Goal</strong> high · <strong>Soul</strong> high · <strong>Aim</strong> high · <strong>Grip</strong> low</div>
+          <div class="v-question">The primal questions still exist, but they are no longer driving.</div>
+          <span class="v-growth-label">Growth path</span>
+          <p class="v-growth">Stewardship. Not more frantic ascent. Not more proof. Remain faithful, give freely, bless generously, keep the line honest as seasons change.</p>
+        </article>
+
+      </div>
+    </div>
+
+    <div class="carousel-meta">
+      <span>Ten patterns · scroll →</span>
+      <span class="hint">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        Drag to flip through
+      </span>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────────────── OUTCOMES ───────────────────────── -->
+<section data-screen-label="07 Outcomes">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="kicker">§ 05 · What the Report Helps You See</span>
+      <h2>Five outcomes — when work, love, wisdom and freedom <em>start moving together</em>.</h2>
+    </div>
+
+    <div class="outcomes">
+      <div class="outcome">
+        <span class="o-num">01</span>
+        <h4>Purpose</h4>
+        <p>You understand what your life is trying to become.</p>
+      </div>
+      <div class="outcome">
+        <span class="o-num">02</span>
+        <h4>Peace</h4>
+        <p>You stop confusing comfort with alignment. You learn where your inner life is coherent and where it is divided.</p>
+      </div>
+      <div class="outcome">
+        <span class="o-num">03</span>
+        <h4>Presence</h4>
+        <p>You see where work has crowded out love, or where longing has avoided form.</p>
+      </div>
+      <div class="outcome">
+        <span class="o-num">04</span>
+        <h4>Prosperity</h4>
+        <p>You recognize the kind of work, responsibility, and contribution that can produce real fruit without hollowing you out.</p>
+      </div>
+      <div class="outcome">
+        <span class="o-num">05</span>
+        <h4>Potential</h4>
+        <p>You stop trying to become someone else and start moving more faithfully as yourself.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────────────── CLOSING ───────────────────────── -->
+<section class="closing" data-screen-label="08 Closing">
+  <div class="closing-inner">
+    <div class="kicker" style="display:block;margin-bottom:32px;">The core promise</div>
+    <h2>Full potential is not maximum intensity.<br/>It is <span class="deg">rightly aimed</span> energy.</h2>
+    <p class="you">You may recognize yourself here — or someone you love. The point is not to put people in boxes. The point is to see the pattern clearly enough to <em>move</em>.</p>
+
+    <div class="triad">
+      <span>Find your angle.</span><span class="sep"></span>
+      <span>Release your grip.</span><span class="sep"></span>
+      <span>Walk your path.</span>
+    </div>
+
+    <div class="cta-row" style="justify-content:center;">
+      <a href="#" class="btn btn-primary">Begin the 50 Questions <span class="arrow">→</span></a>
+      <a href="#" class="btn btn-ghost">Give it to someone</a>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────────────── FOOTER ───────────────────────── -->
+<footer>
+  <div class="wrap">
+    <div class="foot-row">
+      <span>Who Are You? · The 50° Life · v0.1</span>
+      <span><a href="#">About</a> · <a href="#">The full canon</a> · <a href="#">Print the brochure (PDF)</a></span>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

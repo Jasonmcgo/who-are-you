@@ -67,6 +67,30 @@ export const SURVEY_CARD_TO_SHAPE_CARD: Record<CardId, ShapeCardId> = {
   contradiction: "conviction",
 };
 
+// CC-PROSE-1 Layer 2 — Canonical body-card Question strings.
+//
+// Each ShapeCard renders a Question line (italicized) under the card title,
+// above the existing user-specific Read line (`cardHeader`). The Question
+// is the card's stated purpose — the lens through which the body part /
+// register operates — rendered identically across all users for the same
+// card. The Read line below it is the user-specific answer.
+//
+// Per CC-PROSE-1 §"Render style": the literal "Question:" label is
+// clinical and not rendered; the canonical string itself appears in
+// italics directly under the card title.
+export const SHAPE_CARD_QUESTION: Record<ShapeCardId, string> = {
+  lens: "How you read reality",
+  compass: "What you protect first",
+  gravity: "Where responsibility lands",
+  // CC-022c maps trust separately from the SwotCardsWithIds list because
+  // the body card Trust → Ears is rendered under "trust" id elsewhere.
+  trust: "Whose truth gets weight",
+  weather: "Current load and formation context",
+  fire: "Pressure response",
+  conviction: "How belief behaves under cost",
+  path: "Work, love, and giving direction",
+};
+
 // CC-022f — Kicker-icon target size on survey screens. Below the README's
 // 96px floor — deliberate, eyes-open trade-off (mobile-first reality: a
 // 96px icon doesn't fit alongside a kicker on a 360-400px phone). Mobile
@@ -83,4 +107,24 @@ export function getSurveyKickerIcon(cardId: CardId): string | null {
   const shapeId = SURVEY_CARD_TO_SHAPE_CARD[cardId];
   if (!shapeId) return null;
   return SHAPE_CARD_SVG_PATHS[shapeId] ?? null;
+}
+
+// CC-070 — Path · Gait pattern kicker hook. Returns kicker prose strings
+// (zero or more) sourced from `constitution.goalSoulPatterns.fired[]`
+// entries with `renderTarget === 'path_gait_card'`. Currently the
+// Generative Builder pattern (CC-070, heuristic) is the only fillable
+// kicker; future cross-card patterns may attach here too. Kept in
+// cardAssets.ts because it's a card-render concern, not a derivation
+// concern — kicker prose strings live with the pattern catalog
+// (lib/goalSoulPatterns.ts) and surface here for the Path · Gait
+// renderer to consume.
+import type { InnerConstitution } from "./types";
+
+export function getPathGaitPatternKickers(
+  constitution: InnerConstitution
+): string[] {
+  const fired = constitution.goalSoulPatterns?.fired ?? [];
+  return fired
+    .filter((p) => p.renderTarget === "path_gait_card" && p.kickerProse)
+    .map((p) => p.kickerProse);
 }

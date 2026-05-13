@@ -1,0 +1,722 @@
+{
+  "ocean/01-architectural-openness.json": {
+    "open-tensions": {
+      "hash": "2be1c8fcd65a2d16b7ab356db817fa9898b3d0449687d5f6163d287aff3cb295",
+      "length": 544
+    },
+    "mirror-types-seed": {
+      "hash": "5dacaf9612ac28189d00ad9421a81479f9239b005db2655bbf4dd620a8c4e1c7",
+      "length": 661
+    },
+    "conflict-translation": {
+      "hash": "2a6f11d6044faedbe735a316a99a888269e65070193d1309cd4b2a8e9acf3497",
+      "length": 460
+    },
+    "work-map": {
+      "hash": "b148d8843a7553e07d3e1dded2d54fec5ad22b49810fcd08dcff1271d0d58b0d",
+      "length": 1232
+    },
+    "love-map": {
+      "hash": "9160b94ffd1e15fc38424967c45de7fdfb0bf97af7fa9ed10ca99a3632dd3f77",
+      "length": 848
+    },
+    "disposition-mix": {
+      "hash": "950d45dcb35f834aefd98d7799f2c597286aa5d11b72d8dfff3def939c7b2132",
+      "length": 5370
+    },
+    "keystone": {
+      "hash": "c8708c9f4f8b7d391c71fb7d33e6c4a8877b86c5f304d766acdde87ce4f46b1d",
+      "length": 1265
+    }
+  },
+  "ocean/02-high-conscientiousness.json": {
+    "open-tensions": {
+      "hash": "c2dd7e8b7338015ae652e1de7fb90f25b9f2ee0d553013ab63fe2d6da88857c2",
+      "length": 182
+    },
+    "mirror-types-seed": {
+      "hash": "bdf2337cd276c93cfaf06d0b67cb1395c445da65c690e27ca44d16ab7817450b",
+      "length": 633
+    },
+    "conflict-translation": {
+      "hash": "74d0d3dd0265be62c29cc9bd68d98e1d61853a1e1b08aad736f39b30c7c37cac",
+      "length": 456
+    },
+    "work-map": {
+      "hash": "b148d8843a7553e07d3e1dded2d54fec5ad22b49810fcd08dcff1271d0d58b0d",
+      "length": 1232
+    },
+    "love-map": {
+      "hash": "4db315d4d6c71f34b352d5de22a27ed9b2d42b28c4b350b3dfe967d953f3403d",
+      "length": 1264
+    },
+    "disposition-mix": {
+      "hash": "898544d7f63ab98ff3ddf659a6a88649e382de1d7a1ae9ce9c1a2e254c74f88c",
+      "length": 4604
+    },
+    "keystone": {
+      "hash": "(missing)",
+      "length": 0
+    }
+  },
+  "ocean/03-low-extraversion-high-soul.json": {
+    "open-tensions": {
+      "hash": "c2dd7e8b7338015ae652e1de7fb90f25b9f2ee0d553013ab63fe2d6da88857c2",
+      "length": 182
+    },
+    "mirror-types-seed": {
+      "hash": "bdf2337cd276c93cfaf06d0b67cb1395c445da65c690e27ca44d16ab7817450b",
+      "length": 633
+    },
+    "conflict-translation": {
+      "hash": "f24cc073c543aeddec544a9cce2dc24091d5fcd0dc9885061a40510c5ce28950",
+      "length": 466
+    },
+    "work-map": {
+      "hash": "a35d0fcf0884c6d62d2244a2e83c1c9e432adcb511dd0b7a1f0795859ccd9996",
+      "length": 1589
+    },
+    "love-map": {
+      "hash": "eda863195190c823b35c02e8b11406cb2dc8884eca18f2929c41f06b5a50fbfc",
+      "length": 1287
+    },
+    "disposition-mix": {
+      "hash": "44f4970029058ec37e7806c9577045dde25a186edbffacd50496e55528fec0b9",
+      "length": 5332
+    },
+    "keystone": {
+      "hash": "1b0b082cc41b46e64533d4dfd253d5b4f7a3649d2464189fc7b4d4287c309a9c",
+      "length": 1399
+    }
+  },
+  "ocean/04-high-agreeableness-loyalty.json": {
+    "open-tensions": {
+      "hash": "c2dd7e8b7338015ae652e1de7fb90f25b9f2ee0d553013ab63fe2d6da88857c2",
+      "length": 182
+    },
+    "mirror-types-seed": {
+      "hash": "bdf2337cd276c93cfaf06d0b67cb1395c445da65c690e27ca44d16ab7817450b",
+      "length": 633
+    },
+    "conflict-translation": {
+      "hash": "74d0d3dd0265be62c29cc9bd68d98e1d61853a1e1b08aad736f39b30c7c37cac",
+      "length": 456
+    },
+    "work-map": {
+      "hash": "5655dddc182be0996dce34035bcd3c988671a84d716a01ba1b38e75998004df4",
+      "length": 1589
+    },
+    "love-map": {
+      "hash": "ed2d445141ebef872154a7e4e0d0a597a474593c4b1b4c49115b79929323ae99",
+      "length": 1294
+    },
+    "disposition-mix": {
+      "hash": "3a11f803ae30df58cc93fc97a2aef998d74ccbb3314cfb8a457b797c542acf5e",
+      "length": 5267
+    },
+    "keystone": {
+      "hash": "53bcf7316ba8be71a2910e5a2efa7cfd45989de27d248e07fce4df91f8910ab7",
+      "length": 1088
+    }
+  },
+  "ocean/05-low-emotional-reactivity-proxy.json": {
+    "open-tensions": {
+      "hash": "2be1c8fcd65a2d16b7ab356db817fa9898b3d0449687d5f6163d287aff3cb295",
+      "length": 544
+    },
+    "mirror-types-seed": {
+      "hash": "bdf2337cd276c93cfaf06d0b67cb1395c445da65c690e27ca44d16ab7817450b",
+      "length": 633
+    },
+    "conflict-translation": {
+      "hash": "74d0d3dd0265be62c29cc9bd68d98e1d61853a1e1b08aad736f39b30c7c37cac",
+      "length": 456
+    },
+    "work-map": {
+      "hash": "b148d8843a7553e07d3e1dded2d54fec5ad22b49810fcd08dcff1271d0d58b0d",
+      "length": 1232
+    },
+    "love-map": {
+      "hash": "8a3d305e4ba49c615e743b3eb578647e25be802363d93f5c7fc857cc0a21e42a",
+      "length": 1332
+    },
+    "disposition-mix": {
+      "hash": "b1aa9e447a3208452e49e6be9af2e381fce24af2bc8bf53447ec13d9b8a2eb87",
+      "length": 5067
+    },
+    "keystone": {
+      "hash": "de630efc57679f66ffb58bd943784319a69438e25eb57421433475526261eb6b",
+      "length": 1179
+    }
+  },
+  "ocean/06-thin-signal-under-detected.json": {
+    "open-tensions": {
+      "hash": "c2dd7e8b7338015ae652e1de7fb90f25b9f2ee0d553013ab63fe2d6da88857c2",
+      "length": 182
+    },
+    "mirror-types-seed": {
+      "hash": "d4a4a4a9bf6a1101cdbc7f1a757205eb6661ae7c9145751e46f1307bf4e79ac6",
+      "length": 626
+    },
+    "conflict-translation": {
+      "hash": "1645c63d356a2b28660f1e38c44da656affa94b3e60a8e1aac332528f550f5b4",
+      "length": 465
+    },
+    "work-map": {
+      "hash": "4e920e7f235e1527ad1678c8fc35bc64b7bc2ec4bf221840bde4210ac01af33e",
+      "length": 1053
+    },
+    "love-map": {
+      "hash": "264699577e017efb574eb84de3170625325901aa0ae1ed9d05b872f14aae0701",
+      "length": 1184
+    },
+    "disposition-mix": {
+      "hash": "397f22a9ec48abb893c461bbf582f360edea766c0065cb41cf0046a7f5c9eb7f",
+      "length": 4756
+    },
+    "keystone": {
+      "hash": "(missing)",
+      "length": 0
+    }
+  },
+  "ocean/07-jason-real-session.json": {
+    "open-tensions": {
+      "hash": "c2dd7e8b7338015ae652e1de7fb90f25b9f2ee0d553013ab63fe2d6da88857c2",
+      "length": 182
+    },
+    "mirror-types-seed": {
+      "hash": "bf60c2fbe3ade9b17dc8996881da649db04f8729e036fca9dcbf244447fadd43",
+      "length": 654
+    },
+    "conflict-translation": {
+      "hash": "c79e15c23a24f4b889ff97c2ed1eda53ead2c38b57da493832db6581eefd0bc3",
+      "length": 459
+    },
+    "work-map": {
+      "hash": "4e920e7f235e1527ad1678c8fc35bc64b7bc2ec4bf221840bde4210ac01af33e",
+      "length": 1053
+    },
+    "love-map": {
+      "hash": "8de0ef25b84282bcf3d8f6d118f341e73dfb41d780af353bad368e3d62690d1d",
+      "length": 839
+    },
+    "disposition-mix": {
+      "hash": "2e3a3972e9e8b65bedb13a598de860699d14d8f2bcc402ad29026c937cec0aac",
+      "length": 5185
+    },
+    "keystone": {
+      "hash": "7128a19f468502813025122c1a778e712934e176967a5c00728de7f740f88fd4",
+      "length": 1633
+    }
+  },
+  "ocean/24-si-precedent-keeper.json": {
+    "open-tensions": {
+      "hash": "34a30e59b227169e72dbc331c9e697897db9c63832a5b7579f61a57a25a45365",
+      "length": 352
+    },
+    "mirror-types-seed": {
+      "hash": "cebf7d4a84f6dc3facb2377a009a28352324866fac9e3cf80708c70b263333d6",
+      "length": 635
+    },
+    "conflict-translation": {
+      "hash": "c5f8d04449e56777feb8354f160b291fa7f308c021d8275b04c8ad57958d35ae",
+      "length": 469
+    },
+    "work-map": {
+      "hash": "c20a1a519615666094bbac7247be87d7a2530753db51b071e742350a7629a8af",
+      "length": 1372
+    },
+    "love-map": {
+      "hash": "f4eb9df3587c4538ccc02519bcb5dd160f3c86b19a42e8ffcb19db5828db4957",
+      "length": 840
+    },
+    "disposition-mix": {
+      "hash": "34463c1567a979fb7cd7ce31e6718ab58c10baa82b0863a52c50925fbf9cee3b",
+      "length": 5418
+    },
+    "keystone": {
+      "hash": "5e17838678a0f4e7eb40e542b2b8b6bfcca24fe5c17436c2184af1a224c9360d",
+      "length": 1432
+    }
+  },
+  "ocean/25-ti-coherence-prober.json": {
+    "open-tensions": {
+      "hash": "c8151645fa5267615532c4bf42d2ae3f7282b80518d1d9b90c48bc6967440f8b",
+      "length": 819
+    },
+    "mirror-types-seed": {
+      "hash": "0171273181bc24fc48c142884798fc54f8ef9acef86eaccbe9e1c2a7a1ee58b5",
+      "length": 645
+    },
+    "conflict-translation": {
+      "hash": "b0c2fbfc5408c36b616eb78c6447d27962ae11b7b78b02f6c941b9d0bb88fe76",
+      "length": 462
+    },
+    "work-map": {
+      "hash": "b148d8843a7553e07d3e1dded2d54fec5ad22b49810fcd08dcff1271d0d58b0d",
+      "length": 1232
+    },
+    "love-map": {
+      "hash": "2b76fdcb764d57c926dbe559b04fe5c6566ba7a495c60fb02266a846ad330230",
+      "length": 865
+    },
+    "disposition-mix": {
+      "hash": "68c3cdce9c315989d51c82c5417c5d1dc05aa7029c675c4be7b06b25eab0f8b6",
+      "length": 4574
+    },
+    "keystone": {
+      "hash": "1d9ccbe343a00a93fd1776ed0ab288088f001730e5777b1b2d08cfcc11ac6ae5",
+      "length": 1370
+    }
+  },
+  "ocean/26-fi-inner-truth-anchor.json": {
+    "open-tensions": {
+      "hash": "c2dd7e8b7338015ae652e1de7fb90f25b9f2ee0d553013ab63fe2d6da88857c2",
+      "length": 182
+    },
+    "mirror-types-seed": {
+      "hash": "909f1e7577f41b74e1f02b551ddb783d198f5a959c3e91b29950db04a2a57781",
+      "length": 680
+    },
+    "conflict-translation": {
+      "hash": "7a9c898db00980a3f921ebdc8c8a66c19a3aa5230e0fabe903c892ac89c71425",
+      "length": 459
+    },
+    "work-map": {
+      "hash": "e669c92fce5798ed46e96f3bb199710c4245d1b4dae16a96c6d5b23a2d69b9da",
+      "length": 1033
+    },
+    "love-map": {
+      "hash": "a6e10316831afa0e0a488ead3b9d9e45fb596937f416f6c68667c317502dc2b9",
+      "length": 873
+    },
+    "disposition-mix": {
+      "hash": "6be8db4e8a85b4192c75d677827b26e850c67428a2575319d7b86ce308f23c47",
+      "length": 5464
+    },
+    "keystone": {
+      "hash": "e1a43554609a4b39106e664c804e5546b5b7db34d0c382275a259755d4d450f3",
+      "length": 1699
+    }
+  },
+  "ocean/27-fe-room-reader-attuned.json": {
+    "open-tensions": {
+      "hash": "c2dd7e8b7338015ae652e1de7fb90f25b9f2ee0d553013ab63fe2d6da88857c2",
+      "length": 182
+    },
+    "mirror-types-seed": {
+      "hash": "138f6d742931e4f7fca85a8beadeac50474308ed9ad93427692d1084a137fe5b",
+      "length": 668
+    },
+    "conflict-translation": {
+      "hash": "44c942da457daf124dd30eaa334c3840ffe1258104abdf69ecd59cfae1d0fd18",
+      "length": 489
+    },
+    "work-map": {
+      "hash": "312aa7f9e3ec98dda3c8f6c9a0f5e73b808f1a53b01a511f583d4f62ae82ce1c",
+      "length": 1067
+    },
+    "love-map": {
+      "hash": "f3fec0e0f9421d1e229fe840ce3e17343f509423f886a7cdbc43e30f50aed4b2",
+      "length": 833
+    },
+    "disposition-mix": {
+      "hash": "8ed5f7a7709206ab2c931824755fd101bc024c2bcb3c56e3ca376585985ffbce",
+      "length": 5316
+    },
+    "keystone": {
+      "hash": "f822afeece7a05c17ee77dc7c2646a498540bd87d47724d96ec455fccc87a588",
+      "length": 1513
+    }
+  },
+  "goal-soul-give/01-generative.json": {
+    "open-tensions": {
+      "hash": "19516c4270f4c78b926ef7753c3eb50829569ea6732c6e96a9f895923e843db0",
+      "length": 348
+    },
+    "mirror-types-seed": {
+      "hash": "30675688c3ab6f78504d9226f72e891a9c93d221dae5aaf8f1c7201007c98878",
+      "length": 674
+    },
+    "conflict-translation": {
+      "hash": "5a7cfb7a12eb443a00562b4616b6136c540a7308ace4db9f1746a891b36649c4",
+      "length": 464
+    },
+    "work-map": {
+      "hash": "0d2887043af757c8e2f3fe4dc510b07e33595d1054b56d82819133f0208edccb",
+      "length": 1293
+    },
+    "love-map": {
+      "hash": "b0abfeb44760e1b096e76cfff2348e12532dfdbbf366fac5b88a3c11884adbc1",
+      "length": 839
+    },
+    "disposition-mix": {
+      "hash": "b1dbf6fe0b51d5dd2485fc43366e6b7dee7644118cf35f404a3adcbef8c0f160",
+      "length": 5708
+    },
+    "keystone": {
+      "hash": "324c31e0426e863f550d60226fd41aef15a985742f9aa4c7c7d6f82c95f7c04b",
+      "length": 1353
+    }
+  },
+  "goal-soul-give/02-compartmentalized.json": {
+    "open-tensions": {
+      "hash": "19516c4270f4c78b926ef7753c3eb50829569ea6732c6e96a9f895923e843db0",
+      "length": 348
+    },
+    "mirror-types-seed": {
+      "hash": "30675688c3ab6f78504d9226f72e891a9c93d221dae5aaf8f1c7201007c98878",
+      "length": 674
+    },
+    "conflict-translation": {
+      "hash": "61c4f365dec37765a4a95357731fc795ae6960c1ea70b24f6f2e75fcdf8eb54a",
+      "length": 496
+    },
+    "work-map": {
+      "hash": "0d2887043af757c8e2f3fe4dc510b07e33595d1054b56d82819133f0208edccb",
+      "length": 1293
+    },
+    "love-map": {
+      "hash": "b0abfeb44760e1b096e76cfff2348e12532dfdbbf366fac5b88a3c11884adbc1",
+      "length": 839
+    },
+    "disposition-mix": {
+      "hash": "d17bbd86cf7b1cf9acd0a1499510c2cbe8f62f686f0ac6a10919d8cb736a63b2",
+      "length": 5426
+    },
+    "keystone": {
+      "hash": "aad01b0d20c2c64083ff1a34e82ee4c6de5803bcbe1115e7c9db61b2b4e997e8",
+      "length": 1573
+    }
+  },
+  "goal-soul-give/03-striving.json": {
+    "open-tensions": {
+      "hash": "c2dd7e8b7338015ae652e1de7fb90f25b9f2ee0d553013ab63fe2d6da88857c2",
+      "length": 182
+    },
+    "mirror-types-seed": {
+      "hash": "5bdba3fbcf3cd494ea9f4baecc85e189c2d7036b64bcaaa53eee0aea3360964a",
+      "length": 653
+    },
+    "conflict-translation": {
+      "hash": "ab0ee7ed88221def9bd7a1b10ad58050c3d58ecf9f4132fae5c587ec3bfb9f99",
+      "length": 461
+    },
+    "work-map": {
+      "hash": "0d2887043af757c8e2f3fe4dc510b07e33595d1054b56d82819133f0208edccb",
+      "length": 1293
+    },
+    "love-map": {
+      "hash": "1f9476d762e0d8e5c4bb8325a3364e3c8a810269d89b8c21245741dd6b918ed2",
+      "length": 1344
+    },
+    "disposition-mix": {
+      "hash": "d4ec74dcb72a350462389e259a72921d873e4cd1b138d1c04c2142b86e9f190a",
+      "length": 4948
+    },
+    "keystone": {
+      "hash": "425d611fa78128406f4f7fc4a8cd2cbd6efc465a0b25add6a2322f8dced3c170",
+      "length": 1331
+    }
+  },
+  "goal-soul-give/04-longing.json": {
+    "open-tensions": {
+      "hash": "c2dd7e8b7338015ae652e1de7fb90f25b9f2ee0d553013ab63fe2d6da88857c2",
+      "length": 182
+    },
+    "mirror-types-seed": {
+      "hash": "bdf2337cd276c93cfaf06d0b67cb1395c445da65c690e27ca44d16ab7817450b",
+      "length": 633
+    },
+    "conflict-translation": {
+      "hash": "f24cc073c543aeddec544a9cce2dc24091d5fcd0dc9885061a40510c5ce28950",
+      "length": 466
+    },
+    "work-map": {
+      "hash": "5655dddc182be0996dce34035bcd3c988671a84d716a01ba1b38e75998004df4",
+      "length": 1589
+    },
+    "love-map": {
+      "hash": "4a044dc6797ca7ea537bd3e4b4ec7eb2dcb6d68136cf6d8596858e1f8d0b6196",
+      "length": 1287
+    },
+    "disposition-mix": {
+      "hash": "f56b0eceb0582faaf5e73c11e3b8757a27f7e9284c19b79e231df0dd7428e90e",
+      "length": 5623
+    },
+    "keystone": {
+      "hash": "1b0b082cc41b46e64533d4dfd253d5b4f7a3649d2464189fc7b4d4287c309a9c",
+      "length": 1399
+    }
+  },
+  "goal-soul-give/05-steward-not-gripper.json": {
+    "open-tensions": {
+      "hash": "f728794753ec46507536d12ef87da5babc863d0361a90a4f02a7e92bed00fba6",
+      "length": 830
+    },
+    "mirror-types-seed": {
+      "hash": "bdf2337cd276c93cfaf06d0b67cb1395c445da65c690e27ca44d16ab7817450b",
+      "length": 633
+    },
+    "conflict-translation": {
+      "hash": "74d0d3dd0265be62c29cc9bd68d98e1d61853a1e1b08aad736f39b30c7c37cac",
+      "length": 456
+    },
+    "work-map": {
+      "hash": "5655dddc182be0996dce34035bcd3c988671a84d716a01ba1b38e75998004df4",
+      "length": 1589
+    },
+    "love-map": {
+      "hash": "804360adf1077656df78b8683ddf329dbfe4757ddc590d667260a5e96fcbc31c",
+      "length": 1294
+    },
+    "disposition-mix": {
+      "hash": "d86ee763ac42dbf71cabcc7707fe6145dfb97db2b324cbce791839fb9481ae63",
+      "length": 5674
+    },
+    "keystone": {
+      "hash": "dfe4e2ba17cdd69ded6d3bf93a567d88468f78e7c74a040c4ec5366617c6e528",
+      "length": 1289
+    }
+  },
+  "goal-soul-give/06-neutral.json": {
+    "open-tensions": {
+      "hash": "c2dd7e8b7338015ae652e1de7fb90f25b9f2ee0d553013ab63fe2d6da88857c2",
+      "length": 182
+    },
+    "mirror-types-seed": {
+      "hash": "d4a4a4a9bf6a1101cdbc7f1a757205eb6661ae7c9145751e46f1307bf4e79ac6",
+      "length": 626
+    },
+    "conflict-translation": {
+      "hash": "1645c63d356a2b28660f1e38c44da656affa94b3e60a8e1aac332528f550f5b4",
+      "length": 465
+    },
+    "work-map": {
+      "hash": "4e920e7f235e1527ad1678c8fc35bc64b7bc2ec4bf221840bde4210ac01af33e",
+      "length": 1053
+    },
+    "love-map": {
+      "hash": "264699577e017efb574eb84de3170625325901aa0ae1ed9d05b872f14aae0701",
+      "length": 1184
+    },
+    "disposition-mix": {
+      "hash": "397f22a9ec48abb893c461bbf582f360edea766c0065cb41cf0046a7f5c9eb7f",
+      "length": 4756
+    },
+    "keystone": {
+      "hash": "(missing)",
+      "length": 0
+    }
+  },
+  "goal-soul-give/07-true-gripping.json": {
+    "open-tensions": {
+      "hash": "b803a4f8d956c78a34f28a24cfbf3ad197f3ffe2ec779f67da7fad8bacc63330",
+      "length": 874
+    },
+    "mirror-types-seed": {
+      "hash": "d4a4a4a9bf6a1101cdbc7f1a757205eb6661ae7c9145751e46f1307bf4e79ac6",
+      "length": 626
+    },
+    "conflict-translation": {
+      "hash": "10e10e0e4feb407e58a5c5925994e0cafaf8ab50fed7e9f8934172e2e1ff5528",
+      "length": 455
+    },
+    "work-map": {
+      "hash": "4e920e7f235e1527ad1678c8fc35bc64b7bc2ec4bf221840bde4210ac01af33e",
+      "length": 1053
+    },
+    "love-map": {
+      "hash": "d80c5f71eee823a949a3ab40c5cbb5956d86a45b53dac90566257d311c836029",
+      "length": 823
+    },
+    "disposition-mix": {
+      "hash": "c2ecfa36d514ef0b98643f5975e8f0873586e8e3dae20afa0f1a0d818a91324e",
+      "length": 4911
+    },
+    "keystone": {
+      "hash": "3d6115ace0f110e93f45a55463d275e9a54abbad0e74f5eec0f2674c34a717be",
+      "length": 1437
+    }
+  },
+  "goal-soul-give/08-early-career-striving.json": {
+    "open-tensions": {
+      "hash": "c2dd7e8b7338015ae652e1de7fb90f25b9f2ee0d553013ab63fe2d6da88857c2",
+      "length": 182
+    },
+    "mirror-types-seed": {
+      "hash": "5bdba3fbcf3cd494ea9f4baecc85e189c2d7036b64bcaaa53eee0aea3360964a",
+      "length": 653
+    },
+    "conflict-translation": {
+      "hash": "ab0ee7ed88221def9bd7a1b10ad58050c3d58ecf9f4132fae5c587ec3bfb9f99",
+      "length": 461
+    },
+    "work-map": {
+      "hash": "0d2887043af757c8e2f3fe4dc510b07e33595d1054b56d82819133f0208edccb",
+      "length": 1293
+    },
+    "love-map": {
+      "hash": "1f9476d762e0d8e5c4bb8325a3364e3c8a810269d89b8c21245741dd6b918ed2",
+      "length": 1344
+    },
+    "disposition-mix": {
+      "hash": "d4ec74dcb72a350462389e259a72921d873e4cd1b138d1c04c2142b86e9f190a",
+      "length": 4948
+    },
+    "keystone": {
+      "hash": "425d611fa78128406f4f7fc4a8cd2cbd6efc465a0b25add6a2322f8dced3c170",
+      "length": 1331
+    }
+  },
+  "goal-soul-give/09-mid-career-balance.json": {
+    "open-tensions": {
+      "hash": "19516c4270f4c78b926ef7753c3eb50829569ea6732c6e96a9f895923e843db0",
+      "length": 348
+    },
+    "mirror-types-seed": {
+      "hash": "30675688c3ab6f78504d9226f72e891a9c93d221dae5aaf8f1c7201007c98878",
+      "length": 674
+    },
+    "conflict-translation": {
+      "hash": "5a7cfb7a12eb443a00562b4616b6136c540a7308ace4db9f1746a891b36649c4",
+      "length": 464
+    },
+    "work-map": {
+      "hash": "0d2887043af757c8e2f3fe4dc510b07e33595d1054b56d82819133f0208edccb",
+      "length": 1293
+    },
+    "love-map": {
+      "hash": "b0abfeb44760e1b096e76cfff2348e12532dfdbbf366fac5b88a3c11884adbc1",
+      "length": 839
+    },
+    "disposition-mix": {
+      "hash": "b1dbf6fe0b51d5dd2485fc43366e6b7dee7644118cf35f404a3adcbef8c0f160",
+      "length": 5708
+    },
+    "keystone": {
+      "hash": "324c31e0426e863f550d60226fd41aef15a985742f9aa4c7c7d6f82c95f7c04b",
+      "length": 1353
+    }
+  },
+  "goal-soul-give/10-entrepreneur-striving.json": {
+    "open-tensions": {
+      "hash": "c2dd7e8b7338015ae652e1de7fb90f25b9f2ee0d553013ab63fe2d6da88857c2",
+      "length": 182
+    },
+    "mirror-types-seed": {
+      "hash": "5bdba3fbcf3cd494ea9f4baecc85e189c2d7036b64bcaaa53eee0aea3360964a",
+      "length": 653
+    },
+    "conflict-translation": {
+      "hash": "ab0ee7ed88221def9bd7a1b10ad58050c3d58ecf9f4132fae5c587ec3bfb9f99",
+      "length": 461
+    },
+    "work-map": {
+      "hash": "0d2887043af757c8e2f3fe4dc510b07e33595d1054b56d82819133f0208edccb",
+      "length": 1293
+    },
+    "love-map": {
+      "hash": "1f9476d762e0d8e5c4bb8325a3364e3c8a810269d89b8c21245741dd6b918ed2",
+      "length": 1344
+    },
+    "disposition-mix": {
+      "hash": "d4ec74dcb72a350462389e259a72921d873e4cd1b138d1c04c2142b86e9f190a",
+      "length": 4948
+    },
+    "keystone": {
+      "hash": "425d611fa78128406f4f7fc4a8cd2cbd6efc465a0b25add6a2322f8dced3c170",
+      "length": 1331
+    }
+  },
+  "goal-soul-give/11-retirement-longing.json": {
+    "open-tensions": {
+      "hash": "c2dd7e8b7338015ae652e1de7fb90f25b9f2ee0d553013ab63fe2d6da88857c2",
+      "length": 182
+    },
+    "mirror-types-seed": {
+      "hash": "bdf2337cd276c93cfaf06d0b67cb1395c445da65c690e27ca44d16ab7817450b",
+      "length": 633
+    },
+    "conflict-translation": {
+      "hash": "f24cc073c543aeddec544a9cce2dc24091d5fcd0dc9885061a40510c5ce28950",
+      "length": 466
+    },
+    "work-map": {
+      "hash": "5655dddc182be0996dce34035bcd3c988671a84d716a01ba1b38e75998004df4",
+      "length": 1589
+    },
+    "love-map": {
+      "hash": "4a044dc6797ca7ea537bd3e4b4ec7eb2dcb6d68136cf6d8596858e1f8d0b6196",
+      "length": 1287
+    },
+    "disposition-mix": {
+      "hash": "f56b0eceb0582faaf5e73c11e3b8757a27f7e9284c19b79e231df0dd7428e90e",
+      "length": 5623
+    },
+    "keystone": {
+      "hash": "1b0b082cc41b46e64533d4dfd253d5b4f7a3649d2464189fc7b4d4287c309a9c",
+      "length": 1399
+    }
+  },
+  "goal-soul-give/12-productive-ne-default-pair.json": {
+    "open-tensions": {
+      "hash": "19516c4270f4c78b926ef7753c3eb50829569ea6732c6e96a9f895923e843db0",
+      "length": 348
+    },
+    "mirror-types-seed": {
+      "hash": "87a5a985ce653a837823d4616f6a8bda12f44c5d179db6d5bf702018cccf2d32",
+      "length": 652
+    },
+    "conflict-translation": {
+      "hash": "3655985cbf1d6cf43b0a3cc0ebe5c00d3a41f1ae41898c0d78fd2dbb8823eed0",
+      "length": 463
+    },
+    "work-map": {
+      "hash": "1d30b4f1f02493782ad8c21df759151070fedcc45f2233c9202e998f602dd6d0",
+      "length": 1056
+    },
+    "love-map": {
+      "hash": "8d6ffa281fe47b3ec1b71da30b3cbd69fa54e0250cba7bba74af63fecbcfc2c8",
+      "length": 908
+    },
+    "disposition-mix": {
+      "hash": "45f022017ddb02ac4d83c72236ad6aa7fad3f3f45c92c38ccce28433caea6848",
+      "length": 5807
+    },
+    "keystone": {
+      "hash": "8187b3aed3cecaafd04782f68b60e01add9b4c7b06d2df594cc7d13208a7a895",
+      "length": 1527
+    }
+  },
+  "goal-soul-give/13-drive-inverted-case.json": {
+    "open-tensions": {
+      "hash": "0910364af9667a6cb60cec373da34e39e461beb9cf4e973321829ef4fee58031",
+      "length": 1412
+    },
+    "mirror-types-seed": {
+      "hash": "bdf2337cd276c93cfaf06d0b67cb1395c445da65c690e27ca44d16ab7817450b",
+      "length": 633
+    },
+    "conflict-translation": {
+      "hash": "74d0d3dd0265be62c29cc9bd68d98e1d61853a1e1b08aad736f39b30c7c37cac",
+      "length": 456
+    },
+    "work-map": {
+      "hash": "5655dddc182be0996dce34035bcd3c988671a84d716a01ba1b38e75998004df4",
+      "length": 1589
+    },
+    "love-map": {
+      "hash": "804360adf1077656df78b8683ddf329dbfe4757ddc590d667260a5e96fcbc31c",
+      "length": 1294
+    },
+    "disposition-mix": {
+      "hash": "10708b5fa0e0387368a8ae57f2213492d10d7ed4a318580658c2568091bfb549",
+      "length": 5687
+    },
+    "keystone": {
+      "hash": "a87306c4bf34d5ae24e296bee9ad5f251c2c21effd7d3a838cfe009ce2024612",
+      "length": 1437
+    }
+  }
+}

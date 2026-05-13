@@ -91,7 +91,16 @@ export const INVERSION_GAP_THRESHOLD_PERCENT = 15;
 //
 // Rationale per multi-tag is documented in docs/canon/drive-framework.md.
 
-type DriveTag = DriveBucket | "multi" | "exclude";
+// CC-Q3 — Drive tag values. "multi" splits 50/50 across two buckets per
+// MULTI_TAG_SPLITS; "multi-asymmetric" splits per per-signal weights in
+// MULTI_ASYMMETRIC_SPLITS. The asymmetric variant exists specifically
+// for `revealed_reputation_priority` (75% cost + 25% compliance per spec
+// memo §4); future asymmetric splits register the same way.
+type DriveTag =
+  | DriveBucket
+  | "multi"
+  | "multi-asymmetric"
+  | "exclude";
 
 const SIGNAL_DRIVE_TAGS: Record<string, DriveTag> = {
   // Q-S3-close items — money flow within the close circle.
@@ -194,12 +203,62 @@ const SIGNAL_DRIVE_TAGS: Record<string, DriveTag> = {
   cost_drive: "exclude",
   coverage_drive: "exclude",
   compliance_drive: "exclude",
+
+  // CC-Q2 — Q-GS1 `security_freedom_signal` is multi-tagged across cost
+  // (financial cushion / accumulated resources) and compliance (risk
+  // mitigation / room to choose protects against loss). The 50/50 split
+  // honors the canon ambiguity flagged in spec memo §8 open question 2.
+  // Other Q-GS1 / Q-V1 / Q-GRIP1 signals do NOT tag Drive distribution
+  // (per spec memo §4) — they feed Goal / Soul / Vulnerability / Gripping
+  // Pull composites in lib/goalSoulGive.ts.
+  security_freedom_signal: "multi",
+
+  // CC-Q3 — Q-3C2 revealed Drive priority signals. Direct revealed-
+  // behavior measurement that pairs with Q-3C1's claimed Drive ranking.
+  // Per spec memo §4 binding:
+  //   - revealed_cost_priority       → Cost (single)
+  //   - revealed_coverage_priority   → Coverage (single)
+  //   - revealed_compliance_priority → Compliance (single)
+  //   - revealed_goal_priority       → Cost 50% + Coverage 50% (multi)
+  //   - revealed_recovery_priority   → Compliance 50% + Coverage 50% (multi)
+  //   - revealed_reputation_priority → Cost 75% + Compliance 25% (multi-asymmetric)
+  revealed_cost_priority: "cost",
+  revealed_coverage_priority: "coverage",
+  revealed_compliance_priority: "compliance",
+  revealed_goal_priority: "multi",
+  revealed_recovery_priority: "multi",
+  revealed_reputation_priority: "multi-asymmetric",
 };
 
 const MULTI_TAG_SPLITS: Record<string, [DriveBucket, DriveBucket]> = {
   family_spending_priority: ["cost", "coverage"],
   caring_energy_priority: ["coverage", "cost"],
   stability_priority: ["compliance", "coverage"],
+  // CC-Q2 — security/freedom Q-GS1 item splits 50/50 cost+compliance.
+  security_freedom_signal: ["cost", "compliance"],
+  // CC-Q3 — Q-3C2 revealed_goal_priority + revealed_recovery_priority
+  // both split 50/50 across two buckets. revealed_goal_priority pairs
+  // cost (the build's resource frame) with coverage (the build serves
+  // people). revealed_recovery_priority pairs compliance (loss-mitigation,
+  // protect-the-substrate) with coverage (caring for self counts as care).
+  revealed_goal_priority: ["cost", "coverage"],
+  revealed_recovery_priority: ["compliance", "coverage"],
+};
+
+// CC-Q3 — asymmetric multi-tag splits. Each signal contributes weight w
+// distributed per the per-bucket pct values (sum to 100). Currently
+// `revealed_reputation_priority` is the only entry; the canon binding is
+// 75% Cost + 25% Compliance — reputation primarily indexes the resource /
+// status register but partially indexes loss-mitigation (protect-the-self
+// against being seen badly). Spec memo §4.
+const MULTI_ASYMMETRIC_SPLITS: Record<
+  string,
+  ReadonlyArray<{ bucket: DriveBucket; pct: number }>
+> = {
+  revealed_reputation_priority: [
+    { bucket: "cost", pct: 75 },
+    { bucket: "compliance", pct: 25 },
+  ],
 };
 
 // ── Weighting ───────────────────────────────────────────────────────────
@@ -241,7 +300,17 @@ export function computeDriveDistribution(
   for (const sig of signals) {
     const tag = SIGNAL_DRIVE_TAGS[sig.signal_id];
     if (!tag || tag === "exclude") continue;
-    const w = weightFor(sig);
+    // CC-Q3 — Q-3C2 signals carry 1.5x weight relative to other inputs
+    // because they are *direct revealed measurement* of behavior under
+    // crowding, not signals derived from adjacent rankings. The
+    // multiplier ensures Q-3C2 meaningfully shifts the distribution when
+    // present without dominating it; combined with the 6-item ranking
+    // tail, Q-3C2 becomes the load-bearing source of the revealed-side
+    // read while the existing 15 question-equivalents remain corroborating
+    // signal.
+    const baseWeight = weightFor(sig);
+    const isQ3C2 = sig.source_question_ids.includes("Q-3C2");
+    const w = isQ3C2 ? baseWeight * 1.5 : baseWeight;
 
     if (tag === "multi") {
       const split = MULTI_TAG_SPLITS[sig.signal_id];
@@ -262,6 +331,25 @@ export function computeDriveDistribution(
       };
       add(a);
       add(b);
+    } else if (tag === "multi-asymmetric") {
+      // CC-Q3 — asymmetric multi-tag (e.g., reputation 75% cost / 25%
+      // compliance). Distribute w per pct; each bucket bumps inputCount
+      // because the channel contributed even if the share is partial.
+      const splits = MULTI_ASYMMETRIC_SPLITS[sig.signal_id];
+      if (!splits) continue;
+      for (const part of splits) {
+        const portion = (w * part.pct) / 100;
+        if (part.bucket === "cost") {
+          cost += portion;
+          costInputs++;
+        } else if (part.bucket === "coverage") {
+          coverage += portion;
+          coverageInputs++;
+        } else {
+          compliance += portion;
+          complianceInputs++;
+        }
+      }
     } else {
       if (tag === "cost") {
         cost += w;
@@ -410,8 +498,24 @@ export function classifyDriveCase(
 
 // ── Prose generation ────────────────────────────────────────────────────
 //
-// Six locked templates per case. Per spec: don't substitute. If a template
-// reads off-tone in browser smoke, surface for follow-up.
+// CC-083 — case-aware prose composer. Each `DriveCase` value selects one
+// of six templates; the templates differ in *register*, not just in the
+// substituted bucket names. Two registers are canon-locked here:
+//
+//   - Inversion register (inverted-small, inverted-big): names both
+//     "claimed" and "revealed" explicitly, names the specific bucket
+//     inversion pair (e.g., "you ranked building & wealth first, but
+//     your answers read building & wealth third"), frames the gap as
+//     the diagnostic, and does NOT moralize. The user-confirmation
+//     question — "Which feels closer?" — is preserved.
+//
+//   - Alignment / partial / balanced / unstated registers: do not
+//     manufacture a contradiction. Aligned names the convergence;
+//     partial-mismatch names the lean; balanced names the equal weight;
+//     unstated names what's missing.
+//
+// All six templates close with "Which feels closer?" — the user owns the
+// interpretive role across every case (canon).
 
 const HUMAN_LABELS: Record<DriveBucket, string> = {
   cost: "building & wealth",
@@ -419,6 +523,9 @@ const HUMAN_LABELS: Record<DriveBucket, string> = {
   compliance: "risk and uncertainty",
 };
 
+// Sentence-start capitalization. Bucket labels are stored lowercase
+// because they most often interpolate mid-sentence; templates that put
+// a bucket label at sentence start use this helper.
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
@@ -432,18 +539,71 @@ export function generateDriveProse(output: DriveOutput): string {
 
   switch (output.case) {
     case "aligned":
-      return `You name ${claimedFirst} as what most often guides you, and your answers reveal the same motivator — your distribution shows ${revFirst} as the largest share. The match is informative; the why you claim and the why your answers expose are pointing at the same thing.`;
+      // Claimed top matches revealed top. Name both registers, name the
+      // convergence, do not invent a contradiction. Closes with the
+      // canonical confirmation.
+      return (
+        `You claim ${claimedFirst} as your top drive, and your revealed distribution agrees: ${revFirst} reads as the largest share. ` +
+        `Claimed and revealed are pointing the same direction here. ` +
+        `What you'd name and what your answers expose are landing on the same ground — disciplined integration of one register, or one motivator quietly carrying the others. ` +
+        `Which feels closer?`
+      );
     case "inverted-small":
-      return `You name ${claimedFirst} as what most often guides you. Your distribution reveals a different motivator — your answers point most strongly toward ${revFirst}, with ${claimedFirst} appearing as the smallest share. There's a gap between the why you tell yourself and the why your answers expose. The model doesn't read which is closer to truth — it surfaces the gap and asks whether you want to.`;
+      // Claimed first is revealed smallest. The user named X as their
+      // top drive; their answers read X as the bottom slice. Name the
+      // specific bucket inversion (claimed first / reads third).
+      return (
+        `You ranked ${claimedFirst} first as your top drive. ` +
+        `Your revealed distribution names a different motivator — ${revFirst} reads as the largest share, and ${claimedFirst} appears as the smallest. ` +
+        `Claimed and revealed are pointing different directions: you ranked ${claimedFirst} first, but your answers read ${claimedFirst} third. ` +
+        `The gap is the diagnostic, not the balance — what you say guides you and what your week serves are different things. ` +
+        `It could be a season where one register has eclipsed the other, or a stated claim that your behavior hasn't yet caught up to. ` +
+        `Which feels closer?`
+      );
     case "inverted-big":
-      return `What you rank as third in priority is what your distribution reveals as your largest share. ${capitalize(revFirst)} dominates your answers — even though you named ${claimedThird} as third in priority. Sometimes the motivators we don't name are the motivators that have the most weight in our actual lives.`;
+      // Claimed third is revealed largest. The user named X as their
+      // bottom drive; their answers read X as the top slice. Name the
+      // specific bucket inversion (claimed third / reads first).
+      // claimedThird and revFirst label the same bucket here — use
+      // claimedThird consistently to avoid tautology ("X is X").
+      return (
+        `You ranked ${claimedThird} third in priority — the drive you named last. ` +
+        `Your revealed distribution names ${claimedThird} as the largest share. ` +
+        `Claimed and revealed are pointing different directions: you ranked ${claimedThird} third, but your answers read ${claimedThird} first. ` +
+        `The gap is the diagnostic, not the balance — what you place last by intention is what your week most exposes, regardless of which register you'd cite. ` +
+        `It could be a season where the un-named register has gathered weight, or a register that's been load-bearing without being called out. ` +
+        `Which feels closer?`
+      );
     case "partial-mismatch":
-      return `You name ${claimedFirst} as your top drive, and your answers reveal it as a real share — but not the largest. Your distribution leans more toward ${revFirst}. The lean is informative; the question is whether it's intentional, seasonal, or a quiet drift the model is exposing.`;
+      // Claimed top is present in the revealed distribution but not the
+      // largest. A lean, not a contradiction. Both registers named, no
+      // inversion language.
+      return (
+        `You claim ${claimedFirst} as your top drive, and your revealed distribution shows it as a real share — but not the largest. ` +
+        `${capitalize(revFirst)} reads more strongly. ` +
+        `Claimed and revealed lean in similar but not identical directions: ${claimedFirst} is present, ${revFirst} is dominant. ` +
+        `The lean is informative — it could be intentional, seasonal, or a quiet drift the model is surfacing. ` +
+        `Which feels closer?`
+      );
     case "balanced":
-      return `Your distribution is unusually balanced — building & wealth, people-service-and-society, and risk-mitigation motivators show roughly equal weight in your answers. That balance can mean disciplined integration of three competing drives, or it can mean unresolved tradeoffs the model can't see. Which feels closer?`;
+      // All three slices within BALANCED_THRESHOLD_PERCENT. No clear
+      // dominant motivator. Two-interpretation framing (disciplined
+      // integration vs. unresolved tradeoffs) preserved.
+      return (
+        `Your distribution is unusually balanced — building & wealth, people-service-and-society, and risk-mitigation motivators show roughly equal weight in your answers. ` +
+        `Claimed and revealed read with similar weight across the three buckets. ` +
+        `That balance can mean disciplined integration of three competing drives, or it can mean unresolved tradeoffs the model can't see. ` +
+        `Which feels closer?`
+      );
     case "unstated":
     default:
-      return `Your distribution across building & wealth, people-service-and-society, and risk-mitigation motivators reveals ${revFirst} as the largest share. Without your claimed drive, the model can't compare what you'd say guides you against what your answers expose.`;
+      // No Q-3C1 ranking on file. Only the revealed distribution is
+      // available; without a claim, the model can't compare registers.
+      return (
+        `Your revealed distribution names ${revFirst} as the largest share across building & wealth, people-service-and-society, and risk-mitigation motivators. ` +
+        `Without a claimed drive on file, the model can't compare what you'd say guides you against what your answers expose. ` +
+        `Which feels closer to how you'd describe it?`
+      );
   }
 }
 

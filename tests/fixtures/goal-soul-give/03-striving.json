@@ -1,16 +1,24 @@
-[
-  { "question_id": "Q-E1-outward", "card_id": "sacred", "question_text": "outward energy", "type": "ranking", "order": ["building", "solving", "restoring"] },
-  { "question_id": "Q-E1-inward",  "card_id": "sacred", "question_text": "inward energy",  "type": "ranking", "order": ["enjoying", "learning", "caring"] },
-  { "question_id": "Q-A1", "card_id": "agency", "question_text": "spend most of your time", "type": "forced", "response": "Building or creating" },
-  { "question_id": "Q-A2", "card_id": "agency", "question_text": "where energy goes",       "type": "forced", "response": "Building or creating something new" },
-  { "question_id": "Q-3C1",       "card_id": "role",   "question_text": "drive priority",       "type": "ranking", "order": ["cost", "compliance", "coverage"] },
-  { "question_id": "Q-Ambition1", "card_id": "role",   "question_text": "what does the win look like", "type": "ranking", "order": ["success", "wealth", "legacy", "fame"] },
-  { "question_id": "Q-Stakes1", "card_id": "sacred", "question_text": "concrete stakes", "type": "ranking", "order": ["health", "close_relationships", "money", "job", "reputation"] },
-  { "question_id": "Q-S1", "card_id": "sacred", "question_text": "qualities of self", "type": "ranking", "order": ["freedom", "honor", "truth", "stability", "peace", "loyalty"] },
-  { "question_id": "Q-S2", "card_id": "sacred", "question_text": "claims on you", "type": "ranking", "order": ["knowledge", "justice", "family", "faith", "compassion", "mercy"] },
-  { "question_id": "Q-T1", "card_id": "temperament", "question_text": "hard problem", "type": "ranking", "order": ["se", "ni", "ne", "si"] },
-  { "question_id": "Q-T5", "card_id": "temperament", "question_text": "plan not working", "type": "ranking", "order": ["te", "ti", "fi", "fe"] },
-  { "question_id": "Q-P1", "card_id": "pressure", "question_text": "expressing a belief that costs relationships", "type": "forced", "response": "Say it directly" },
-  { "question_id": "Q-P2", "card_id": "pressure", "question_text": "belief at job risk", "type": "forced", "response": "Accept the risk" },
-  { "question_id": "Q-I1", "card_id": "conviction", "question_text": "belief you'd bear cost to keep", "type": "freeform", "response": "I believe excellent execution is itself a form of integrity, and I would risk a job before shipping work I knew was sloppy." }
-]
+{
+  "answers": [
+    { "question_id": "Q-E1-outward", "card_id": "sacred", "question_text": "outward energy", "type": "ranking", "order": ["building", "solving", "restoring"] },
+    { "question_id": "Q-E1-inward",  "card_id": "sacred", "question_text": "inward energy",  "type": "ranking", "order": ["enjoying", "learning", "caring"] },
+    { "question_id": "Q-A1", "card_id": "agency", "question_text": "spend most of your time", "type": "forced", "response": "Building or creating" },
+    { "question_id": "Q-A2", "card_id": "agency", "question_text": "where energy goes",       "type": "forced", "response": "Building or creating something new" },
+    { "question_id": "Q-3C1",       "card_id": "role",   "question_text": "drive priority",       "type": "ranking", "order": ["cost", "compliance", "coverage"] },
+    { "question_id": "Q-Ambition1", "card_id": "role",   "question_text": "what does the win look like", "type": "ranking", "order": ["success", "wealth", "legacy", "fame"] },
+    { "question_id": "Q-Stakes1", "card_id": "sacred", "question_text": "concrete stakes", "type": "ranking", "order": ["health", "close_relationships", "money", "job", "reputation"] },
+    { "question_id": "Q-S1", "card_id": "sacred", "question_text": "qualities of self", "type": "ranking", "order": ["freedom", "honor", "truth", "stability", "peace", "loyalty"] },
+    { "question_id": "Q-S2", "card_id": "sacred", "question_text": "claims on you", "type": "ranking", "order": ["knowledge", "justice", "family", "faith", "compassion", "mercy"] },
+    { "question_id": "Q-T1", "card_id": "temperament", "question_text": "hard problem", "type": "ranking", "order": ["se", "ni", "ne", "si"] },
+    { "question_id": "Q-T5", "card_id": "temperament", "question_text": "plan not working", "type": "ranking", "order": ["te", "ti", "fi", "fe"] },
+    { "question_id": "Q-P1", "card_id": "pressure", "question_text": "expressing a belief that costs relationships", "type": "forced", "response": "Say it directly" },
+    { "question_id": "Q-P2", "card_id": "pressure", "question_text": "belief at job risk", "type": "forced", "response": "Accept the risk" },
+    { "question_id": "Q-I1", "card_id": "conviction", "question_text": "belief you'd bear cost to keep", "type": "freeform", "response": "I believe excellent execution is itself a form of integrity, and I would risk a job before shipping work I knew was sloppy." },
+    { "question_id": "Q-GS1", "card_id": "sacred", "question_text": "what makes a successful effort feel worth it", "type": "ranking", "order": ["goal_completion", "durable_creation", "security_freedom", "creative_truth", "gripping_proof", "soul_calling", "soul_people"] },
+    { "question_id": "Q-V1", "card_id": "conviction", "question_text": "why your work really matters", "type": "ranking", "order": ["goal_logic_explanation", "performance_identity", "sacred_belief_connection", "vulnerability_open_uncertainty", "soul_beloved_named", "vulnerability_deflection"] },
+    { "question_id": "Q-GRIP1", "card_id": "pressure", "question_text": "what you grip under pressure", "type": "ranking", "order": ["grips_control", "grips_security", "grips_certainty", "grips_reputation", "grips_old_plan", "grips_comfort", "grips_neededness", "grips_approval"] },
+    { "question_id": "Q-3C2", "card_id": "role", "question_text": "what you protect first in practice", "type": "ranking", "order": ["cost_priority", "goal_priority", "reputation_priority", "compliance_priority", "recovery_priority", "coverage_priority"] },
+    { "question_id": "Q-L1", "card_id": "sacred", "question_text": "how love becomes visible", "type": "ranking", "order": ["problem_solving", "co_construction", "protection", "verbal_expression", "presence", "shared_experience", "quiet_sacrifice"] }
+  ],
+  "demographics": null
+}

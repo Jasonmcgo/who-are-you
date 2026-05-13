@@ -8,11 +8,14 @@
     "start": "next start -p 3003",
     "lint": "eslint",
     "audit:goal-soul-give": "tsx tests/audit/goalSoulGive.audit.ts",
+    "audit:ocean": "tsx tests/audit/oceanDashboard.audit.ts",
+    "audit:ocean:diagnose": "tsx tests/audit/oceanDashboard.audit.ts --diagnose",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.95.1",
     "drizzle-orm": "^0.36.4",
     "next": "16.2.4",
     "postgres": "^3.4.5",

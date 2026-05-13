@@ -1,0 +1,25 @@
+{
+  "answers": [
+    { "question_id": "Q-E1-inward",  "card_id": "sacred", "question_text": "inward energy",  "type": "ranking", "order": ["caring", "enjoying", "learning"] },
+    { "question_id": "Q-A1", "card_id": "agency", "question_text": "spend most of your time", "type": "forced", "response": "Maintaining responsibilities" },
+    { "question_id": "Q-A2", "card_id": "agency", "question_text": "where energy goes",       "type": "forced", "response": "Restoring order and stability" },
+    { "question_id": "Q-3C1",       "card_id": "role",   "question_text": "drive priority",       "type": "ranking", "order": ["cost", "coverage", "compliance"] },
+    { "question_id": "Q-Stakes1", "card_id": "sacred", "question_text": "concrete stakes", "type": "ranking", "order": ["close_relationships", "health", "reputation", "job", "money"] },
+    { "question_id": "Q-S1", "card_id": "sacred", "question_text": "qualities of self", "type": "ranking", "order": ["loyalty", "stability", "peace", "freedom", "truth", "honor"] },
+    { "question_id": "Q-S2", "card_id": "sacred", "question_text": "claims on you", "type": "ranking", "order": ["family", "compassion", "mercy", "faith", "knowledge", "justice"] },
+    { "question_id": "Q-X3-public", "card_id": "context", "question_text": "public-mission institutional trust", "type": "ranking", "order": ["education", "government_services", "nonprofits", "religious", "government_elected"] },
+    { "question_id": "Q-X3-information-and-commercial", "card_id": "context", "question_text": "info/commercial institutional trust", "type": "ranking", "order": ["small_business", "journalism", "large_companies", "news_organizations", "social_media"] },
+    { "question_id": "Q-X4-relational", "card_id": "context", "question_text": "relational trust", "type": "ranking", "order": ["family", "partner", "friend"] },
+    { "question_id": "Q-X4-chosen",     "card_id": "context", "question_text": "chosen trust",     "type": "ranking", "order": ["mentor", "outside_expert", "own_counsel"] },
+    { "question_id": "Q-S3-close", "card_id": "sacred", "question_text": "close-circle money", "type": "ranking", "order": ["family", "friends", "yourself"] },
+    { "question_id": "Q-S3-wider", "card_id": "sacred", "question_text": "wider-circle money", "type": "ranking", "order": ["nonprofits_religious", "social", "companies"] },
+    { "question_id": "Q-T8", "card_id": "temperament", "question_text": "someone struggling", "type": "ranking", "order": ["fe", "fi", "ti", "te"] },
+    { "question_id": "Q-I1", "card_id": "conviction", "question_text": "belief you'd bear cost to keep", "type": "freeform", "response": "I believe my first responsibility is to the people who depend on me, and I would bear inconvenience or social cost to keep faith with them." },
+    { "question_id": "Q-GS1", "card_id": "sacred", "question_text": "what makes a successful effort feel worth it", "type": "ranking", "order": ["soul_people", "soul_calling", "creative_truth", "security_freedom", "durable_creation", "goal_completion", "gripping_proof"] },
+    { "question_id": "Q-V1", "card_id": "conviction", "question_text": "why your work really matters", "type": "ranking", "order": ["sacred_belief_connection", "soul_beloved_named", "vulnerability_open_uncertainty", "goal_logic_explanation", "performance_identity", "vulnerability_deflection"] },
+    { "question_id": "Q-GRIP1", "card_id": "pressure", "question_text": "what you grip under pressure", "type": "ranking", "order": ["grips_neededness", "grips_approval", "grips_security", "grips_old_plan", "grips_comfort", "grips_control", "grips_certainty", "grips_reputation"] },
+    { "question_id": "Q-3C2", "card_id": "role", "question_text": "what you protect first in practice", "type": "ranking", "order": ["coverage_priority", "compliance_priority", "recovery_priority", "reputation_priority", "goal_priority", "cost_priority"] },
+    { "question_id": "Q-L1", "card_id": "sacred", "question_text": "how love becomes visible", "type": "ranking", "order": ["presence", "quiet_sacrifice", "co_construction", "verbal_expression", "protection", "problem_solving", "shared_experience"] }
+  ],
+  "demographics": null
+}

@@ -1,0 +1,24 @@
+{
+  "label": "Crisis class — Am I loved? grip with thin Soul axis (Goal 35 + Soul 20). Reaching for love/belonging while the relational line itself is empty.",
+  "synthetic": true,
+  "primalCluster": {
+    "primary": "Am I loved?",
+    "confidence": "high",
+    "contributingGrips": ["Grips being needed under pressure"],
+    "scores": {
+      "Am I safe?": 0,
+      "Am I secure?": 0,
+      "Am I loved?": 1.5,
+      "Am I wanted?": 0.5,
+      "Am I successful?": 0,
+      "Am I good enough?": 0,
+      "Do I have purpose?": 0
+    }
+  },
+  "goalScore": 35,
+  "soulScore": 20,
+  "expected": {
+    "pathClass": "crisis",
+    "crisisFlavor": "grasp-without-substance"
+  }
+}

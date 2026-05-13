@@ -1,0 +1,26 @@
+{
+  "label": "Low Emotional Reactivity / proxy-only: ER 0% guard fires; prose translates to 'low or under-detected'",
+  "answers": [
+    { "question_id": "Q-E1-outward", "card_id": "sacred", "question_text": "outward energy", "type": "ranking", "order": ["building", "solving", "restoring"] },
+    { "question_id": "Q-E1-inward",  "card_id": "sacred", "question_text": "inward energy",  "type": "ranking", "order": ["learning", "caring", "enjoying"] },
+    { "question_id": "Q-A1", "card_id": "agency", "question_text": "spend most of your time", "type": "forced", "response": "Building or creating" },
+    { "question_id": "Q-A2", "card_id": "agency", "question_text": "where energy goes",       "type": "forced", "response": "Building or creating something new" },
+    { "question_id": "Q-3C1",       "card_id": "role",   "question_text": "drive priority",       "type": "ranking", "order": ["cost", "coverage", "compliance"] },
+    { "question_id": "Q-Ambition1", "card_id": "role",   "question_text": "what does the win look like", "type": "ranking", "order": ["legacy", "success", "wealth", "fame"] },
+    { "question_id": "Q-S1", "card_id": "sacred", "question_text": "qualities of self", "type": "ranking", "order": ["stability", "truth", "honor", "freedom", "peace", "loyalty"] },
+    { "question_id": "Q-S2", "card_id": "sacred", "question_text": "claims on you", "type": "ranking", "order": ["family", "knowledge", "compassion", "faith", "justice", "mercy"] },
+    { "question_id": "Q-T5", "card_id": "temperament", "question_text": "plan not working", "type": "ranking", "order": ["te", "ti", "fi", "fe"] },
+    { "question_id": "Q-P1", "card_id": "pressure", "question_text": "expressing belief that costs relationships", "type": "forced", "response": "Say it directly" },
+    { "question_id": "Q-P2", "card_id": "pressure", "question_text": "belief at job risk", "type": "forced", "response": "Accept the risk" },
+    { "question_id": "Q-F2", "card_id": "formation", "question_text": "childhood environment", "type": "forced", "response": "Stable and predictable" },
+    { "question_id": "Q-X1", "card_id": "context", "question_text": "current life feels", "type": "forced", "response": "Stable and manageable" },
+    { "question_id": "Q-I1", "card_id": "conviction", "question_text": "belief you'd bear cost to keep", "type": "freeform", "response": "I believe excellent execution is itself a form of integrity, and I would risk standing rather than ship work I knew was sloppy." },
+    { "question_id": "Q-O1", "card_id": "temperament", "question_text": "openness subtype", "type": "ranking", "order": ["intellectual", "experiential", "perspective", "low_novelty_preference", "aesthetic", "emotional"] }
+  ],
+  "demographics": null,
+  "expected": {
+    "_cc_q1_note": "CC-Q1 added Q-O1 only — Q-O2 deliberately omitted to preserve the proxyOnly=true test path. Q-O1 doesn't tag N, so the ER channel remains proxy-coded (intensity indirect; signal density below threshold).",
+    "emotionalReactivityProxyOnly": true,
+    "noPersonalityVerdict": true
+  }
+}

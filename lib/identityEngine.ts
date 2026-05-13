@@ -17,6 +17,7 @@ import type {
   MirrorTopGift,
   MirrorTopTrap,
   NextMove,
+  OceanIntensityBands,
   PathOutput,
   ShapeCardId,
   ShapeOutputs,
@@ -35,6 +36,20 @@ import { computeOceanOutput } from "./ocean";
 import { computeWorkMapOutput } from "./workMap";
 import { computeLoveMapOutput } from "./loveMap";
 import { computeGoalSoulGive } from "./goalSoulGive";
+import { detectGoalSoulPatterns } from "./goalSoulPatterns";
+import { computeMovement } from "./goalSoulMovement";
+import { computeRiskForm } from "./riskForm";
+import { computeMovementQuadrant } from "./movementQuadrant";
+import {
+  archetypeInputsFromConstitution,
+  computeArchetype,
+  GIFT_LABELS_BY_ARCHETYPE,
+} from "./profileArchetype";
+// CC-SYNTHESIS-3 — runtime cache lookup for LLM-articulated Path master
+// synthesis paragraph. The composer module (synthesis3Llm) and the
+// inputs-derivation module (synthesis3Inputs) are imported lazily after
+// the constitution is otherwise complete so the LLM cache lookup can't
+// affect any other engine output.
 
 // CC-022a Item 1 helpers — name threading. Provided here as the engine-
 // layer primitives so prose generators (CC-022b consumers) can substitute
@@ -283,6 +298,134 @@ export const SIGNAL_DESCRIPTIONS: Record<string, string> = {
     "Pulls toward wealth — accumulation as an end, money and assets built and held — when imagining what winning looks like.",
   legacy_priority:
     "Pulls toward legacy — lasting impact, what outlives you in the world or in others — when imagining what winning looks like.",
+  // CC-Q1 — Q-O1 ranking signals (direct Openness subtype measurement). Each
+  // item maps to one Openness subdimension (intellectual / aesthetic / novelty
+  // / aesthetic-emotional facet) plus a low-novelty-preference register that
+  // negatively contributes to the Novelty subdim. None tag into Drive
+  // distribution per the spec memo §4 binding.
+  openness_intellectual:
+    "Pulls toward new ideas, models, theories, or frameworks — the intellectual register of openness.",
+  openness_aesthetic:
+    "Pulls toward new beauty, music, design, language, or atmosphere — the aesthetic register of openness.",
+  openness_perspective:
+    "Pulls toward new people, cultures, or perspectives — the cross-cutting perspective register of openness.",
+  openness_experiential:
+    "Pulls toward new experiences, places, tools, or methods — the experiential / novelty register of openness.",
+  openness_emotional:
+    "Pulls toward new emotional honesty or self-understanding — the inner-feelings register of aesthetic openness.",
+  low_novelty_preference:
+    "Prefers what is tested, familiar, and proven over novel directions — indexes negatively into the Novelty subdimension and positively into Conscientiousness.",
+  // CC-Q1 — Q-O2 ranking signals (direct Emotional Reactivity measurement).
+  // When any of these fire, the engine sets `proxyOnly = false` on the ER
+  // confidence flag — the proxy disclosure prose stops rendering because
+  // direct measurement is now available. The seven items map onto the four
+  // canonical reactivity processing modes (composure / analytical / acting-
+  // out / avoidant) plus the named-affect registers anxiety and anger.
+  low_reactivity_focus:
+    "Reports a sharpening / focusing inner state when stakes rise — the low-band emotional-reactivity register, registered as direct measurement rather than proxy.",
+  anxious_reactivity:
+    "Reports an anxious or restless inner state when stakes rise — the active-worry register of high emotional reactivity.",
+  anger_reactivity:
+    "Reports an angry or reactive inner state when stakes rise — the outward-charge register of high emotional reactivity.",
+  detached_reactivity:
+    "Reports a numb, analytical, or detached inner state when stakes rise — the cool-distanced processing register, often proxy-coded for suppression.",
+  overwhelmed_functioning:
+    "Reports an overwhelmed-but-functional inner state when stakes rise — load-bearing through pressure with the reactivity active.",
+  hidden_reactivity:
+    "Reports surface composure with intense inner state when stakes rise — the private-reactivity register; affect-channel active but not externally visible.",
+  avoidant_reactivity:
+    "Reports active avoidance — distraction, escape — when stakes rise; reactivity expressed as motion away from the stakes.",
+  // CC-Q2 — Q-GS1 Goal/Soul calibration signals. Direct measurement of
+  // what makes a successful effort feel worth it. Each signal feeds Goal
+  // composite, Soul composite, Vulnerability composite, or Gripping Pull
+  // per spec memo §3 wiring. None tag Drive directly except
+  // `security_freedom_signal` (multi-tagged cost+compliance via
+  // SIGNAL_DRIVE_TAGS in lib/drive.ts).
+  goal_completion_signal:
+    "Names the goal being reached — the metric you set, the result you aimed at — as what makes effort feel most worth it.",
+  soul_people_signal:
+    "Names helping people you care about as what makes effort feel most worth it.",
+  soul_calling_signal:
+    "Names serving something larger than yourself as what makes effort feel most worth it.",
+  gripping_proof_signal:
+    "Names proving capability — settling a question about your own capacity — as what makes effort feel most worth it.",
+  security_freedom_signal:
+    "Names creating security or freedom — financial cushion, optionality, room to choose — as what makes effort feel most worth it.",
+  creative_truth_signal:
+    "Names expressing something true that needed form — giving structure to something already real inside — as what makes effort feel most worth it.",
+  durable_creation_signal:
+    "Names creating something beautiful, useful, or durable — the made thing that now exists in the world — as what makes effort feel most worth it.",
+  // CC-Q2 — Q-V1 Vulnerability / open-hand register signals. Direct
+  // measurement of the user's posture when asked why work matters.
+  goal_logic_explanation:
+    "Reaches for logic, model, or structure when asked why work matters — the explaining-not-naming register, mild Vulnerability suppression.",
+  soul_beloved_named:
+    "Names the person, people, or cause served when asked why work matters — strong direct Soul lift; naming-as-vulnerability also lifts Vulnerability composite.",
+  vulnerability_open_uncertainty:
+    "Stays with open uncertainty when asked why work matters — direct Vulnerability composite lift (not-yet-resolved register).",
+  vulnerability_deflection:
+    "Deflects the why-question because it feels too personal — direct Vulnerability composite suppression.",
+  performance_identity:
+    "Points at output rather than naming the why — performance-identity register; suppresses Vulnerability and contributes mildly to Gripping Pull.",
+  sacred_belief_connection:
+    "Connects work to a belief you'd bear cost to protect — direct Vulnerability composite lift.",
+  // CC-Q2 — Q-GRIP1 direct Gripping Pull self-report signals. Each item
+  // names a specific thing the user grips under pressure. All eight feed
+  // Gripping Pull score + signal list as PRIMARY direct measurement; the
+  // existing cluster-fires check stays as a backstop.
+  grips_control:
+    "Reports gripping control — schedules, decisions, the field — under pressure.",
+  grips_security:
+    "Reports gripping money or security — moving toward the financial cushion or safer path — under pressure.",
+  grips_reputation:
+    "Reports gripping reputation — managing standing, optics, position — under pressure.",
+  grips_certainty:
+    "Reports gripping being right — holding to the answer even when challenged — under pressure.",
+  grips_neededness:
+    "Reports gripping the role of indispensability — being needed by others — under pressure.",
+  grips_comfort:
+    "Reports gripping comfort or escape — moving toward the soft register, distraction — under pressure.",
+  grips_old_plan:
+    "Reports gripping a plan that used to work — running the previously-validated playbook past its season — under pressure.",
+  grips_approval:
+    "Reports gripping the approval of specific others — tracking the read of people whose disappointment costs — under pressure.",
+  // CC-Q3 — Q-3C2 revealed Drive priority signals. Direct measurement of
+  // what behavior protects first when life gets crowded. Pairs with Q-3C1
+  // (claimed Drive). Drive bucket tags live in lib/drive.ts SIGNAL_DRIVE_TAGS
+  // (CC-Q3 extends the table per spec memo §4).
+  revealed_cost_priority:
+    "Protects money, margin, and financial options first when life gets crowded — revealed Cost-bucket Drive register.",
+  revealed_coverage_priority:
+    "Protects time and presence with people who depend on you first when life gets crowded — revealed Coverage-bucket Drive register.",
+  revealed_compliance_priority:
+    "Protects safety, rules, risk control, and avoiding exposure first when life gets crowded — revealed Compliance-bucket Drive register.",
+  revealed_goal_priority:
+    "Protects progress on the thing you are building first when life gets crowded — revealed Goal-coded direction (split-tagged Cost+Coverage in Drive).",
+  revealed_recovery_priority:
+    "Protects rest, health, and recovery first when life gets crowded — revealed self-restoration register (split-tagged Compliance+Coverage in Drive).",
+  revealed_reputation_priority:
+    "Protects reputation or standing with important people first when life gets crowded — revealed Reputation register (asymmetric Cost 75% + Compliance 25% in Drive).",
+  // CC-Q4 — Q-L1 Love translation signals. Direct measurement of how the
+  // user's love becomes visible to the people closest to them. Pairs with
+  // Q-S1 + Q-S2 (sacred-value abstractions); Q-L1 captures the
+  // expression-style register that the existing flavor matchers
+  // previously inferred from Q-S2 / Q-S3 / Q-X4 indirect signals. Per
+  // spec memo §3 wiring, the 7 signals feed existing Love Map flavor
+  // predicates as PRIMARY direct measurement.
+  love_presence:
+    "Names staying present over time — the durability register; love-as-showing-up — as how the people closest to you know you love them.",
+  love_problem_solving:
+    "Names solving problems that burden them — the practical register; love as removing the heavy thing — as how the people closest to you know you love them.",
+  love_verbal_expression:
+    "Names saying what they mean to you — the spoken register; love as direct verbal naming — as how the people closest to you know you love them.",
+  love_protection:
+    "Names protecting them from risk or harm — the guardian register; love as standing-between — as how the people closest to you know you love them.",
+  love_co_construction:
+    "Names building conditions where they can flourish — the co-construction register; love as ground-making — as how the people closest to you know you love them.",
+  love_quiet_sacrifice:
+    "Names sacrificing quietly without making it visible — the silent register; love as cost-borne-unnamed — as how the people closest to you know you love them.",
+  love_shared_experience:
+    "Names creating beauty, humor, or shared experience — the shared-aliveness register; love as moments-alive-together — as how the people closest to you know you love them.",
 };
 
 const SACRED_PRIORITY_SIGNAL_IDS: SignalId[] = [
@@ -1355,7 +1498,14 @@ export function deriveSacredValues(answers: Answer[]): string[] {
 
 export function buildInnerConstitution(
   answers: Answer[],
-  metaSignals: MetaSignal[] = []
+  metaSignals: MetaSignal[] = [],
+  // CC-070 — optional demographics for life-stage-gated Movement guidance.
+  // Pre-CC-070 callers passing 1-2 args continue to work; the Movement
+  // layer falls back to `lifeStageGate: 'unknown'` when demographics is
+  // omitted. Demographics has zero impact on derivation (canon §
+  // demographic-rules.md Rule 4); it only shapes the Movement guidance
+  // sentence.
+  demographics?: DemographicSet | null
 ): InnerConstitution {
   const signals = deriveSignals(answers);
   // CC-060 — compute Drive output up-front so it can be threaded into the
@@ -1516,7 +1666,697 @@ export function buildInnerConstitution(
     topCompass, topGravity, agency, weather, fire, stack,
   });
 
+  // CC-070 — pattern catalog (heuristic) + Movement layer. Both run after
+  // the rest of the constitution is assembled so detectors can read the
+  // final goalSoulGive output. Demographics threads through Movement only
+  // (per §13.7); patterns are pure functions of signals + goalSoulGive.
+  baseConstitution.goalSoulPatterns = detectGoalSoulPatterns(baseConstitution);
+  baseConstitution.goalSoulMovement = computeMovement(
+    goalSoulGiveOutput,
+    demographics ?? null,
+    oceanOutput?.dispositionSignalMix.intensities,
+    signals
+  );
+
+  // CC-3CS-STRENGTH-MIX-AXIS-ALIGNMENT — Foundation Phase 1.
+  // Compute and attach 3C Strengths to the Drive output. Strengths are
+  // independent 0-100 substance scores (Cost ≡ Goal-axis, Coverage ≡
+  // Soul-axis, Compliance fresh from conviction + Conscientiousness +
+  // Mix.compliance). The existing Drive Mix is preserved verbatim.
+  // Runs AFTER computeGoalSoulGive (which produces Goal/Soul scores)
+  // and AFTER computeOceanOutput (which produces Conscientiousness).
+  attachDriveStrengths(baseConstitution);
+
+  // CC-SYNTHESIS-1A Addition 1 — Risk Form 2x2 reading. The legacy
+  // classifier reads the Drive Mix `compliance` bucket against
+  // grippingPull score. Canonical interpretive classification lives in
+  // `computeRiskFormFromAim` (Aim + Grip substrate); this call is
+  // retained for cohort comparison + synthesis3 cache hash stability
+  // (per CC-STRENGTH-MIGRATION-AND-STAKES-SPLIT §10 note).
+  if (
+    baseConstitution.shape_outputs.path.drive &&
+    baseConstitution.goalSoulMovement
+  ) {
+    baseConstitution.riskForm = computeRiskForm(
+      baseConstitution.shape_outputs.path.drive.distribution,
+      baseConstitution.goalSoulMovement.dashboard.grippingPull.score
+    );
+  }
+
+  // CC-GRIP-WIRING-AND-FLOOR-CALIBRATION — Grip decomposition must
+  // attach BEFORE Movement Quadrant so the Quadrant twin gating can
+  // read the canonical §13 composed Grip (constitution.gripReading.score)
+  // rather than the legacy additive value.
+  attachGripDecomposition(baseConstitution);
+
+  // CC-SYNTHESIS-1A Addition 2 — Four-Quadrant Movement label keyed off
+  // the (Goal, Soul) plane.
+  // CC-PHASE-3A-LABEL-LOGIC — now takes angle + gripClusterFires.
+  // CC-GRIP-WIRING-AND-FLOOR-CALIBRATION — gripScore migrated from the
+  // legacy additive `grippingPull.score` to the canonical multiplicative
+  // `gripReading.score` (DefensiveGrip × StakesAmplifier).
+  if (baseConstitution.goalSoulMovement) {
+    const dash = baseConstitution.goalSoulMovement.dashboard;
+    baseConstitution.movementQuadrant = computeMovementQuadrant({
+      adjustedGoal: dash.goalScore,
+      adjustedSoul: dash.soulScore,
+      angleDegrees: dash.direction.angle,
+      gripClusterFires:
+        baseConstitution.goalSoulGive?.evidence.grippingClusterFires ?? false,
+      gripScore:
+        baseConstitution.gripReading?.score ?? dash.grippingPull.score,
+    });
+  }
+
+  // CC-SHAPE-AWARE-PROSE-ROUTING — classify the user into one of the
+  // three canonical profile archetypes (jasonType / cindyType / danielType)
+  // OR an explicit unmappedType fallback. This runs AFTER Movement
+  // Quadrant + Lens stack are populated, both of which the classifier
+  // consumes. Downstream prose modules route template selection through
+  // `constitution.profileArchetype.primary`.
+  baseConstitution.profileArchetype = computeArchetype(
+    archetypeInputsFromConstitution(baseConstitution)
+  );
+
+  // CC-SHAPE-AWARE-PROSE-ROUTING — overlay archetype-canonical gift /
+  // growth-edge labels onto cross_card.topGifts and cross_card.topRisks
+  // for the named archetypes (cindyType / danielType). This routes the
+  // labels to downstream consumers (gifts-and-edges table, "To keep X
+  // without Y" growth-path lines, etc.) so the entire prose surface
+  // speaks in the archetype's register rather than the Te/Ti-coded
+  // defaults. jasonType + unmappedType keep their existing labels per
+  // CC out-of-scope guard #11.
+  const archetypeKey = baseConstitution.profileArchetype.primary;
+  if (archetypeKey === "cindyType" || archetypeKey === "danielType") {
+    const overlay = GIFT_LABELS_BY_ARCHETYPE[archetypeKey];
+    const n = Math.min(
+      overlay.length,
+      baseConstitution.cross_card.topGifts.length,
+      baseConstitution.cross_card.topRisks.length
+    );
+    for (let i = 0; i < n; i++) {
+      baseConstitution.cross_card.topGifts[i] = {
+        ...baseConstitution.cross_card.topGifts[i],
+        label: overlay[i].label,
+      };
+      baseConstitution.cross_card.topRisks[i] = {
+        ...baseConstitution.cross_card.topRisks[i],
+        label: overlay[i].growthEdge,
+      };
+    }
+  }
+
+  // CC-AGE-CALIBRATION — developmental-band classification from the
+  // age demographic. Pure deterministic age → band mapping; the LLM
+  // prose layer reads `bandReading.registerHint` to adjust tone.
+  // MUST run BEFORE attachLlmPathMasterSynthesis and
+  // attachLlmGripParagraph because those cache-key derivations read
+  // bandReading from the constitution.
+  attachBandReading(baseConstitution, demographics ?? null);
+
+  // CC-AIM-REBUILD-MOVEMENT-LIMITER — Phase 2 derivation pipeline.
+  // Order is load-bearing per the CC's "Orchestration" section:
+  //   3-4. Grip decomposition (moved earlier per CC-GRIP-WIRING-AND-FLOOR-CALIBRATION
+  //        so Quadrant routing can read gripReading.score).
+  //   7.   ConvictionClarity
+  //   8.   GoalSoulCoherence
+  //   9.   ResponsibilityIntegration (depends on grip decomposition)
+  //  10.   computeAimScore (new 5-component formula) — depends on
+  //        ConvictionClarity, GoalSoulCoherence, ResponsibilityIntegration
+  //  11.   Movement Limiter (depends on Aim + canonical Grip)
+  attachConvictionClarity(baseConstitution);
+  attachGoalSoulCoherence(baseConstitution);
+  attachResponsibilityIntegration(baseConstitution);
+  attachAimReading(baseConstitution);
+  attachMovementLimiter(baseConstitution);
+
+  // CC-GRIP-TAXONOMY — derive Primal cluster from the named-grips that
+  // fired in goalSoulMovement. Pure deterministic mapping; no LLM.
+  // MUST run BEFORE attachPrimalCoherence (which reads gripTaxonomy)
+  // and BEFORE attachLlmPathMasterSynthesis / attachLlmGripParagraph
+  // (which read coherenceReading via the inputs builder).
+  attachGripTaxonomy(baseConstitution);
+
+  // CC-GRIP-TAXONOMY-REPLACEMENT — classify into the 4-layer Grip
+  // Pattern taxonomy. Runs AFTER gripTaxonomy + profileArchetype so the
+  // classifier can read the engine-internal Primal register, the
+  // archetype, the Compass top-4, and the Q-GRIP1 surface cluster.
+  attachGripPattern(baseConstitution);
+
+  // CC-HANDS-CARD — 9th body card. Runs AFTER archetype + gripPattern
+  // + drive.strengths because Hands composes from all three (plus
+  // Q-A1/A2/GS1/V1 signals + gift category + Lens driver).
+  attachHandsCard(baseConstitution);
+
+  // CC-PRIMAL-COHERENCE — two-path framework gating. Reads the Primal
+  // cluster + Goal/Soul scores, classifies path as trajectory vs
+  // crisis. CC-CRISIS-PATH-PROSE consumes the resulting `pathClass`
+  // and `crisisFlavor` fields via the LLM input contracts; therefore
+  // this attachment MUST run BEFORE attachLlmPathMasterSynthesis and
+  // attachLlmGripParagraph so the cache hash reflects the path class.
+  attachPrimalCoherence(baseConstitution);
+
+  // CC-SYNTHESIS-3 — attach LLM-articulated Path master synthesis
+  // paragraph from the static cache when present. Pure cache lookup;
+  // never calls the API at runtime (per CC-SYNTHESIS-3 Out-of-Scope #4).
+  // Falls through to null when the cache file doesn't have an entry
+  // for this fixture's input hash; renderer falls back to the
+  // mechanical CC-SYNTHESIS-1F Path master synthesis composer.
+  attachLlmPathMasterSynthesis(baseConstitution);
+
+  // CC-GRIP-TAXONOMY — LLM-articulated Grip paragraph cache lookup.
+  // Runs after attachGripTaxonomy + attachPrimalCoherence so its
+  // input contract sees both gripTaxonomy and coherenceReading.
+  attachLlmGripParagraph(baseConstitution);
+
   return baseConstitution;
+}
+
+function attachHandsCard(constitution: InnerConstitution): void {
+  // CC-HANDS-CARD — derive the 9th body card. Pure deterministic
+  // templated composition; no LLM calls. Reads archetype + gripPattern
+  // + drive.strengths + Q-A1/A2/GS1/V1 surface signals.
+  try {
+    const requireFn: NodeJS.Require | undefined =
+      typeof require === "function" ? require : undefined;
+    if (!requireFn) return;
+    const { computeHandsCard } = requireFn(
+      "./handsCard"
+    ) as typeof import("./handsCard");
+    const archetype =
+      constitution.profileArchetype?.primary ?? "unmappedType";
+    const gripPatternBucket =
+      constitution.gripPattern?.bucket ?? "unmapped";
+    const goalScore =
+      constitution.goalSoulMovement?.dashboard.goalScore ?? 0;
+    const costStrength =
+      constitution.shape_outputs.path.drive?.strengths?.cost ?? 0;
+    // TopGiftEntry doesn't carry a category field; fall back to the
+    // shape_outputs.lens gift category as the user's primary gift.
+    const topGiftCategory =
+      constitution.shape_outputs?.lens?.gift?.category ?? null;
+    const lensDriver =
+      constitution.lens_stack?.dominant
+        ? constitution.lens_stack.dominant
+        : "unknown";
+    const surfaceById = (id: string, qid: string): string | null => {
+      const hit = constitution.signals.find(
+        (s) =>
+          s.signal_id === id && s.source_question_ids.includes(qid)
+      );
+      return hit ? hit.signal_id : null;
+    };
+    const qA1Activity = (() => {
+      const hit = constitution.signals.find((s) =>
+        s.source_question_ids.includes("Q-A1")
+      );
+      return hit?.signal_id ?? null;
+    })();
+    const qA2EnergyDirection = (() => {
+      const hit = constitution.signals.find((s) =>
+        s.source_question_ids.includes("Q-A2")
+      );
+      return hit?.signal_id ?? null;
+    })();
+    const qGS1TopReward = (() => {
+      const hits = constitution.signals
+        .filter((s) => s.source_question_ids.includes("Q-GS1"))
+        .map((s) => ({ id: s.signal_id, rank: s.rank ?? 99 }))
+        .sort((a, b) => a.rank - b.rank);
+      return hits[0]?.id ?? null;
+    })();
+    const qV1TopMeaning = (() => {
+      const hits = constitution.signals
+        .filter((s) => s.source_question_ids.includes("Q-V1"))
+        .map((s) => ({ id: s.signal_id, rank: s.rank ?? 99 }))
+        .sort((a, b) => a.rank - b.rank);
+      return hits[0]?.id ?? null;
+    })();
+    void surfaceById;
+    constitution.handsCard = computeHandsCard({
+      archetype,
+      gripPatternBucket,
+      goalScore,
+      costStrength,
+      topGiftCategory,
+      lensDriver,
+      qA1Activity,
+      qA2EnergyDirection,
+      qGS1TopReward,
+      qV1TopMeaning,
+    });
+  } catch {
+    // Silent fallback — handsCard stays undefined.
+  }
+}
+
+function attachGripPattern(constitution: InnerConstitution): void {
+  // CC-GRIP-TAXONOMY-REPLACEMENT — classify the user into one of the
+  // 7 canonical Grip Pattern buckets + an unmapped fallback. Inputs:
+  // Q-GRIP1 surface cluster (top-3), engine-internal Primal register
+  // (cache stability proxy), Compass top-4, driver pair, archetype.
+  try {
+    const requireFn: NodeJS.Require | undefined =
+      typeof require === "function" ? require : undefined;
+    if (!requireFn) return;
+    const { classifyGripPattern } = requireFn(
+      "./gripPattern"
+    ) as typeof import("./gripPattern");
+    const qGrip1Top3 = constitution.signals
+      .filter(
+        (s) =>
+          s.source_question_ids.includes("Q-GRIP1") &&
+          s.signal_id.startsWith("grips_")
+      )
+      .map((s) => ({ id: s.signal_id, rank: s.rank ?? 99 }))
+      .sort((a, b) => a.rank - b.rank)
+      .slice(0, 3)
+      .map((s) => s.id);
+    const compassTop4 = constitution.signals
+      .filter(
+        (s) =>
+          s.from_card === "sacred" &&
+          s.source_question_ids.some((q) => q === "Q-S1" || q === "Q-S2")
+      )
+      .map((s) => ({ id: s.signal_id, rank: s.rank ?? 99 }))
+      .sort((a, b) => a.rank - b.rank)
+      .slice(0, 4)
+      .map((s) => s.id);
+    const driverPair = ((): import("./types").FunctionPairKey | null => {
+      const dom = constitution.lens_stack?.dominant;
+      const aux = constitution.lens_stack?.auxiliary;
+      if (!dom || !aux) return null;
+      const key = `${dom[0].toUpperCase()}${dom[1]}${aux[0].toUpperCase()}${aux[1]}` as import("./types").FunctionPairKey;
+      const allowed = new Set<import("./types").FunctionPairKey>([
+        "NeTi", "NeFi", "NiTe", "NiFe",
+        "SeTi", "SeFi", "SiTe", "SiFe",
+        "TeNi", "TeSi", "TiNe", "TiSe",
+        "FeNi", "FeSi", "FiNe", "FiSe",
+      ]);
+      return allowed.has(key) ? key : null;
+    })();
+    constitution.gripPattern = classifyGripPattern({
+      qGrip1Top3,
+      livedPrimalRegister: constitution.gripTaxonomy?.primary ?? null,
+      compassTop4,
+      driverPair,
+      archetype: constitution.profileArchetype?.primary ?? "unmappedType",
+      dominant: constitution.lens_stack?.dominant ?? null,
+    });
+  } catch {
+    // Silent fallback — gripPattern stays undefined.
+  }
+}
+
+function attachGripTaxonomy(constitution: InnerConstitution): void {
+  try {
+    const requireFn: NodeJS.Require | undefined =
+      typeof require === "function" ? require : undefined;
+    if (!requireFn) return;
+    const { derivePrimalCluster } = requireFn(
+      "./gripTaxonomy"
+    ) as typeof import("./gripTaxonomy");
+    const namedGrips =
+      constitution.goalSoulMovement?.dashboard.grippingPull.signals.map(
+        (s) => s.humanReadable
+      ) ?? [];
+    // CC-GRIP-CALIBRATION — read full shape into the calibration
+    // context. Each field has a graceful fallback when the
+    // prerequisite layer didn't populate (thin-signal sessions).
+    const topCompassRefs = getTopCompassValues(constitution.signals).slice(
+      0,
+      4
+    );
+    const topCompassLabels = topCompassRefs.map(
+      (r) => COMPASS_LABEL[r.signal_id] ?? r.signal_id
+    );
+    const oceanIntensities =
+      constitution.ocean?.dispositionSignalMix.intensities;
+    const ctx = {
+      // The calibration rules read the same named-grip list the
+      // deterministic floor uses; passing it through directly keeps the
+      // two layers in lock-step.
+      contributingGrips: namedGrips,
+      lensDominant: constitution.lens_stack.dominant,
+      lensAuxiliary: constitution.lens_stack.auxiliary,
+      topCompass: topCompassLabels,
+      riskFormLetter: constitution.riskForm?.letter ?? null,
+      oceanAgreeableness: oceanIntensities?.agreeableness ?? null,
+      oceanConscientiousness: oceanIntensities?.conscientiousness ?? null,
+      goalScore: constitution.goalSoulMovement?.dashboard.goalScore ?? null,
+      soulScore: constitution.goalSoulMovement?.dashboard.soulScore ?? null,
+      vulnerability:
+        constitution.goalSoulGive?.rawScores.vulnerability ?? null,
+    };
+    constitution.gripTaxonomy = derivePrimalCluster(namedGrips, ctx);
+  } catch {
+    // Silent fallback — gripTaxonomy stays undefined.
+  }
+}
+
+function attachDriveStrengths(constitution: InnerConstitution): void {
+  try {
+    const requireFn: NodeJS.Require | undefined =
+      typeof require === "function" ? require : undefined;
+    if (!requireFn) return;
+    const { computeDriveStrengths } = requireFn(
+      "./threeCStrength"
+    ) as typeof import("./threeCStrength");
+    const drive = constitution.shape_outputs.path.drive;
+    const goalSoul = constitution.goalSoulGive;
+    if (!drive || !goalSoul) return;
+    const oceanIntensities =
+      constitution.ocean?.dispositionSignalMix.intensities ?? null;
+    const convictionTemp =
+      constitution.belief_under_tension?.conviction_temperature ?? null;
+    drive.strengths = computeDriveStrengths({
+      goalScore: goalSoul.adjustedScores.goal,
+      soulScore: goalSoul.adjustedScores.soul,
+      driveMixCompliance: drive.distribution.compliance,
+      convictionTemperature: convictionTemp,
+      oceanIntensities,
+    });
+  } catch {
+    // Silent fallback — drive.strengths stays undefined.
+  }
+}
+
+function attachGripDecomposition(constitution: InnerConstitution): void {
+  // CC-AIM-REBUILD-MOVEMENT-LIMITER Segment 3.
+  try {
+    const requireFn: NodeJS.Require | undefined =
+      typeof require === "function" ? require : undefined;
+    if (!requireFn) return;
+    const {
+      computeStakesLoad,
+      computeDefensiveGrip,
+      computeGripFromDefensive,
+      computeGrip,
+    } = requireFn("./gripDecomposition") as typeof import("./gripDecomposition");
+    const grippingPull = constitution.goalSoulGive?.grippingPull;
+    const rawScores = constitution.goalSoulGive?.rawScores;
+    if (!grippingPull || !rawScores) return;
+    const stakes = computeStakesLoad(constitution.signals);
+    const defensive = computeDefensiveGrip({
+      signals: constitution.signals,
+      vulnerability: rawScores.vulnerability,
+      rawSoulScore: rawScores.soul,
+    });
+    const composed = computeGripFromDefensive(defensive.score, stakes.score);
+    grippingPull.stakesLoad = stakes.score;
+    grippingPull.defensiveGrip = defensive.score;
+    grippingPull.gripAmplifier = composed.amplifier;
+    grippingPull.gripFromDefensive = composed.grip;
+    // CC-STRENGTH-MIGRATION-AND-STAKES-SPLIT §13 — surface the canonical
+    // multiplicative reading on the constitution. Distinct from the
+    // legacy additive `grippingPull.score`, which is preserved.
+    constitution.gripReading = computeGrip(defensive.score, stakes.score);
+  } catch {
+    // Silent fallback
+  }
+}
+
+function attachConvictionClarity(constitution: InnerConstitution): void {
+  try {
+    const requireFn: NodeJS.Require | undefined =
+      typeof require === "function" ? require : undefined;
+    if (!requireFn) return;
+    const { computeConvictionClarity } = requireFn(
+      "./convictionClarity"
+    ) as typeof import("./convictionClarity");
+    const signals = constitution.signals;
+    const hasSignal = (id: string): boolean =>
+      signals.some((s) => s.signal_id === id);
+    const rankFrom = (id: string, q: string): number | null => {
+      const hit = signals.find(
+        (s) => s.signal_id === id && s.source_question_ids.includes(q)
+      );
+      return hit?.rank ?? null;
+    };
+    const oceanIntensities =
+      constitution.ocean?.dispositionSignalMix.intensities;
+    constitution.convictionClarity = computeConvictionClarity({
+      highConvictionExpression: hasSignal("high_conviction_expression"),
+      highConvictionUnderRisk: hasSignal("high_conviction_under_risk"),
+      convictionUnderCost: hasSignal("conviction_under_cost"),
+      vulnerabilityOpenUncertaintyRank: rankFrom(
+        "vulnerability_open_uncertainty",
+        "Q-V1"
+      ),
+      sacredBeliefConnectionRank: rankFrom("sacred_belief_connection", "Q-V1"),
+      performanceIdentityRank: rankFrom("performance_identity", "Q-V1"),
+      goalLogicExplanationRank: rankFrom("goal_logic_explanation", "Q-V1"),
+      beliefUnderTensionTemperature:
+        constitution.belief_under_tension?.conviction_temperature ?? null,
+      conscientiousness: oceanIntensities?.conscientiousness ?? null,
+    });
+  } catch {
+    // Silent fallback
+  }
+}
+
+function attachGoalSoulCoherence(constitution: InnerConstitution): void {
+  try {
+    const requireFn: NodeJS.Require | undefined =
+      typeof require === "function" ? require : undefined;
+    if (!requireFn) return;
+    const { computeGoalSoulCoherence } = requireFn(
+      "./goalSoulCoherence"
+    ) as typeof import("./goalSoulCoherence");
+    const angle = constitution.goalSoulMovement?.dashboard.direction.angle;
+    if (angle === undefined) return;
+    constitution.goalSoulCoherence = computeGoalSoulCoherence({
+      angleDegrees: angle,
+    });
+  } catch {
+    // Silent fallback
+  }
+}
+
+function attachResponsibilityIntegration(
+  constitution: InnerConstitution
+): void {
+  try {
+    const requireFn: NodeJS.Require | undefined =
+      typeof require === "function" ? require : undefined;
+    if (!requireFn) return;
+    const { computeResponsibilityIntegration } = requireFn(
+      "./responsibilityIntegration"
+    ) as typeof import("./responsibilityIntegration");
+    const grip = constitution.goalSoulGive?.grippingPull;
+    const dashboard = constitution.goalSoulMovement?.dashboard;
+    if (!grip || !dashboard) return;
+    if (grip.stakesLoad === undefined || grip.defensiveGrip === undefined)
+      return;
+    constitution.responsibilityIntegration = computeResponsibilityIntegration({
+      stakesLoad: grip.stakesLoad,
+      defensiveGrip: grip.defensiveGrip,
+      movementStrength: dashboard.movementStrength.length,
+    });
+  } catch {
+    // Silent fallback
+  }
+}
+
+function attachAimReading(constitution: InnerConstitution): void {
+  try {
+    const requireFn: NodeJS.Require | undefined =
+      typeof require === "function" ? require : undefined;
+    if (!requireFn) return;
+    const {
+      computeAimScore,
+      computeAimScoreLegacy,
+      convictionScoreFromTemperature,
+    } = requireFn("./aim") as typeof import("./aim");
+    const { computeRiskFormFromAim } = requireFn(
+      "./riskForm"
+    ) as typeof import("./riskForm");
+    const driveStrengths = constitution.shape_outputs.path.drive?.strengths;
+    const driveDistribution =
+      constitution.shape_outputs.path.drive?.distribution;
+    const movement = constitution.goalSoulMovement?.dashboard;
+    if (!driveStrengths || !driveDistribution || !movement) return;
+
+    const aimReading = computeAimScore({
+      wiseRiskStrength: driveStrengths.compliance,
+      convictionClarity: constitution.convictionClarity?.score ?? 50,
+      goalSoulCoherence: constitution.goalSoulCoherence?.score ?? 50,
+      movementStrength: movement.movementStrength.length,
+      responsibilityIntegration:
+        constitution.responsibilityIntegration?.score ?? 0,
+    });
+    constitution.aimReading = aimReading;
+
+    // CC-STRENGTH-MIGRATION-AND-STAKES-SPLIT §D — the legacy Aim is no
+    // longer canonical. It is still computed and attached because the
+    // cohort cache hash in `synthesis3Inputs.ts:aimScore` consumes it
+    // for hash stability per the prior CC-AIM-REBUILD-MOVEMENT-LIMITER
+    // decision ("the LLM cache hash uses the LEGACY Aim score so
+    // existing cached paragraphs remain valid"). The §D intent is met
+    // at the render layer: no render path consumes `aimReadingLegacy`
+    // (verified by the audit), so users never see it. A future CC may
+    // migrate the cache hash off the legacy Aim and drop attachment.
+    const convictionTemp =
+      constitution.belief_under_tension?.conviction_temperature ?? null;
+    constitution.aimReadingLegacy = computeAimScoreLegacy({
+      complianceBucket: driveDistribution.compliance,
+      costBucket: driveDistribution.cost,
+      convictionScore: convictionScoreFromTemperature(convictionTemp),
+      movementStrength: movement.movementStrength.length,
+    });
+
+    // CC-PHASE-3A-LABEL-LOGIC — switch riskFormFromAim to consume the
+    // NEW Aim formula.
+    // CC-GRIP-WIRING-AND-FLOOR-CALIBRATION — canonical Grip substrate
+    // is now `gripReading.score` (§13 DefensiveGrip × StakesAmplifier),
+    // not the legacy additive `grippingPull.score`. Cache hash stability
+    // is preserved in synthesis3Inputs / gripTaxonomyInputs by
+    // re-computing a legacy-grip-based letter for the hash key only.
+    const canonicalGripForRisk =
+      constitution.gripReading?.score ?? movement.grippingPull.score;
+    constitution.riskFormFromAim = computeRiskFormFromAim(
+      aimReading.score,
+      canonicalGripForRisk
+    );
+  } catch {
+    // Silent fallback
+  }
+}
+
+function attachMovementLimiter(constitution: InnerConstitution): void {
+  // CC-AIM-REBUILD-MOVEMENT-LIMITER Segment 4.
+  try {
+    const requireFn: NodeJS.Require | undefined =
+      typeof require === "function" ? require : undefined;
+    if (!requireFn) return;
+    const { computeUsableMovement } = requireFn(
+      "./movementLimiter"
+    ) as typeof import("./movementLimiter");
+    const dashboard = constitution.goalSoulMovement?.dashboard;
+    const aimScore = constitution.aimReading?.score;
+    if (!dashboard || aimScore === undefined) return;
+    // CC-GRIP-WIRING-AND-FLOOR-CALIBRATION — drag computation now
+    // reads the canonical §13 composed Grip (constitution.gripReading.score)
+    // directly. Falls back to gripFromDefensive (same value, attached on
+    // the dashboard for back-compat) then to legacy additive only if the
+    // decomposition didn't attach.
+    const grip =
+      constitution.gripReading?.score ??
+      dashboard.grippingPull.gripFromDefensive ??
+      dashboard.grippingPull.score;
+    dashboard.movementLimiter = computeUsableMovement({
+      potentialMovement: dashboard.movementStrength.length,
+      grip,
+      aim: aimScore,
+    });
+  } catch {
+    // Silent fallback
+  }
+}
+
+function attachBandReading(
+  constitution: InnerConstitution,
+  demographics: DemographicSet | null
+): void {
+  try {
+    const requireFn: NodeJS.Require | undefined =
+      typeof require === "function" ? require : undefined;
+    if (!requireFn) return;
+    const {
+      classifyDevelopmentalBand,
+      extractAgeFromDemographics,
+      TOO_YOUNG_AGE,
+    } = requireFn("./ageCalibration") as typeof import("./ageCalibration");
+    const extracted = extractAgeFromDemographics(demographics);
+    if (!extracted) {
+      // Missing age — leave bandReading undefined and tooYoungForInstrument
+      // unset. Prose layer falls back to age-agnostic register.
+      return;
+    }
+    if (extracted.age < TOO_YOUNG_AGE) {
+      constitution.bandReading = null;
+      constitution.tooYoungForInstrument = true;
+      return;
+    }
+    const reading = classifyDevelopmentalBand(extracted.age, {
+      fromDecadeMidpoint: extracted.fromDecadeMidpoint,
+    });
+    constitution.bandReading = reading;
+  } catch {
+    // Silent fallback — bandReading stays undefined.
+  }
+}
+
+function attachPrimalCoherence(constitution: InnerConstitution): void {
+  try {
+    const requireFn: NodeJS.Require | undefined =
+      typeof require === "function" ? require : undefined;
+    if (!requireFn) return;
+    const { computePrimalCoherence } = requireFn(
+      "./primalCoherence"
+    ) as typeof import("./primalCoherence");
+    const cluster = constitution.gripTaxonomy;
+    const dashboard = constitution.goalSoulMovement?.dashboard;
+    if (!cluster || !dashboard) return;
+    constitution.coherenceReading = computePrimalCoherence(
+      cluster,
+      dashboard.goalScore,
+      dashboard.soulScore
+    );
+  } catch {
+    // Silent fallback — coherenceReading stays undefined.
+  }
+}
+
+function attachLlmGripParagraph(constitution: InnerConstitution): void {
+  try {
+    const requireFn: NodeJS.Require | undefined =
+      typeof require === "function" ? require : undefined;
+    if (!requireFn) return;
+    const { deriveGripInputs } = requireFn(
+      "./gripTaxonomyInputs"
+    ) as typeof import("./gripTaxonomyInputs");
+    const { readCachedGripParagraph } = requireFn(
+      "./gripTaxonomyLlm"
+    ) as typeof import("./gripTaxonomyLlm");
+    const inputs = deriveGripInputs(constitution);
+    if (!inputs) return;
+    const paragraph = readCachedGripParagraph(inputs);
+    if (paragraph) constitution.gripParagraphLlm = paragraph;
+  } catch {
+    // Silent fallback — gripParagraphLlm stays undefined.
+  }
+}
+
+// CC-SYNTHESIS-3 helper — runtime-only cache read. Imported lazily so
+// the engine module compiles in environments where the cache file or
+// composer module isn't available (e.g., browser bundle, where node:fs
+// isn't available). On any error the engine silently falls back —
+// `masterSynthesisLlm` stays undefined and the renderer uses the
+// mechanical paragraph.
+function attachLlmPathMasterSynthesis(constitution: InnerConstitution): void {
+  try {
+    // Dynamic require to avoid loading node:fs in browser builds.
+    // Both modules are pure-data on the runtime path (no API calls).
+    // The require() is wrapped in a function so a static analyzer
+    // doesn't try to bundle the cache file as a build asset.
+    const requireFn: NodeJS.Require | undefined =
+      typeof require === "function" ? require : undefined;
+    if (!requireFn) return;
+    const { deriveSynthesis3Inputs } = requireFn(
+      "./synthesis3Inputs"
+    ) as typeof import("./synthesis3Inputs");
+    const { readCachedParagraph } = requireFn(
+      "./synthesis3Llm"
+    ) as typeof import("./synthesis3Llm");
+    const inputs = deriveSynthesis3Inputs(constitution);
+    const paragraph = readCachedParagraph(inputs);
+    if (paragraph) {
+      constitution.shape_outputs.path.masterSynthesisLlm = paragraph;
+    }
+  } catch {
+    // Silent fallback. The renderer reads the field as nullable.
+  }
 }
 
 export function toRankingAnswer(
@@ -1567,107 +2407,14 @@ export function toAnswer(
 // ──────────────────────────────────────────────────────────────────────────
 
 // ── Aggregation helpers ──────────────────────────────────────────────────
-
-const PERCEIVING: CognitiveFunctionId[] = ["ni", "ne", "si", "se"];
-const JUDGING: CognitiveFunctionId[] = ["ti", "te", "fi", "fe"];
-
-const STACK_TABLE: Record<string, [CognitiveFunctionId, CognitiveFunctionId, CognitiveFunctionId, CognitiveFunctionId]> = {
-  "ni|te": ["ni", "te", "fi", "se"], // INTJ
-  "ti|ne": ["ti", "ne", "si", "fe"], // INTP
-  "te|ni": ["te", "ni", "se", "fi"], // ENTJ
-  "ne|ti": ["ne", "ti", "fe", "si"], // ENTP
-  "ni|fe": ["ni", "fe", "ti", "se"], // INFJ
-  "fi|ne": ["fi", "ne", "si", "te"], // INFP
-  "fe|ni": ["fe", "ni", "se", "ti"], // ENFJ
-  "ne|fi": ["ne", "fi", "te", "si"], // ENFP
-  "si|te": ["si", "te", "fi", "ne"], // ISTJ
-  "ti|se": ["ti", "se", "ni", "fe"], // ISTP
-  "te|si": ["te", "si", "ne", "fi"], // ESTJ
-  "se|ti": ["se", "ti", "fe", "ni"], // ESTP
-  "si|fe": ["si", "fe", "ti", "ne"], // ISFJ
-  "fi|se": ["fi", "se", "ni", "te"], // ISFP
-  "fe|si": ["fe", "si", "ne", "ti"], // ESFJ
-  "se|fi": ["se", "fi", "te", "ni"], // ESFP
-};
-
-const MBTI_LOOKUP: Record<string, string> = {
-  "ni|te": "INTJ", "ti|ne": "INTP", "te|ni": "ENTJ", "ne|ti": "ENTP",
-  "ni|fe": "INFJ", "fi|ne": "INFP", "fe|ni": "ENFJ", "ne|fi": "ENFP",
-  "si|te": "ISTJ", "ti|se": "ISTP", "te|si": "ESTJ", "se|ti": "ESTP",
-  "si|fe": "ISFJ", "fi|se": "ISFP", "fe|si": "ESFJ", "se|fi": "ESFP",
-};
-
-function averageRank(signals: Signal[], fn: CognitiveFunctionId): number {
-  const matches = signals.filter((s) => s.signal_id === fn && s.rank !== undefined);
-  if (matches.length === 0) return Number.POSITIVE_INFINITY;
-  const sum = matches.reduce((acc, s) => acc + (s.rank ?? 0), 0);
-  return sum / matches.length;
-}
-
-export function aggregateLensStack(signals: Signal[]): LensStack {
-  // Compute average rank for each function across its appearances.
-  const perceivingRanks = PERCEIVING.map((fn) => ({ fn, avg: averageRank(signals, fn) }));
-  const judgingRanks = JUDGING.map((fn) => ({ fn, avg: averageRank(signals, fn) }));
-  perceivingRanks.sort((a, b) => a.avg - b.avg || a.fn.localeCompare(b.fn));
-  judgingRanks.sort((a, b) => a.avg - b.avg || a.fn.localeCompare(b.fn));
-
-  const dominantPerceiving = perceivingRanks[0];
-  const dominantJudging = judgingRanks[0];
-
-  // No Temperament data at all → degenerate stack with low confidence.
-  if (!isFinite(dominantPerceiving.avg) || !isFinite(dominantJudging.avg)) {
-    return {
-      dominant: "ni",
-      auxiliary: "te",
-      tertiary: "fi",
-      inferior: "se",
-      confidence: "low",
-    };
-  }
-
-  // Try perceiving-as-dominant first; fall back to judging-as-dominant for stack lookup.
-  let confidence: "high" | "low" = "high";
-  // Confidence drops if perceiving and second-place perceiving are tied (or judging analogue).
-  if (
-    perceivingRanks.length > 1 &&
-    perceivingRanks[1].avg === dominantPerceiving.avg
-  ) {
-    confidence = "low";
-  }
-  if (
-    judgingRanks.length > 1 &&
-    judgingRanks[1].avg === dominantJudging.avg
-  ) {
-    confidence = "low";
-  }
-
-  // Pick which goes "first" in the stack: lower average wins (more dominant overall).
-  const perceivingFirst = dominantPerceiving.avg <= dominantJudging.avg;
-  const key = perceivingFirst
-    ? `${dominantPerceiving.fn}|${dominantJudging.fn}`
-    : `${dominantJudging.fn}|${dominantPerceiving.fn}`;
-  const stackTuple = STACK_TABLE[key];
-  const mbtiCode = MBTI_LOOKUP[key];
-
-  if (!stackTuple) {
-    return {
-      dominant: dominantPerceiving.fn,
-      auxiliary: dominantJudging.fn,
-      tertiary: PERCEIVING.find((f) => f !== dominantPerceiving.fn) ?? "ni",
-      inferior: JUDGING.find((f) => f !== dominantJudging.fn) ?? "fe",
-      confidence: "low",
-    };
-  }
-
-  return {
-    dominant: stackTuple[0],
-    auxiliary: stackTuple[1],
-    tertiary: stackTuple[2],
-    inferior: stackTuple[3],
-    mbtiCode,
-    confidence,
-  };
-}
+//
+// CC-JX — `aggregateLensStack` moved to lib/jungianStack.ts as the single
+// source of truth for cog-function stack resolution. Both Lens
+// classification (this file) and OCEAN bridges (lib/ocean.ts) read from
+// the shared resolver. Re-exported here so existing import sites that
+// `from "./identityEngine"` keep working bit-for-bit.
+import { aggregateLensStack } from "./jungianStack";
+export { aggregateLensStack };
 
 export type SignalRef = {
   signal_id: SignalId;
@@ -1824,7 +2571,12 @@ function inferAgencyPattern(signals: Signal[]): AgencyPattern {
 
 // ── Vocabulary helpers ───────────────────────────────────────────────────
 
-const COMPASS_LABEL: Partial<Record<SignalId, string>> = {
+// CC-PROSE-1B Layer 4 — exported for `lib/coreSignalMap.ts` to map a top
+// compass / top gravity SignalRef to a single human-readable label.
+// Internal callers continue to use `valueListPhrase` (which composes a
+// joined phrase across multiple refs); the Core Signal Map needs a single
+// label per cell, so it consumes COMPASS_LABEL / GRAVITY_LABEL directly.
+export const COMPASS_LABEL: Partial<Record<SignalId, string>> = {
   freedom_priority: "Freedom",
   truth_priority: "Truth",
   stability_priority: "Stability",
@@ -1839,7 +2591,7 @@ const COMPASS_LABEL: Partial<Record<SignalId, string>> = {
   mercy_priority: "Mercy",            // CC-046 — was missing since CC-028
 };
 
-const GRAVITY_LABEL: Partial<Record<SignalId, string>> = {
+export const GRAVITY_LABEL: Partial<Record<SignalId, string>> = {
   individual_responsibility_priority: "Individual",
   system_responsibility_priority: "System",
   nature_responsibility_priority: "Nature",
@@ -4320,6 +5072,24 @@ export function generateConflictTranslation(
   );
 }
 
+// CC-SHAPE-AWARE-PROSE-ROUTING — Mirror-Types contrast pool. Each cell
+// holds the user-facing register name AND a one-clause protect-by
+// gloss. The active dominant's row is filtered out of the contrast
+// list so the user never sees their own register in the alternatives.
+const MIRROR_TYPES_REGISTERS: Record<
+  CognitiveFunctionId,
+  { name: string; protectClause: (label: string) => string }
+> = {
+  ti: { name: "logical precision", protectClause: () => `getting the reasoning right` },
+  ni: { name: "convergent insight", protectClause: () => `holding the long-arc interpretation` },
+  fi: { name: "personal authenticity", protectClause: () => `refusing to participate in what feels false` },
+  te: { name: "operational clarity", protectClause: () => `holding to what can be measured and shipped` },
+  si: { name: "verified precedent", protectClause: () => `holding to what's been tested` },
+  se: { name: "present-tense honesty", protectClause: () => `naming what is actually happening in the room` },
+  ne: { name: "open exploration", protectClause: () => `keeping the alternative reads alive` },
+  fe: { name: "relational attunement", protectClause: () => `reading the room and saying what serves` },
+};
+
 export function generateMirrorTypesSeed(
   topCompass: SignalRef[],
   stack: LensStack
@@ -4334,19 +5104,31 @@ export function generateMirrorTypesSeed(
   const top = topCompass[0];
   const label = COMPASS_LABEL[top.signal_id] ?? top.signal_id;
   const dom = stack.dominant;
-  const lensExpression =
-    dom === "ti" ? `logical precision — protecting ${label} by getting the reasoning right`
-    : dom === "ni" ? `convergent insight — protecting ${label} by holding the long-arc interpretation`
-    : dom === "fi" ? `personal authenticity — protecting ${label} by refusing to participate in what feels false`
-    : dom === "te" ? `operational clarity — protecting ${label} by holding to what can be measured and shipped`
-    : dom === "si" ? `verified precedent — protecting ${label} by holding to what's been tested`
-    : dom === "se" ? `present-tense honesty — protecting ${label} by naming what is actually happening in the room`
-    : dom === "ne" ? `open exploration — protecting ${label} by keeping the alternative reads alive`
-    : `relational attunement — protecting ${label} by reading the room and saying what serves`;
+  const ownRegister = MIRROR_TYPES_REGISTERS[dom];
+  const lensExpression = `${ownRegister.name} — protecting ${label} by ${ownRegister.protectClause(label)}`;
+
+  // CC-SHAPE-AWARE-PROSE-ROUTING — pick two contrast registers that
+  // are NOT the user's own. Prefer canonically distant shapes (fi/si
+  // pair, the original contrast example) but fall through to other
+  // shapes when the user's dom IS fi or si.
+  const candidatePairs: Array<[CognitiveFunctionId, CognitiveFunctionId]> = [
+    ["fi", "si"],
+    ["se", "ni"],
+    ["ne", "te"],
+    ["fe", "ti"],
+    ["fi", "te"],
+    ["si", "ne"],
+  ];
+  const pair =
+    candidatePairs.find(([a, b]) => a !== dom && b !== dom) ?? ["fi", "ne"];
+  const [a, b] = pair;
+  const aReg = MIRROR_TYPES_REGISTERS[a];
+  const bReg = MIRROR_TYPES_REGISTERS[b];
+
   return (
     `Your ${label}-shape leans toward ${lensExpression}. ` +
     `People who organize around ${label} differently may sound nothing like you and still share your deepest commitment. ` +
-    `Someone whose ${label}-shape leans toward authenticity will protect ${label} by refusing to participate in what feels false; someone whose ${label}-shape leans toward verified precedent will protect ${label} by holding to what's been tested. ` +
+    `Someone whose ${label}-shape leans toward ${aReg.name} will protect ${label} by ${aReg.protectClause(label)}; someone whose ${label}-shape leans toward ${bReg.name} will protect ${label} by ${bReg.protectClause(label)}. ` +
     `They may strike you as sentimental, or rigid, or impractical — and they may be protecting the same thing you are, in a register you don't speak.`
   );
 }
@@ -5283,12 +6065,19 @@ export type CrossCardPattern = {
   name: string;
   description: string;
   applicable_card: ShapeCardId;
+  // CC-PATTERN-CATALOG-SI-SE-FI — `oceanBands` is an optional 6th argument
+  // threaded through `detectCrossCardPatterns`. Pre-existing patterns
+  // (CC-029 Tier 1/2 and earlier) defined their detection with 5 params;
+  // they remain assignable because TypeScript allows a function with fewer
+  // parameters to satisfy a slot expecting more (extra args are ignored).
+  // Only the Si/Se/Ti/Fi/Fe-1 patterns added by this CC consume the new arg.
   detection: (
     signals: Signal[],
     topCompass: SignalRef[],
     topGravity: SignalRef[],
     lensStack: LensStack,
-    metaSignals: MetaSignal[]
+    metaSignals: MetaSignal[],
+    oceanBands?: OceanIntensityBands
   ) => boolean;
   prose: (
     signals: Signal[],
@@ -5644,6 +6433,144 @@ export const CROSS_CARD_PATTERNS: CrossCardPattern[] = [
       return `${capitalize(possessive)} attunement to others is real — you read what the moment is asking and respond to what's needed. The same register, under social pressure, can yield more than you intend. The gift and the risk are the same instrument; the question is whether you're attending to what others need or attending to what you need to keep your place with them.`;
     },
   },
+
+  // ── CC-PATTERN-CATALOG-SI-SE-FI — Si / Se / Ti / Fi / Fe second-route patterns
+  // Five additional patterns that close the function-coverage asymmetry
+  // (feedback_pattern_catalog_function_bias). CC-029 Tier 2 already added
+  // one pattern per Si/Se/Ti/Fi/Fe; this CC adds a second discriminating
+  // route per function so the engine has more to compose against for
+  // those shapes. All five gate on `lensStack.dominant` alone — no
+  // accidental firings on Ni/Ne/Te shapes. Pure engine layer; no prose
+  // render changes; no new questions or signals.
+
+  // 18 — Si precedent-keeper under pressure
+  {
+    pattern_id: "si_precedent_keeper_under_pressure",
+    name: "Si — precedent-keeper under pressure",
+    description:
+      "Si dominant + Conscientiousness moderate-high or high + Stability / Loyalty / Family / Honor in the top-2 sacred-value ranking. The shape that defends what holds when pressure rises — distinct from 'control' (Ni-flavored) and from 'money/security' (Drive-bucket-flavored). Captures Si's preservation register as active defense, not nostalgia.",
+    applicable_card: "weather",
+    detection: (_signals, topCompass, _tg, lensStack, _ms, oceanBands) => {
+      if (lensStack.dominant !== "si") return false;
+      if (!oceanBands) return false;
+      const cDisciplined =
+        oceanBands.conscientiousness === "high" ||
+        oceanBands.conscientiousness === "moderate-high";
+      if (!cDisciplined) return false;
+      const protectClass: SignalId[] = [
+        "stability_priority",
+        "loyalty_priority",
+        "family_priority",
+        "honor_priority",
+      ];
+      return protectClass.some((sid) => compassRanksTop(topCompass, sid, 2));
+    },
+    prose: (_s, _tc, _tg, _ls, demographics) => {
+      const possessive = nameOrYour(demographics);
+      const subj = getUserName(demographics) ?? "you";
+      const s = getUserName(demographics) ? "s" : "";
+      return `When pressure rises, ${subj} defend${s} what holds — the kept commitment, the precedent, the people and structures whose continuity ${possessive} care is bound up with. The risk is reading every disruption as a threat to what's worth keeping; not every change is an erosion. The growth move is naming which precedents are load-bearing and which are inherited furniture.`;
+    },
+  },
+
+  // 19 — Se present-tense responder
+  {
+    pattern_id: "se_present_tense_responder",
+    name: "Se — present-tense responder",
+    description:
+      "Se dominant + observable outward engagement (Extraversion moderate-high/high) OR Conscientiousness high. Captures the shape that responds to what's actually in the room rather than working a long-range plan. Distinct from se_crisis_alive_planning_strain (which gates on Q-A1 reactive_operator); this pattern surfaces the same gift in disciplined-presence form — present-tense engagement carried by either outward energy or strong self-direction.",
+    applicable_card: "path",
+    detection: (_signals, _tc, _tg, lensStack, _ms, oceanBands) => {
+      if (lensStack.dominant !== "se") return false;
+      if (!oceanBands) return false;
+      const eForward =
+        oceanBands.extraversion === "high" ||
+        oceanBands.extraversion === "moderate-high";
+      const cHigh = oceanBands.conscientiousness === "high";
+      return eForward || cHigh;
+    },
+    prose: (_s, _tc, _tg, _ls, demographics) => {
+      const possessive = nameOrYour(demographics);
+      const subj = getUserName(demographics) ?? "you";
+      return `${capitalize(possessive)} sensing register is most alive in what's actually here — the conversation in the room, the work in ${possessive} hands, the move that's available now. The same register that makes ${subj} effective in the present can under-invest in the long arc, where today's responsiveness doesn't carry. The growth move isn't to dampen the immediacy; it's to choose one long-arc commitment and protect it on a different rhythm than the day's demands set.`;
+    },
+  },
+
+  // 20 — Ti coherence prover
+  {
+    pattern_id: "ti_coherence_prover",
+    name: "Ti — coherence prover",
+    description:
+      "Ti dominant + Truth or Knowledge in the top-2 sacred-value ranking. Captures the shape that needs the read to be internally consistent before committing. Distinct from ti_closed_reasoning_chamber (which gates on holds_internal_conviction + Te-low) and from Te-flavored 'being right' externalism — this pattern names the protect-class commitment to coherence itself.",
+    applicable_card: "conviction",
+    detection: (_signals, topCompass, _tg, lensStack) => {
+      if (lensStack.dominant !== "ti") return false;
+      return (
+        compassRanksTop(topCompass, "truth_priority", 2) ||
+        compassRanksTop(topCompass, "knowledge_priority", 2)
+      );
+    },
+    prose: (_s, _tc, _tg, _ls, demographics) => {
+      const possessive = nameOrYour(demographics);
+      const subj = getUserName(demographics) ?? "you";
+      const s = getUserName(demographics) ? "s" : "";
+      return `${capitalize(possessive)} read of a situation has to be internally coherent before ${subj} commit${s} to it — the frame has to hold together, not just sound right. This is different from needing to be right externally; ${subj} ${getUserName(demographics) ? "is" : "are"} testing whether the model is consistent with itself. The risk is delaying action until coherence is total, when many real moves are made on partial models the world keeps revising.`;
+    },
+  },
+
+  // 21 — Fi inner-compass refusal
+  {
+    pattern_id: "fi_inner_compass_refusal",
+    name: "Fi — inner-compass refusal",
+    description:
+      "Fi dominant + low/moderate Agreeableness band OR conviction_under_cost signal present. Captures the shape that refuses to perform agreement when the inner compass disagrees. Distinct from fi_personally_authentic_only (which gates on Q-P2 high_conviction_under_risk) and from Fe-flavored approval-seeking or Te-flavored 'being right' — this pattern names the spine that doesn't soften under social cost.",
+    applicable_card: "fire",
+    detection: (signals, _tc, _tg, lensStack, _ms, oceanBands) => {
+      if (lensStack.dominant !== "fi") return false;
+      const aLowOrModerate =
+        oceanBands?.agreeableness === "low" ||
+        oceanBands?.agreeableness === "moderate";
+      const bearsCost = has(signals, "conviction_under_cost");
+      return aLowOrModerate || bearsCost;
+    },
+    prose: (_s, _tc, _tg, _ls, demographics) => {
+      const possessive = nameOrYour(demographics);
+      const subj = getUserName(demographics) ?? "you";
+      return `When ${possessive} inner compass disagrees with the room, ${subj} won't perform agreement to keep the peace — the cost of pretending registers higher than the cost of being the one who didn't fold. The risk is reading every soft moment as a test of spine; not every accommodation is a betrayal of self. The growth move is distinguishing the moments that require ${possessive} refusal from the moments that just ask for ${possessive} patience.`;
+    },
+  },
+
+  // 22 — Fe room-attunement under conflict
+  {
+    pattern_id: "fe_room_attunement_under_conflict",
+    name: "Fe — room-attunement under conflict",
+    description:
+      "Fe dominant + Extraversion moderate or higher + one of Compassion / Peace / Family / Loyalty / Mercy in the top-2 sacred-value ranking. Captures the shape that reads the room's tension before naming the user's own. Distinct from fe_attunement_to_yielded_conviction (which gates on Q-P1 adapts_under_social_pressure) and from gripCalibration's 'approval of specific people' (which is Primal-mapping) — this is pre-Primal pattern detection of relational-values attunement.",
+    applicable_card: "fire",
+    detection: (_signals, topCompass, _tg, lensStack, _ms, oceanBands) => {
+      if (lensStack.dominant !== "fe") return false;
+      if (!oceanBands) return false;
+      const eObservable =
+        oceanBands.extraversion === "high" ||
+        oceanBands.extraversion === "moderate-high" ||
+        oceanBands.extraversion === "moderate";
+      if (!eObservable) return false;
+      const relational: SignalId[] = [
+        "compassion_priority",
+        "peace_priority",
+        "family_priority",
+        "loyalty_priority",
+        "mercy_priority",
+      ];
+      return relational.some((sid) => compassRanksTop(topCompass, sid, 2));
+    },
+    prose: (_s, _tc, _tg, _ls, demographics) => {
+      const possessive = nameOrYour(demographics);
+      const subj = getUserName(demographics) ?? "you";
+      const s = getUserName(demographics) ? "s" : "";
+      return `When tension surfaces, ${subj} read${s} the room before ${subj} read${s} ${possessive} own position — the relational stakes register first, the personal stakes second. This is real gift in the rooms that need someone tracking what's between people. The risk is that ${possessive} own position gets less attention than ${possessive} read of everyone else's, and the cost of that gap shows up later, in private.`;
+    },
+  },
 ];
 
 export function detectCrossCardPatterns(
@@ -5652,11 +6579,14 @@ export function detectCrossCardPatterns(
   topGravity: SignalRef[],
   lensStack: LensStack,
   metaSignals: MetaSignal[],
-  demographics?: DemographicSet | null
+  demographics?: DemographicSet | null,
+  oceanBands?: OceanIntensityBands
 ): { pattern: CrossCardPattern; prose: string }[] {
   const out: { pattern: CrossCardPattern; prose: string }[] = [];
   for (const p of CROSS_CARD_PATTERNS) {
-    if (p.detection(signals, topCompass, topGravity, lensStack, metaSignals)) {
+    if (
+      p.detection(signals, topCompass, topGravity, lensStack, metaSignals, oceanBands)
+    ) {
       out.push({
         pattern: p,
         prose: p.prose(signals, topCompass, topGravity, lensStack, demographics),
@@ -5876,6 +6806,168 @@ function thesisFor(
   return THESIS_TEMPLATES[key] ?? THESIS_FALLBACK_BY_FUNCTION[lensStack.dominant];
 }
 
+// CC-PROSE-1 Layer 1 — Executive Read.
+//
+// 2-sentence top-of-report distillation rendered immediately after the
+// masthead block (drop-cap shapeInOneSentence + uncomfortableButTrue +
+// MBTI disclosure) and before "How to Read This." Lifts directly from
+// the existing Synthesis composer's two load-bearing one-liners:
+//   1. The gift/danger parallel-line close (GIFT_DANGER_LINES keyed to
+//      Lens dominant function).
+//   2. The "not X, but Y" thesis line (thesisFor — keyed to dominant
+//      function + top Compass value).
+//
+// Second-person register throughout (per engine canon). No invented
+// claims — every word lifts from existing engine maps. The drop-cap
+// already shows shapeInOneSentence so Executive Read does not duplicate
+// that line; it surfaces the gift/danger and growth-task headlines that
+// previously lived only inside the late-report Synthesis section.
+// CC-SYNTHESIS-1A Addition 3 — Two-Tier Closing-Phrase logic.
+//
+// The pre-1A Closing Read prose for the GIVE quadrant contains the
+// phrase "the early shape of giving" mid-paragraph (in
+// goalSoulGive.PROSE_TEMPLATES.give). 1A gates whether that phrase
+// stays as the default OR gets substituted with the canonical-arrived
+// phrase "Giving is Work that has found its beloved object."
+//
+// The arrived phrase fires only when ALL three conditions hold:
+//   1. movementQuadrant.label === "Giving / Presence"
+//      (high Goal AND high Soul, both ≥ MOVEMENT_QUADRANT_HIGH_THRESHOLD)
+//   2. riskForm.letter === "Wisdom-governed"
+//      (risk-orientation present AND grip moderate)
+//   3. movementStrength.length ≥ 70
+//      (longer than the engine's "long" threshold floor of 60; cap below
+//      "full" which fires at 85 — reserves the canonical close for shapes
+//      whose movement is strong-and-sustained rather than just past the
+//      "long" boundary)
+//
+// Per Jason canon: "the canonical close is reserved for arrived shapes;
+// default to early-shape-of-giving for ambiguous or transitional shapes."
+// Render rule: only the embedded phrase changes; the surrounding
+// sentence is unchanged. Substitution happens at composition time so
+// renderMirror.ts and the React render path share one source of truth.
+const CLOSING_PHRASE_DEFAULT = "the early shape of giving";
+const CLOSING_PHRASE_ARRIVED = "Giving is Work that has found its beloved object";
+const CLOSING_PHRASE_ARRIVED_STRENGTH_FLOOR = 70;
+
+// CC-SHAPE-AWARE-PROSE-ROUTING — archetype-routed Closing Read prose for
+// the GIVE quadrant. Each archetype carries its canonical line (see
+// `ARCHETYPE_CANONICAL_LINE` in lib/profileArchetype.ts). Non-GIVE
+// quadrants keep the legacy templates because they describe formation
+// states (Striving / Longing / Drift) that don't yet have an archetype
+// signature.
+const CLOSING_READ_GIVE_BY_ARCHETYPE: Record<
+  "jasonType" | "cindyType" | "danielType",
+  string
+> = {
+  jasonType:
+    "Your verbs and your nouns appear to be pulling in the same direction — the long-arc structure you build is in service of the truth you keep returning to. The instrument reads this as the early shape of giving — work taking the form of love, love taking the form of work. The work is to translate conviction into visible, revisable, present-tense structure. Keep this shape honest as the seasons turn.",
+  cindyType:
+    "Your life appears organized around love made concrete. You do not merely value Family; you act as if Family is something that must be held, fed, defended, and kept. The instrument reads this as the early shape of giving — work taking the form of love, love taking the form of work. The work is not to care less. It is to let love become sustainable enough to last.",
+  danielType:
+    "Your life appears organized around faithful continuity: belief made visible through repeated action, responsibility carried across time, and love expressed as reliability. The instrument reads this as the early shape of giving — work taking the form of love, love taking the form of work. The work is not to abandon what has endured. It is to let what has endured remain alive enough to update.",
+};
+
+export function composeClosingReadProse(
+  constitution: InnerConstitution
+): string {
+  const goalSoulGive = constitution.goalSoulGive;
+  if (!goalSoulGive || !goalSoulGive.prose) return "";
+  let prose = goalSoulGive.prose;
+
+  // CC-SHAPE-AWARE-PROSE-ROUTING — route the GIVE-quadrant prose
+  // through the user's archetype. unmappedType / non-GIVE quadrants
+  // keep the legacy template.
+  if (goalSoulGive.quadrant === "give") {
+    const archetype = constitution.profileArchetype?.primary;
+    if (
+      archetype === "jasonType" ||
+      archetype === "cindyType" ||
+      archetype === "danielType"
+    ) {
+      prose = CLOSING_READ_GIVE_BY_ARCHETYPE[archetype];
+    }
+  }
+
+  // CC-070 wrap-compat — when the Defensive Builder pattern fires inside
+  // the Striving quadrant, append its kicker prose. (Mirrored from
+  // renderMirror.ts so the kicker stays attached to the closing read
+  // regardless of which composer caller emits the prose.)
+  if (goalSoulGive.quadrant === "striving") {
+    const fired = constitution.goalSoulPatterns?.fired ?? [];
+    const dbKicker = fired.find(
+      (p) => p.id === "defensive_builder" && p.kickerProse
+    );
+    if (dbKicker) {
+      prose = `${prose} ${dbKicker.kickerProse}`;
+    }
+  }
+
+  // Two-tier substitution: only fires for the GIVE quadrant template
+  // (the only template containing CLOSING_PHRASE_DEFAULT). Conditions
+  // are independently AND'd; any single condition unmet → keep default.
+  const quadrantArrived =
+    constitution.movementQuadrant?.label === "Giving / Presence";
+  // CC-PHASE-3A-LABEL-LOGIC — riskForm.letter is the legacy-classifier
+  // reading, which now emits the new labels ("Open-Handed Aim"). The
+  // canonical "arrived" condition is high-Aim + low-Grip.
+  const riskWisdom =
+    constitution.riskForm?.letter === "Open-Handed Aim";
+  const strengthLong =
+    (constitution.goalSoulMovement?.dashboard.movementStrength.length ?? 0) >=
+    CLOSING_PHRASE_ARRIVED_STRENGTH_FLOOR;
+  if (
+    quadrantArrived &&
+    riskWisdom &&
+    strengthLong &&
+    prose.includes(CLOSING_PHRASE_DEFAULT)
+  ) {
+    prose = prose.replace(CLOSING_PHRASE_DEFAULT, CLOSING_PHRASE_ARRIVED);
+  }
+
+  return prose;
+}
+
+// CC-PROSE-1B Layer 5 — extracted helpers so composeReportCallouts can
+// reuse the exact same thesis-line and gift/danger-line construction the
+// Executive Read uses. Single source of truth: when these helpers change
+// (e.g., template phrasing tweaks), the Executive Read AND Layer 5 callouts
+// stay in lockstep automatically. No new strings introduced — both helpers
+// lift verbatim from existing engine maps.
+export function composeGiftDangerLine(constitution: InnerConstitution): string {
+  const dom = constitution.lens_stack.dominant;
+  const gd = GIFT_DANGER_LINES[dom];
+  return `Your gift is ${gd.gift}. Your danger is ${gd.danger}.`;
+}
+
+export function composeThesisLine(constitution: InnerConstitution): string {
+  const topCompass = getTopCompassValues(constitution.signals);
+  const thesis = thesisFor(constitution.lens_stack, topCompass);
+  return `You are a ${thesis.shapeDescriptor} whose growth edge is not ${thesis.assumedX}, but ${thesis.structuralY}.`;
+}
+
+export function composeExecutiveRead(constitution: InnerConstitution): string {
+  return `${composeGiftDangerLine(constitution)} ${composeThesisLine(constitution)}`;
+}
+
+// CC-PROSE-1B Layer 5C — surface the thesis components individually so
+// the Final Line composer can mechanically recombine `shapeDescriptor` +
+// `structuralY` (with an imperative-cast transformation on the latter)
+// without re-parsing the composed thesis sentence.
+export function getThesisComponents(constitution: InnerConstitution): {
+  shapeDescriptor: string;
+  assumedX: string;
+  structuralY: string;
+} {
+  const topCompass = getTopCompassValues(constitution.signals);
+  const t = thesisFor(constitution.lens_stack, topCompass);
+  return {
+    shapeDescriptor: t.shapeDescriptor,
+    assumedX: t.assumedX,
+    structuralY: t.structuralY,
+  };
+}
+
 function buildKeepWithoutLines(
   constitution: InnerConstitution
 ): string[] {
@@ -5901,26 +6993,40 @@ function lowerInitial(s: string): string {
   return s.charAt(0).toLowerCase() + s.slice(1);
 }
 
-export function generateSimpleSummary(
-  constitution: InnerConstitution,
-  demographics?: DemographicSet | null
-): string {
-  const name = getUserName(demographics);
-  const possessive = name ? `${name}'s` : "Your";
+// CC-PROSE-1B Layer 5B — expose the Synthesis composer's structural
+// parts so the markdown / React render layers can interleave the Most
+// Useful Line callout between the parallel-line tercet and the closing
+// thesis sentence without duplicating the gift/danger content.
+//
+// Pre-1B: generateSimpleSummary returned a single \n\n-joined string
+// (intro + tercet + giftDanger + thesis). Post-1B: the same composer
+// is also available as discrete parts; generateSimpleSummary returns
+// the joined form for any caller that wants the legacy single-string
+// shape.
+export type SimpleSummaryParts = {
+  intro: string;
+  tercet: string | null;
+  giftDanger: string;
+  thesis: string;
+};
+
+export function getSimpleSummaryParts(
+  constitution: InnerConstitution
+): SimpleSummaryParts {
   const lensStack = constitution.lens_stack;
   const dom = lensStack.dominant;
   const topCompass = getTopCompassValues(constitution.signals);
 
-  // 4-7 synthesizing sentences. Pulls from the existing constitution
-  // outputs rather than re-deriving — the synthesis should match what
-  // the user has already read in the cards above.
+  // Synthesizing sentences (intro paragraph). Pulls from the existing
+  // constitution outputs rather than re-deriving — the synthesis should
+  // match what the user has already read in the cards above.
   const synthesisLines: string[] = [];
   synthesisLines.push(
-    `${possessive} shape reads as ${FUNCTION_VOICE[dom]} supported by ${FUNCTION_VOICE[lensStack.auxiliary]} — the way ${name ? name : "you"} process${name ? "es" : ""} the world before any single read settles.`
+    `Your shape reads as ${FUNCTION_VOICE[dom]} supported by ${FUNCTION_VOICE[lensStack.auxiliary]} — the way you process the world before any single read settles.`
   );
   if (topCompass.length > 0) {
     synthesisLines.push(
-      `What ${name ? name : "you"} protect${name ? "s" : ""} clusters around ${valueListPhrase(topCompass, 0)} — the values the rest of the read is organized around.`
+      `What you protect clusters around ${valueListPhrase(topCompass, 0)} — the values the rest of the read is organized around.`
     );
   }
   if (constitution.belief_under_tension) {
@@ -5935,39 +7041,54 @@ export function generateSimpleSummary(
           ? "a privately-held conviction"
           : "an actively wrestling posture";
       synthesisLines.push(
-        `The Keystone Reflection surfaced ${postureWord} around the belief ${name ? name : "you"} named — held in a way that's part of the shape, not separate from it.`
+        `The Keystone Reflection surfaced ${postureWord} around the belief you named — held in a way that's part of the shape, not separate from it.`
       );
     }
   }
   if (constitution.tensions.length > 0) {
     synthesisLines.push(
-      `The tensions the engine surfaced are not failures of ${possessive.toLowerCase() === "your" ? "your" : possessive} shape — they are the shape's edges, where one strength meets the world that doesn't always reward it.`
+      `The tensions the engine surfaced are not failures of your shape — they are the shape's edges, where one strength meets the world that doesn't always reward it.`
     );
   }
-  // Closing synthesis sentence.
   synthesisLines.push(
-    `The growth path is not to become someone else; it is to become more grounded, more legible, and more free inside the person ${name ? name : "you"} already ${name ? "is" : "are"}.`
+    `The growth path is not to become someone else; it is to become more grounded, more legible, and more free inside the person you already are.`
   );
 
-  // Closing pattern A — "To keep X without Y" parallel lines
   const keepLines = buildKeepWithoutLines(constitution);
+  const tercet = keepLines.length > 0 ? keepLines.join("\n") : null;
 
-  // Closing pattern B — gift/danger compression keyed to dominant function
-  const gd = GIFT_DANGER_LINES[dom];
-  const giftDanger = `${possessive} gift is ${gd.gift}. ${possessive} danger is ${gd.danger}.`;
+  // Closing patterns B + C — share source of truth with Executive Read +
+  // Layer 5 callouts (CC-PROSE-1B).
+  const giftDanger = composeGiftDangerLine(constitution);
+  const thesis = composeThesisLine(constitution);
 
-  // Closing pattern C — "not X, but Y" thesis
-  const thesis = thesisFor(lensStack, topCompass);
-  const thesisSubj = name ?? "This shape";
-  const isVerb = name ? "is" : "is";
-  const thesisLine = `${thesisSubj} ${isVerb} a ${thesis.shapeDescriptor} whose growth edge is not ${thesis.assumedX}, but ${thesis.structuralY}.`;
+  return {
+    intro: synthesisLines.join(" "),
+    tercet,
+    giftDanger,
+    thesis,
+  };
+}
 
-  const sections: string[] = [];
-  sections.push(synthesisLines.join(" "));
-  if (keepLines.length > 0) sections.push(keepLines.join("\n"));
-  sections.push(giftDanger);
-  sections.push(thesisLine);
-
+export function generateSimpleSummary(
+  constitution: InnerConstitution,
+  // CC-PROSE-1A Fix 3 — `_demographics` is no longer read inside the
+  // composer (the voice is locked to second-person regardless of name
+  // presence). The parameter stays for call-site signature compatibility
+  // with pre-Fix-3 callers and for any future re-introduction of
+  // name-aware prose that doesn't violate the second-person register;
+  // the leading underscore signals intentionally unused.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _demographics?: DemographicSet | null
+): string {
+  // CC-PROSE-1B Layer 5B — delegate to getSimpleSummaryParts so the
+  // joined-string and parts shapes share one composer. CC-PROSE-1A
+  // second-person voice is preserved unchanged inside the parts builder.
+  const parts = getSimpleSummaryParts(constitution);
+  const sections: string[] = [parts.intro];
+  if (parts.tercet) sections.push(parts.tercet);
+  sections.push(parts.giftDanger);
+  sections.push(parts.thesis);
   return sections.join("\n\n");
 }
 

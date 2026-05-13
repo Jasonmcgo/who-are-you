@@ -123,10 +123,54 @@ function instrumentIs(stack: LensStack, fns: string[]): boolean {
   return fns.includes(stack.auxiliary);
 }
 
+// CC-STRENGTH-MIGRATION-AND-STAKES-SPLIT §10 — union read of Strength
+// (canon-§10 substrate) and Mix (legacy substrate, retained for
+// cohort cache stability). Matches the workMap classifier exactly.
+const STRENGTH_LEAN_THRESHOLD = 55;
+const MIX_LEAN_THRESHOLD = 38;
+
 function isCoverageLeaning(drive: DriveOutput | undefined): boolean {
   if (!drive) return false;
+  const s = drive.strengths;
+  const strengthLean =
+    !!s &&
+    s.coverage >= s.cost &&
+    s.coverage >= s.compliance &&
+    s.coverage >= STRENGTH_LEAN_THRESHOLD;
   const d = drive.distribution;
-  return d.coverage >= d.cost && d.coverage >= d.compliance && d.coverage >= 38;
+  const mixLean =
+    d.coverage >= d.cost &&
+    d.coverage >= d.compliance &&
+    d.coverage >= MIX_LEAN_THRESHOLD;
+  return strengthLean || mixLean;
+}
+
+// CC-Q4 — Q-L1 direct-measurement lift. When any of the named love_*
+// signals ranks top-1 in Q-L1, the predicate gets a strong lift; top-2
+// gets a moderate lift; rank ≥ 3 contributes nothing. The lift is
+// returned as a 0–1 value so callers can multiply by their flavor-
+// specific weight (typical: 0.3 × directLift). Pre-Q-L1 fixtures get 0
+// from this helper (no signal source from Q-L1) and rely on the existing
+// inferred-from-Q-S2/Q-X4 components — backward-compatible.
+const Q_L1_LIFT_TOP1 = 1.0;
+const Q_L1_LIFT_TOP2 = 0.55;
+
+function loveDirectLift(signals: Signal[], ids: SignalId[]): number {
+  let max = 0;
+  for (const id of ids) {
+    const sig = signals.find(
+      (s) =>
+        s.signal_id === id &&
+        s.source_question_ids.includes("Q-L1") &&
+        s.rank !== undefined
+    );
+    if (!sig || sig.rank === undefined) continue;
+    let lift = 0;
+    if (sig.rank === 1) lift = Q_L1_LIFT_TOP1;
+    else if (sig.rank === 2) lift = Q_L1_LIFT_TOP2;
+    if (lift > max) max = lift;
+  }
+  return max;
 }
 
 // ── Register definitions (v1 placeholder content — locked structure) ────
@@ -462,7 +506,17 @@ const commitmentLoyaltyPredicate: FlavorPredicate = (inp) => {
       ? 1
       : 0;
   const family = rankAtMost(signals, "family_priority", 5) ? 1 : 0;
-  return loyalty * 0.3 + conviction * 0.25 + trust * 0.25 + family * 0.2;
+  // CC-Q4 — Q-L1 direct lift. love_presence (durability) and
+  // love_protection (guardian) anchor to the commitment / loyalty
+  // register; love_quiet_sacrifice contributes lightly because
+  // unspoken sacrifice composes with fidelity.
+  const directLift = loveDirectLift(signals, [
+    "love_presence",
+    "love_protection",
+    "love_quiet_sacrifice",
+  ]);
+  const inferred = loyalty * 0.3 + conviction * 0.25 + trust * 0.25 + family * 0.2;
+  return Math.min(1, inferred + directLift * 0.3);
 };
 
 const funAdventurePredicate: FlavorPredicate = (inp) => {
@@ -471,9 +525,12 @@ const funAdventurePredicate: FlavorPredicate = (inp) => {
   const freedom = rankAtMost(signals, "freedom_priority", 3) ? 1 : 0;
   const socialSpending = rankAtMost(signals, "social_spending_priority", 2) ? 1 : 0;
   const learningEnergy = rankAtMost(signals, "learning_energy_priority", 2) ? 1 : 0;
-  return (
-    enjoyingEnergy * 0.3 + freedom * 0.25 + socialSpending * 0.2 + learningEnergy * 0.25
-  );
+  // CC-Q4 — love_shared_experience (creating beauty / humor / shared
+  // moments) is the canonical Q-L1 anchor for Fun / Adventure / Living-Life.
+  const directLift = loveDirectLift(signals, ["love_shared_experience"]);
+  const inferred =
+    enjoyingEnergy * 0.3 + freedom * 0.25 + socialSpending * 0.2 + learningEnergy * 0.25;
+  return Math.min(1, inferred + directLift * 0.3);
 };
 
 const buildingConstructionPredicate: FlavorPredicate = (inp) => {
@@ -487,12 +544,19 @@ const buildingConstructionPredicate: FlavorPredicate = (inp) => {
     rankAtMost(signals, "family_priority", 3)
       ? 1
       : 0;
-  return (
+  // CC-Q4 — love_problem_solving (practical / removing burden) and
+  // love_co_construction (build conditions for flourishing) both anchor
+  // the Building / Co-construction register directly.
+  const directLift = loveDirectLift(signals, [
+    "love_problem_solving",
+    "love_co_construction",
+  ]);
+  const inferred =
     buildingEnergy * 0.3 +
     familySpending * 0.2 +
     aspirationFit * 0.25 +
-    successAndFamily * 0.25
-  );
+    successAndFamily * 0.25;
+  return Math.min(1, inferred + directLift * 0.3);
 };
 
 const championingPredicate: FlavorPredicate = (inp) => {
@@ -512,12 +576,15 @@ const championingPredicate: FlavorPredicate = (inp) => {
   )
     ? 1
     : 0;
-  return (
+  // CC-Q4 — love_co_construction (build conditions for their flourishing)
+  // is the Q-L1 composite that anchors Championing alongside Building.
+  const directLift = loveDirectLift(signals, ["love_co_construction"]);
+  const inferred =
     caringModerate * 0.25 +
     mentorTrust * 0.25 +
     ambitionFit * 0.25 +
-    individualResponsibility * 0.25
-  );
+    individualResponsibility * 0.25;
+  return Math.min(1, inferred + directLift * 0.3);
 };
 
 const tendernessCarePredicate: FlavorPredicate = (inp) => {
@@ -530,7 +597,15 @@ const tendernessCarePredicate: FlavorPredicate = (inp) => {
       : 0;
   const feInLens = driverIs(lensStack, ["fe"]) || instrumentIs(lensStack, ["fe"]) ? 1 : 0;
   const family = rankAtMost(signals, "family_priority", 3) ? 1 : 0;
-  return caringEnergy * 0.3 + compassionMercy * 0.25 + feInLens * 0.2 + family * 0.25;
+  // CC-Q4 — love_quiet_sacrifice (silent-care register) and love_presence
+  // (showing-up as gift) both anchor Tenderness / Care.
+  const directLift = loveDirectLift(signals, [
+    "love_quiet_sacrifice",
+    "love_presence",
+  ]);
+  const inferred =
+    caringEnergy * 0.3 + compassionMercy * 0.25 + feInLens * 0.2 + family * 0.25;
+  return Math.min(1, inferred + directLift * 0.3);
 };
 
 const witnessingRecognitionPredicate: FlavorPredicate = (inp) => {
@@ -547,7 +622,12 @@ const witnessingRecognitionPredicate: FlavorPredicate = (inp) => {
     rankAtMost(signals, "friend_trust_priority", 2)
       ? 1
       : 0;
-  return fiDriver * 0.3 + truthAndFamily * 0.25 + conviction * 0.2 + trustBoth * 0.25;
+  // CC-Q4 — love_verbal_expression (saying what they mean to you) is the
+  // canonical Q-L1 anchor for Witnessing / Recognition (naming as gift).
+  const directLift = loveDirectLift(signals, ["love_verbal_expression"]);
+  const inferred =
+    fiDriver * 0.3 + truthAndFamily * 0.25 + conviction * 0.2 + trustBoth * 0.25;
+  return Math.min(1, inferred + directLift * 0.3);
 };
 
 const devotionToCallingPredicate: FlavorPredicate = (inp) => {
@@ -567,6 +647,10 @@ const devotionToCallingPredicate: FlavorPredicate = (inp) => {
     (caringRank === undefined || caringRank > 2)
       ? 1
       : 0;
+  // CC-Q4 — Devotion to a Calling has no canonical Q-L1 anchor (Q-L1
+  // captures love-expression toward the people closest to you, while
+  // Devotion to a Calling is the calling-as-love register). Predicate
+  // unchanged — Q-L1 contributes 0 here, by design.
   return legacy * 0.3 + buildingEnergy * 0.25 + valueGate * 0.2 + nonPersonalProxy * 0.25;
 };
 

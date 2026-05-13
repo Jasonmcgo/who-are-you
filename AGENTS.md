@@ -37,3 +37,26 @@ Every CC-NNN prompt must include, at minimum:
 - **Acceptance Criteria** — numbered, checkable, including "no file outside the Allowed-to-Modify list has been edited."
 - **Report Back** — specific sections that force side-effects and scope deltas into the open.
 <!-- END:cc-workflow -->
+
+<!-- BEGIN:question-bank-architecture -->
+# Question Bank Architecture
+
+## 50-question ceiling (canon)
+
+**The user-facing assessment is capped at 50 questions.** This is a hard architectural constraint. Future bank expansions stay within this budget; CC prompts that add new questions must explicitly account for the count and cite this rule.
+
+Current count: see `data/questions.ts` (`grep -c "question_id:"`).
+
+## Discipline for new questions
+
+A new question earns its slot only when it closes a measurement gap that derivation cannot fill. Per `feedback_minimal_questions_maximum_output` memory:
+
+- Derivation over new measurement.
+- Re-tag existing signals before adding new ones.
+- New questions need an explicit gap statement: what is the engine reading via proxy or heuristic that direct measurement would sharpen, and why that sharpening is worth the slot.
+- CC prompts adding questions must verify the bank stays under 50 in the Acceptance Criteria.
+
+## Reduction is also work
+
+Removing or hiding questions (e.g., reducing user-facing prominence of derived multi-stage questions while keeping the bank intact behind the scenes) is a legitimate use of the budget. The 50 ceiling protects against unbounded growth, not against thoughtful re-allocation.
+<!-- END:question-bank-architecture -->

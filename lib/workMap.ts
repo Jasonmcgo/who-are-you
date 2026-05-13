@@ -77,16 +77,46 @@ function topRankSignals(signals: Signal[], topN: number): SignalId[] {
   return ids;
 }
 
+// CC-STRENGTH-MIGRATION-AND-STAKES-SPLIT §10 — interpretive lean
+// classifiers now consult both substrates and report a lean when EITHER
+// fires. The Strength substrate (independent 0-100 substance) is the
+// canonical canon-§10 read; the Mix substrate (100%-summing emphasis %)
+// is preserved as a fallback so cohort cache hashes stay byte-stable
+// for fixtures whose top-line lean was determined under the legacy
+// emphasis-based read. V1 Strength threshold = 55; Mix threshold = 38.
+// Audit `strength-lean-threshold-calibration-reported` reports cohort
+// behavior at 50/55/60/65 for future calibration.
+export const STRENGTH_LEAN_THRESHOLD = 55;
+const MIX_LEAN_THRESHOLD = 38;
+
 function isCostLeaning(drive: DriveOutput | undefined): boolean {
   if (!drive) return false;
+  const s = drive.strengths;
+  const strengthLean =
+    !!s &&
+    s.cost >= s.coverage &&
+    s.cost >= s.compliance &&
+    s.cost >= STRENGTH_LEAN_THRESHOLD;
   const d = drive.distribution;
-  return d.cost >= d.coverage && d.cost >= d.compliance && d.cost >= 38;
+  const mixLean =
+    d.cost >= d.coverage && d.cost >= d.compliance && d.cost >= MIX_LEAN_THRESHOLD;
+  return strengthLean || mixLean;
 }
 
 function isCoverageLeaning(drive: DriveOutput | undefined): boolean {
   if (!drive) return false;
+  const s = drive.strengths;
+  const strengthLean =
+    !!s &&
+    s.coverage >= s.cost &&
+    s.coverage >= s.compliance &&
+    s.coverage >= STRENGTH_LEAN_THRESHOLD;
   const d = drive.distribution;
-  return d.coverage >= d.cost && d.coverage >= d.compliance && d.coverage >= 38;
+  const mixLean =
+    d.coverage >= d.cost &&
+    d.coverage >= d.compliance &&
+    d.coverage >= MIX_LEAN_THRESHOLD;
+  return strengthLean || mixLean;
 }
 
 function isBalancedDrive(drive: DriveOutput | undefined): boolean {
@@ -166,10 +196,17 @@ export const WORK_REGISTERS: readonly WorkRegister[] = [
     register_label: "Embodied Craft Work",
     short_description:
       "Work that lives in the body — skill expressed through hands, presence, timing, contact. The framework is internalized; the doing is precise because the body knows.",
+    // CC-SHAPE-AWARE-PROSE-ROUTING — example anchors broadened beyond
+    // elite-technical specialties to include humane, non-elite craft
+    // work (hospitality, caregiving, hands-on service, performance).
     example_anchors: [
       "surgeon, technician, master craftsperson",
-      "performer / athlete",
-      "chef, instrument-maker",
+      "performer / athlete / dancer / musician",
+      "chef, instrument-maker, baker, brewer",
+      "hospitality (server, host, event coordinator)",
+      "caregiver, home-maker, hands-on service work",
+      "trades (carpentry, plumbing, mechanic, electrician)",
+      "retail / customer-facing craft, health support, community service",
     ],
     composes_naturally_with: EMBODIED_LENSES,
   },
@@ -226,10 +263,19 @@ export const WORK_REGISTERS: readonly WorkRegister[] = [
     register_label: "Operational / Stewardship Work",
     short_description:
       "Work that keeps systems running through standards, precedent, duty, and operational trust. The texture is reliability over years; the gift is making the institution continue to work.",
+    // CC-SHAPE-AWARE-PROSE-ROUTING — broadened beyond white-collar
+    // operations to include the full range of faithful-steward roles
+    // (facilities, logistics, family business, church administration,
+    // skilled trades supervision, veteran leadership).
     example_anchors: [
       "operations management, COO",
       "institutional administration",
       "military / police leadership, project / program management",
+      "facilities management, logistics, compliance",
+      "church / nonprofit administration",
+      "skilled trades supervision, family-business operations",
+      "finance / accounting controls, veteran leadership",
+      "maintenance of inherited systems and standards",
     ],
     composes_naturally_with: STEWARDSHIP_LENSES,
   },

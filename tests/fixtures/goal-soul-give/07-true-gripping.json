@@ -1,15 +1,23 @@
-[
-  { "question_id": "Q-E1-inward",  "card_id": "sacred", "question_text": "inward energy",  "type": "ranking", "order": ["enjoying", "learning", "caring"] },
-  { "question_id": "Q-A1", "card_id": "agency", "question_text": "spend most of your time", "type": "forced", "response": "Maintaining responsibilities" },
-  { "question_id": "Q-A2", "card_id": "agency", "question_text": "where energy goes",       "type": "forced", "response": "Exploring, learning, or wandering" },
-  { "question_id": "Q-3C1",       "card_id": "role",   "question_text": "drive priority",       "type": "ranking", "order": ["cost", "compliance", "coverage"] },
-  { "question_id": "Q-Stakes1", "card_id": "sacred", "question_text": "concrete stakes", "type": "ranking", "order": ["money", "reputation", "job", "health", "close_relationships"] },
-  { "question_id": "Q-S1", "card_id": "sacred", "question_text": "qualities of self", "type": "ranking", "order": ["honor", "freedom", "truth", "stability", "peace", "loyalty"] },
-  { "question_id": "Q-S2", "card_id": "sacred", "question_text": "claims on you", "type": "ranking", "order": ["knowledge", "justice", "faith", "family", "compassion", "mercy"] },
-  { "question_id": "Q-X4-relational", "card_id": "context", "question_text": "relational trust", "type": "ranking", "order": ["friend", "partner", "family"] },
-  { "question_id": "Q-X4-chosen",     "card_id": "context", "question_text": "chosen trust",     "type": "ranking", "order": ["own_counsel", "mentor", "outside_expert"] },
-  { "question_id": "Q-S3-close", "card_id": "sacred", "question_text": "close-circle money", "type": "ranking", "order": ["family", "friends", "yourself"] },
-  { "question_id": "Q-P1", "card_id": "pressure", "question_text": "expressing a belief that costs relationships", "type": "forced", "response": "Stay silent" },
-  { "question_id": "Q-P2", "card_id": "pressure", "question_text": "belief at job risk", "type": "forced", "response": "Hide it from work" },
-  { "question_id": "Q-I1", "card_id": "conviction", "question_text": "belief you'd bear cost to keep", "type": "freeform", "response": "I believe my reputation has to remain intact, and I would adapt or stay quiet rather than risk losing standing or income over a position I hold privately." }
-]
+{
+  "answers": [
+    { "question_id": "Q-E1-inward",  "card_id": "sacred", "question_text": "inward energy",  "type": "ranking", "order": ["enjoying", "learning", "caring"] },
+    { "question_id": "Q-A1", "card_id": "agency", "question_text": "spend most of your time", "type": "forced", "response": "Maintaining responsibilities" },
+    { "question_id": "Q-A2", "card_id": "agency", "question_text": "where energy goes",       "type": "forced", "response": "Exploring, learning, or wandering" },
+    { "question_id": "Q-3C1",       "card_id": "role",   "question_text": "drive priority",       "type": "ranking", "order": ["cost", "compliance", "coverage"] },
+    { "question_id": "Q-Stakes1", "card_id": "sacred", "question_text": "concrete stakes", "type": "ranking", "order": ["money", "reputation", "job", "health", "close_relationships"] },
+    { "question_id": "Q-S1", "card_id": "sacred", "question_text": "qualities of self", "type": "ranking", "order": ["honor", "freedom", "truth", "stability", "peace", "loyalty"] },
+    { "question_id": "Q-S2", "card_id": "sacred", "question_text": "claims on you", "type": "ranking", "order": ["knowledge", "justice", "faith", "family", "compassion", "mercy"] },
+    { "question_id": "Q-X4-relational", "card_id": "context", "question_text": "relational trust", "type": "ranking", "order": ["friend", "partner", "family"] },
+    { "question_id": "Q-X4-chosen",     "card_id": "context", "question_text": "chosen trust",     "type": "ranking", "order": ["own_counsel", "mentor", "outside_expert"] },
+    { "question_id": "Q-S3-close", "card_id": "sacred", "question_text": "close-circle money", "type": "ranking", "order": ["family", "friends", "yourself"] },
+    { "question_id": "Q-P1", "card_id": "pressure", "question_text": "expressing a belief that costs relationships", "type": "forced", "response": "Stay silent" },
+    { "question_id": "Q-P2", "card_id": "pressure", "question_text": "belief at job risk", "type": "forced", "response": "Hide it from work" },
+    { "question_id": "Q-I1", "card_id": "conviction", "question_text": "belief you'd bear cost to keep", "type": "freeform", "response": "I believe my reputation has to remain intact, and I would adapt or stay quiet rather than risk losing standing or income over a position I hold privately." },
+    { "question_id": "Q-GS1", "card_id": "sacred", "question_text": "what makes a successful effort feel worth it", "type": "ranking", "order": ["gripping_proof", "security_freedom", "goal_completion", "durable_creation", "creative_truth", "soul_calling", "soul_people"] },
+    { "question_id": "Q-V1", "card_id": "conviction", "question_text": "why your work really matters", "type": "ranking", "order": ["performance_identity", "goal_logic_explanation", "vulnerability_deflection", "sacred_belief_connection", "soul_beloved_named", "vulnerability_open_uncertainty"] },
+    { "question_id": "Q-GRIP1", "card_id": "pressure", "question_text": "what you grip under pressure", "type": "ranking", "order": ["grips_reputation", "grips_security", "grips_control", "grips_certainty", "grips_old_plan", "grips_comfort", "grips_approval", "grips_neededness"] },
+    { "question_id": "Q-3C2", "card_id": "role", "question_text": "what you protect first in practice", "type": "ranking", "order": ["coverage_priority", "compliance_priority", "recovery_priority", "reputation_priority", "goal_priority", "cost_priority"] },
+    { "question_id": "Q-L1", "card_id": "sacred", "question_text": "how love becomes visible", "type": "ranking", "order": ["protection", "quiet_sacrifice", "presence", "problem_solving", "co_construction", "verbal_expression", "shared_experience"] }
+  ],
+  "demographics": null
+}

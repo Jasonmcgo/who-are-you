@@ -17,6 +17,14 @@ import Link from "next/link";
 import InnerConstitutionPage from "../../../components/InnerConstitutionPage";
 import AttachmentsPanel from "../../../components/AttachmentsPanel";
 import { buildInnerConstitution } from "../../../../lib/identityEngine";
+// CODEX-SYNTHESIS-3-RUNTIME-FALLBACK — augment session constitution
+// with LLM Path master synthesis paragraph via the server-side API
+// endpoint. Live sessions (e.g., Jason + family members) compute
+// inputs that miss the static fixture cache; this hook hits the
+// endpoint, which calls Anthropic + persists the result for next time.
+import { useLlmMasterSynthesis } from "../../../../lib/synthesis3LlmClient";
+// CC-GRIP-TAXONOMY — sibling hook for the Grip section LLM articulation.
+import { useGripParagraph } from "../../../../lib/gripTaxonomyLlmClient";
 import {
   buildFilename,
   renderMirrorAsMarkdown,
@@ -296,6 +304,12 @@ export default function SessionDetailPage({
       data.inner_constitution.meta_signals
     );
   }, [data]);
+  // CODEX-SYNTHESIS-3-RUNTIME-FALLBACK + CC-GRIP-TAXONOMY — chained
+  // augments. Path master synthesis runs first; then Grip section. Both
+  // pass-through cleanly when their respective static caches hit;
+  // both fire server-only API calls on miss.
+  const synthesisAugmented = useLlmMasterSynthesis(constitution);
+  const augmentedConstitution = useGripParagraph(synthesisAugmented);
 
   if (loadError) {
     return (
@@ -449,7 +463,9 @@ export default function SessionDetailPage({
       >
         <div style={{ flex: "1 1 70%", minWidth: 0 }}>
           <AdminExportPanel
-            constitution={constitution ?? data.inner_constitution}
+            constitution={
+              augmentedConstitution ?? constitution ?? data.inner_constitution
+            }
             demographics={toDemographicSet(data.demographics)}
             answers={data.answers ?? []}
             sessionDate={data.saved_at ? new Date(data.saved_at) : null}
@@ -465,7 +481,9 @@ export default function SessionDetailPage({
               onStartSave) and Share (hideShareBlock). The "start over"
               button at the footer points back to the sessions list. */}
           <InnerConstitutionPage
-            constitution={constitution ?? data.inner_constitution}
+            constitution={
+              augmentedConstitution ?? constitution ?? data.inner_constitution
+            }
             confirmations={confirmations}
             setConfirmations={setConfirmations}
             explainOpen={explainOpen}

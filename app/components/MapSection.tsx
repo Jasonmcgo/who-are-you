@@ -21,6 +21,16 @@ import {
   SHAPE_CARD_MAP_SIZE_PX,
   SHAPE_CARD_SVG_PATHS,
 } from "../../lib/cardAssets";
+import {
+  composeCompassMovementNote,
+  composeConvictionMovementNote,
+  composeFireMovementNote,
+  composeGravityMovementNote,
+  composeLensMovementNote,
+  composePathMasterSynthesis,
+  composeTrustCorrectionChannel,
+  composeWeatherStateVsShape,
+} from "../../lib/synthesis1Finish";
 
 type Props = {
   constitution: InnerConstitution;
@@ -128,6 +138,31 @@ export default function MapSection({
     return grouped;
   }, [constitution, demographics]);
 
+  // CC-SYNTHESIS-1-FINISH — per-card synthesis lines computed once and
+  // memoized so the 6 composer calls run in one pass (instead of once
+  // per render). Sections B (Trust) + C (Weather) + E (Movement Notes
+  // on Lens / Compass / Conviction / Gravity / Fire) + F (Path master
+  // synthesis paragraph) all attach to the appropriate ShapeCard slot.
+  //
+  // CC-SYNTHESIS-3 — `pathMaster` prefers the LLM-articulated cached
+  // paragraph (`shape_outputs.path.masterSynthesisLlm`) when present;
+  // falls back to the mechanical CC-SYNTHESIS-1F composer otherwise.
+  const synthLines = useMemo(
+    () => ({
+      lens: composeLensMovementNote(constitution),
+      compass: composeCompassMovementNote(constitution),
+      conviction: composeConvictionMovementNote(constitution),
+      gravity: composeGravityMovementNote(constitution),
+      trust: composeTrustCorrectionChannel(constitution),
+      weather: composeWeatherStateVsShape(constitution),
+      fire: composeFireMovementNote(constitution),
+      pathMaster:
+        constitution.shape_outputs.path.masterSynthesisLlm ??
+        composePathMasterSynthesis(constitution),
+    }),
+    [constitution]
+  );
+
   // CC-022b Item 2 — demographic-augmented Path output. Append the
   // profession hook to the Work subsection prose; marital hook to Love.
   // Original strings preserved when no specified-state demographic exists.
@@ -225,6 +260,7 @@ export default function MapSection({
         mode="accordion"
         expanded={expanded.lens}
         onToggle={() => toggle("lens")}
+        synthesisLine={synthLines.lens}
       />
       <CrossCardPatternBlock
         cardId="lens"
@@ -238,6 +274,7 @@ export default function MapSection({
         mode="accordion"
         expanded={expanded.compass}
         onToggle={() => toggle("compass")}
+        synthesisLine={synthLines.compass}
       />
       {/* CC-054 — Peace + Faith cross-signal disambiguation. Renders
           inside the expanded Compass card body (gated on expanded.compass)
@@ -293,6 +330,81 @@ export default function MapSection({
         expanded={expanded.compass}
         proses={patternsByCard.get("compass")}
       />
+      {/* CC-HANDS-CARD — 9th body card. Inserts after Heart/Compass and
+          before the next card (Voice/Conviction in this React render
+          order). Existential Goal-axis card with dual-mode read. */}
+      {constitution.handsCard ? (
+        <section
+          className="font-serif"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+            padding: "20px 22px",
+            margin: "6px 0",
+            borderLeft: "2px solid var(--rule, #d4c8a8)",
+            background: "var(--paper, #f7f1e6)",
+          }}
+        >
+          <h3
+            style={{
+              fontSize: 17,
+              fontWeight: 600,
+              margin: 0,
+              color: "var(--ink, #2b2417)",
+            }}
+          >
+            Hands — Work
+          </h3>
+          <p
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              margin: 0,
+              color: "var(--ink-soft, #6f6555)",
+            }}
+          >
+            What you build and carry
+          </p>
+          <p style={{ fontStyle: "italic", margin: 0, lineHeight: 1.55 }}>
+            {constitution.handsCard.openingLine}
+          </p>
+          <p style={{ margin: 0, lineHeight: 1.55 }}>
+            <strong>Strength</strong> — {constitution.handsCard.strength}
+          </p>
+          <p style={{ margin: 0, lineHeight: 1.55 }}>
+            <strong>Growth Edge</strong> —{" "}
+            {constitution.handsCard.growthEdge}
+          </p>
+          <p style={{ margin: 0, lineHeight: 1.55 }}>
+            <strong>Under Pressure</strong> — In health:{" "}
+            {constitution.handsCard.underPressure.healthRegister} Under load:{" "}
+            {constitution.handsCard.underPressure.pressureRegister}{" "}
+            {constitution.handsCard.underPressure.integrationLine}
+          </p>
+          <p style={{ margin: 0, lineHeight: 1.55 }}>
+            <strong>Practice</strong> — {constitution.handsCard.practice}
+          </p>
+          <p style={{ fontStyle: "italic", margin: 0, lineHeight: 1.55 }}>
+            {constitution.handsCard.movementNote}
+          </p>
+          <p style={{ fontStyle: "italic", margin: 0, lineHeight: 1.55 }}>
+            {constitution.handsCard.closingLine}
+          </p>
+          <p
+            style={{
+              fontStyle: "italic",
+              margin: 0,
+              lineHeight: 1.55,
+              fontSize: 13,
+              color: "var(--ink-soft, #6f6555)",
+            }}
+          >
+            Hands is what your life makes real. Work Map is where that making
+            may fit.
+          </p>
+        </section>
+      ) : null}
       <CardSvgPlate cardId="conviction" />
       <ShapeCard
         variant="conviction"
@@ -300,6 +412,7 @@ export default function MapSection({
         mode="accordion"
         expanded={expanded.conviction}
         onToggle={() => toggle("conviction")}
+        synthesisLine={synthLines.conviction}
       />
       <CrossCardPatternBlock
         cardId="conviction"
@@ -313,6 +426,7 @@ export default function MapSection({
         mode="accordion"
         expanded={expanded.gravity}
         onToggle={() => toggle("gravity")}
+        synthesisLine={synthLines.gravity}
       />
       <CrossCardPatternBlock
         cardId="gravity"
@@ -326,6 +440,7 @@ export default function MapSection({
         mode="accordion"
         expanded={expanded.trust}
         onToggle={() => toggle("trust")}
+        synthesisLine={synthLines.trust}
       />
       <CrossCardPatternBlock
         cardId="trust"
@@ -339,6 +454,7 @@ export default function MapSection({
         mode="accordion"
         expanded={expanded.weather}
         onToggle={() => toggle("weather")}
+        synthesisLine={synthLines.weather}
       />
       <CrossCardPatternBlock
         cardId="weather"
@@ -352,6 +468,7 @@ export default function MapSection({
         mode="accordion"
         expanded={expanded.fire}
         onToggle={() => toggle("fire")}
+        synthesisLine={synthLines.fire}
       />
       <CrossCardPatternBlock
         cardId="fire"
@@ -365,6 +482,7 @@ export default function MapSection({
         mode="accordion"
         expanded={expanded.path}
         onToggle={() => toggle("path")}
+        pathMasterSynthesis={synthLines.pathMaster}
       />
       <CrossCardPatternBlock
         cardId="path"
@@ -445,7 +563,7 @@ function CrossCardPatternBlock({
           margin: 0,
         }}
       >
-        Pattern observation
+        Pattern in motion
       </p>
       {proses.map((prose, i) => (
         <p

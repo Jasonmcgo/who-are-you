@@ -10,6 +10,7 @@ import {
   SHAPE_CARD_PATTERN_NOTE,
   type ShapeCardId,
 } from "../../lib/identityEngine";
+import { SHAPE_CARD_QUESTION } from "../../lib/cardAssets";
 import PathExpanded from "./PathExpanded";
 
 // Pre-CC-025 saved sessions don't carry patternNote on output. Map cardName
@@ -20,16 +21,61 @@ function patternNoteFromCardName(cardName: string): string | null {
   return SHAPE_CARD_PATTERN_NOTE[id] ?? null;
 }
 
+// CC-PROSE-1 Layer 2 — Canonical Question line, rendered between the
+// card kicker (e.g., "Lens · Eyes") and the user-specific Read line
+// (cardHeader). Same string per card across all users. The component is
+// a thin wrapper so both the markdown renderer and React share a single
+// canonical Question source via SHAPE_CARD_QUESTION.
+//
+// CC-PROSE-1A Fix 1 — non-italic, uppercase-tracked label register
+// (mirrors the SectionLabel / CellLabel typography family). The italic
+// Read line directly below carries the user-specific reading; the
+// Question line carries the card's purpose. Stacking two italic lines
+// blurred them into a single voice — the uppercase-tracked rendering
+// makes the Question read as a heading-tier label and the Read read as
+// the body answer.
+function CardQuestion({ id }: { id: ShapeCardId }) {
+  const text = SHAPE_CARD_QUESTION[id];
+  if (!text) return null;
+  return (
+    <p
+      className="font-mono uppercase"
+      style={{
+        fontSize: 10.5,
+        letterSpacing: "0.1em",
+        color: "var(--ink-mute)",
+        lineHeight: 1.5,
+        margin: 0,
+      }}
+    >
+      {text}
+    </p>
+  );
+}
+
 type CommonAccordionProps = {
   expanded?: boolean;
   onToggle?: () => void;
   mode?: "default" | "accordion";
+  // CC-SYNTHESIS-1-FINISH — per-card synthesis line. Renders between
+  // Practice (or Posture for Conviction) and Pattern Note. Source
+  // depends on card id: Lens / Compass / Gravity / Fire get Movement
+  // Notes (Section E); Trust gets Correction Channel (Section B);
+  // Weather gets State-vs-Shape qualifier (Section C); Conviction gets
+  // its own Movement Note (Section E).
+  synthesisLine?: string | null;
 };
 
 type Props =
   | ({ variant: "full-swot"; output: FullSwotOutput; mbtiSlot?: ReactNode } & CommonAccordionProps)
   | ({ variant: "conviction"; output: ConvictionOutput } & CommonAccordionProps)
-  | ({ variant: "path"; output: PathOutput } & CommonAccordionProps);
+  // CC-SYNTHESIS-1-FINISH Section F — `pathMasterSynthesis` replaces the
+  // pre-1F `output.directionalParagraph` rendered inside PathExpanded.
+  | ({
+      variant: "path";
+      output: PathOutput;
+      pathMasterSynthesis?: string;
+    } & CommonAccordionProps);
 
 function CardKicker({ name, bodyPart }: { name: string; bodyPart: string }) {
   return (
@@ -97,6 +143,42 @@ function CellBody({ text }: { text: string }) {
     >
       {text}
     </p>
+  );
+}
+
+// CC-SYNTHESIS-1-FINISH — Synthesis paragraph component for Movement
+// Notes (Section E), Trust Correction Channel (Section B), Weather
+// State-vs-Shape qualifier (Section C). Visually distinct from
+// Pattern Note (italic aphorism Cell) and Pattern in motion (sibling
+// CrossCardPatternBlock). Renders the bold-prefix-em-dash header
+// inline with the body text. The composer outputs already include
+// `**Movement Note** — ` / `**Correction channel.** ` / `**State vs.
+// shape.** ` markdown — we strip the markdown and split prefix from
+// body so React can render the bold prefix and non-italic body in
+// separate spans.
+function SynthesisParagraph({ text }: { text: string }) {
+  // Strip surrounding markdown bold (`**...**`) on the leading label
+  // and split on the em-dash separator if present, so the bold prefix
+  // renders distinct from the body in the styled component.
+  const m = text.match(/^\*\*([^*]+)\*\*\s*(?:—\s*)?([\s\S]*)$/);
+  const prefix = m ? m[1] : "";
+  const body = m ? m[2] : text;
+  return (
+    <div className="flex flex-col" style={{ gap: 6 }}>
+      <p
+        className="font-serif text-[15px] md:text-[15.5px]"
+        style={{ color: "var(--ink)", lineHeight: 1.6, margin: 0 }}
+      >
+        {prefix ? (
+          <>
+            <span style={{ fontWeight: 700 }}>{prefix}</span>
+            {body ? <> — {body}</> : null}
+          </>
+        ) : (
+          body
+        )}
+      </p>
+    </div>
   );
 }
 
@@ -199,10 +281,12 @@ export default function ShapeCard(props: Props) {
 
   // ── full-swot ──────────────────────────────────────────────────
   if (props.variant === "full-swot") {
-    const { output, mbtiSlot } = props;
+    const { output, mbtiSlot, synthesisLine } = props;
+    const cardId = output.cardName.toLowerCase() as ShapeCardId;
     const header = (
       <>
         <CardKicker name={output.cardName} bodyPart={output.bodyPart} />
+        <CardQuestion id={cardId} />
         <CardHeader text={output.cardHeader} />
       </>
     );
@@ -216,6 +300,13 @@ export default function ShapeCard(props: Props) {
         <Cell label="Strength" text={output.gift.text} />
         <Cell label="Growth Edge" text={output.blindSpot.text} />
         <Cell label="Practice" text={output.growthEdge.text} />
+        {/* CC-SYNTHESIS-1-FINISH — per-card synthesis line (Movement
+            Note for Lens/Compass/Gravity/Fire; Correction Channel
+            reframe for Trust; State-vs-Shape qualifier for Weather).
+            Renders between Practice and Pattern Note (italic closer). */}
+        {synthesisLine && synthesisLine.length > 0 ? (
+          <SynthesisParagraph text={synthesisLine} />
+        ) : null}
         {patternNoteText ? (
           <Cell label="Pattern Note" text={patternNoteText} variant="aphorism" />
         ) : null}
@@ -258,10 +349,11 @@ export default function ShapeCard(props: Props) {
 
   // ── conviction ─────────────────────────────────────────────────
   if (props.variant === "conviction") {
-    const { output } = props;
+    const { output, synthesisLine } = props;
     const header = (
       <>
         <CardKicker name={output.cardName} bodyPart={output.bodyPart} />
+        <CardQuestion id="conviction" />
         <CardHeader text={output.cardHeader} />
       </>
     );
@@ -277,6 +369,12 @@ export default function ShapeCard(props: Props) {
           <CellLabel>Posture</CellLabel>
           <CellBody text={output.posture} />
         </div>
+        {/* CC-SYNTHESIS-1-FINISH Section E — Conviction Movement Note
+            (Speech-risk pattern under cost). Between Posture and the
+            Pattern Note italic closer. */}
+        {synthesisLine && synthesisLine.length > 0 ? (
+          <SynthesisParagraph text={synthesisLine} />
+        ) : null}
         {patternNoteText ? (
           <Cell label="Pattern Note" text={patternNoteText} variant="aphorism" />
         ) : null}
@@ -316,10 +414,11 @@ export default function ShapeCard(props: Props) {
   }
 
   // ── path ───────────────────────────────────────────────────────
-  const { output } = props;
+  const { output, pathMasterSynthesis } = props;
   const header = (
     <>
       <CardKicker name={output.cardName} bodyPart={output.bodyPart} />
+      <CardQuestion id="path" />
       <CardHeader text="how this shape moves through work, love, and giving" />
     </>
   );
@@ -329,7 +428,10 @@ export default function ShapeCard(props: Props) {
 
   const body = (
     <div className="flex flex-col" style={{ gap: 22 }}>
-      <PathExpanded output={output} />
+      <PathExpanded
+        output={output}
+        masterSynthesisOverride={pathMasterSynthesis}
+      />
       {pathPatternNoteText ? (
         <Cell label="Pattern Note" text={pathPatternNoteText} variant="aphorism" />
       ) : null}

@@ -355,6 +355,50 @@ export const questions: Question[] = [
       { id: "fi", label: "Voice D", voice: "Voice D", quote: `"I want to honor what this feels like from inside their life. I don't want to rush past the meaning of it just to make myself useful."`, example: "I want to honor what this actually means to them before I do anything that's really about my own need to be helpful.", signal: "fi" },
     ],
   },
+  // ── CC-Q1 — OCEAN direct-measurement (Q-O1 + Q-O2) ─────────────────────
+  //
+  // Bundle 1 of the question-additions chain (docs/question-bank-additions-
+  // spec.md §2 Bundle 1). Both questions ride the existing `temperament`
+  // survey card_id, which routes to the `lens` shape card via
+  // SURVEY_CARD_TO_SHAPE_CARD. Q-O1 closes the Novelty thinness gap that
+  // CC-072 surfaced (Novelty thin in 5/6 designed fixtures); Q-O2 closes
+  // the proxyOnly default state CC-072 surfaced (ER proxy in 6/6
+  // fixtures). Both add direct measurement to subdimensions / intensities
+  // that the engine was previously inferring from indirect proxy signals.
+  // Per Out-of-Scope §6/§7 of the spec memo, the new signals do NOT change
+  // OCEAN intensity multipliers (INTENSITY_K) and do NOT tag into Drive
+  // bucket distribution.
+  {
+    question_id: "Q-O1",
+    card_id: "temperament",
+    type: "ranking",
+    text: "What kind of new are you most drawn toward?",
+    helper: "Rank from most pull to least.",
+    items: [
+      { id: "intellectual",          label: "New ideas, models, theories, or frameworks.",       gloss: "the pull toward fresh conceptual territory.",                            signal: "openness_intellectual"    },
+      { id: "aesthetic",             label: "New beauty, music, design, language, or atmosphere.", gloss: "the pull toward sensory richness, mood, expressive form.",            signal: "openness_aesthetic"       },
+      { id: "perspective",           label: "New people, cultures, or perspectives.",            gloss: "the pull toward other minds, other ways of being.",                      signal: "openness_perspective"     },
+      { id: "experiential",          label: "New experiences, places, tools, or methods.",       gloss: "the pull toward firsthand novelty — places, practices, methods.",       signal: "openness_experiential"    },
+      { id: "emotional",             label: "New emotional honesty or self-understanding.",      gloss: "the pull toward inner discovery — feeling registers, self-knowledge.",   signal: "openness_emotional"       },
+      { id: "low_novelty_preference", label: "I prefer what is tested, familiar, and proven.",   gloss: "the pull toward stability and the proven over novelty.",                 signal: "low_novelty_preference"   },
+    ],
+  },
+  {
+    question_id: "Q-O2",
+    card_id: "temperament",
+    type: "ranking",
+    text: "When the stakes rise, your inner state usually becomes:",
+    helper: "Rank from most-true to least.",
+    items: [
+      { id: "low_reactivity_focus",     label: "Sharper and more focused.",                  gloss: "stakes-rising sharpens attention and steadies the system.",            signal: "low_reactivity_focus"     },
+      { id: "anxious_reactivity",       label: "Anxious or restless.",                       gloss: "stakes-rising surfaces an active, mobile worry register.",             signal: "anxious_reactivity"       },
+      { id: "anger_reactivity",         label: "Angry or reactive.",                         gloss: "stakes-rising surfaces an outward, action-edged charge.",              signal: "anger_reactivity"         },
+      { id: "detached_reactivity",      label: "Numb, analytical, or detached.",             gloss: "stakes-rising shifts you into a cooler, distanced register.",          signal: "detached_reactivity"      },
+      { id: "overwhelmed_functioning",  label: "Overwhelmed but still functional.",          gloss: "stakes-rising loads the system; you keep moving while loaded.",        signal: "overwhelmed_functioning"  },
+      { id: "hidden_reactivity",        label: "Calm on the outside, intense inside.",       gloss: "stakes-rising stays internal — surface composure, inner intensity.",   signal: "hidden_reactivity"        },
+      { id: "avoidant_reactivity",      label: "Avoidant; I look for distraction or escape.", gloss: "stakes-rising pulls you toward distance, distraction, or escape.",   signal: "avoidant_reactivity"      },
+    ],
+  },
   // ── CC-016 — Allocation Layer (Money + Energy) ─────────────────────────
   {
     question_id: "Q-S3-close",
@@ -420,6 +464,98 @@ export const questions: Question[] = [
     text: "When outward energy and inward energy compete for the same hour, which actually wins?",
     helper: "Your top picks from the previous two rankings. Rank in resolved priority.",
   },
+  // ── CC-Q2 — Movement-layer direct measurement ─────────────────────────
+  //
+  // Bundle 2 of the question-additions chain (docs/question-bank-additions-
+  // spec.md §2 Bundle 2). Three questions cross-cut multiple composites:
+  //
+  //   - Q-GS1  (sacred / Compass)    — Goal vs Soul calibration
+  //   - Q-V1   (conviction)          — Vulnerability / open-hand register
+  //   - Q-GRIP1 (pressure)           — direct Gripping Pull self-report
+  //
+  // Per spec memo §3 wiring + §6 consumption: signals feed Goal / Soul /
+  // Vulnerability / Gripping Pull composites in lib/goalSoulGive.ts. Drive
+  // bucket tagging is limited to `security_freedom_signal` (multi-tagged
+  // cost+compliance); Q-3C2 lands in CC-Q3.
+  {
+    question_id: "Q-GS1",
+    card_id: "sacred",
+    type: "ranking",
+    text: "When a major effort succeeds, what makes it feel most worth it?",
+    helper: "Rank from most-true to least. The model reads direction, not moral quality.",
+    items: [
+      { id: "goal_completion",  label: "The goal was reached.",                          gloss: "the win lands on the metric you set, the result you aimed at.",                       signal: "goal_completion_signal"  },
+      { id: "soul_people",      label: "It helped people I care about.",                 gloss: "the win lands on the people whose well-being mattered to you.",                       signal: "soul_people_signal"      },
+      { id: "soul_calling",     label: "It served something larger than me.",            gloss: "the win lands on a cause, calling, or commitment beyond personal benefit.",          signal: "soul_calling_signal"     },
+      { id: "gripping_proof",   label: "It proved I was capable.",                       gloss: "the win settles a question about your own capacity.",                                 signal: "gripping_proof_signal"   },
+      { id: "security_freedom", label: "It created security or freedom.",                gloss: "the win lands on margin — financial cushion, optionality, room to choose.",          signal: "security_freedom_signal" },
+      { id: "creative_truth",   label: "It expressed something true that needed form.",  gloss: "the win lands on giving structure to something that was already real inside.",       signal: "creative_truth_signal"   },
+      { id: "durable_creation", label: "It created something beautiful, useful, or durable.", gloss: "the win lands on the made thing — what now exists in the world that didn't.",   signal: "durable_creation_signal" },
+    ],
+  },
+  {
+    question_id: "Q-V1",
+    card_id: "conviction",
+    type: "ranking",
+    text: "When someone asks why your work really matters, what are you most likely to do?",
+    helper: "Rank from most-likely to least.",
+    items: [
+      { id: "goal_logic_explanation",    label: "Explain the logic, model, or structure.",            gloss: "you reach for the reasoning — the structure that makes it make sense.",          signal: "goal_logic_explanation"        },
+      { id: "soul_beloved_named",        label: "Name the person, people, or cause it serves.",       gloss: "you name the recipient — the one your work is for.",                              signal: "soul_beloved_named"            },
+      { id: "vulnerability_open_uncertainty", label: "Admit I am still trying to understand that.", gloss: "you stay with the open question rather than performing a settled answer.",       signal: "vulnerability_open_uncertainty" },
+      { id: "vulnerability_deflection",  label: "Deflect, because it feels too personal.",            gloss: "you redirect the question; the meaning lives somewhere private.",                  signal: "vulnerability_deflection"      },
+      { id: "performance_identity",      label: "Say the results should speak for themselves.",       gloss: "you point at the output rather than naming the why.",                              signal: "performance_identity"          },
+      { id: "sacred_belief_connection",  label: "Tie it to a belief I would bear cost to protect.",   gloss: "you connect the work to a conviction you'd pay to keep.",                          signal: "sacred_belief_connection"      },
+    ],
+  },
+  {
+    question_id: "Q-GRIP1",
+    card_id: "pressure",
+    type: "ranking",
+    text: "Under pressure, what do you most tend to grip?",
+    helper: "Rank from most-true to least. The model reads pattern, not judgment.",
+    items: [
+      { id: "grips_control",     label: "Control.",                                            gloss: "tightening the reins on what's happening — schedules, decisions, the field.",         signal: "grips_control"     },
+      { id: "grips_security",    label: "Money or security.",                                  gloss: "moving toward the financial cushion or the safer path.",                              signal: "grips_security"    },
+      { id: "grips_reputation",  label: "Reputation.",                                         gloss: "managing how this looks to others — standing, optics, position.",                    signal: "grips_reputation"  },
+      { id: "grips_certainty",   label: "Being right.",                                        gloss: "holding to the answer — the position you arrived at, even when challenged.",          signal: "grips_certainty"   },
+      { id: "grips_neededness",  label: "Being needed.",                                       gloss: "holding the role of indispensability — the one others can't do without.",            signal: "grips_neededness"  },
+      { id: "grips_comfort",     label: "Comfort or escape.",                                  gloss: "moving toward the soft register — distraction, ease, the off-switch.",                signal: "grips_comfort"     },
+      { id: "grips_old_plan",    label: "A plan that used to work.",                           gloss: "running the previously-validated playbook past its season.",                          signal: "grips_old_plan"    },
+      { id: "grips_approval",    label: "The approval of people I do not want to disappoint.", gloss: "tracking the read of specific others — the people whose disappointment costs.",     signal: "grips_approval"    },
+    ],
+  },
+  // ── CC-Q4 — Love translation question (Q-L1) ──────────────────────────
+  //
+  // Bundle 4 of the question-additions chain (docs/question-bank-additions-
+  // spec.md §2 Bundle 4). Closes the Love Map measurement gap — the
+  // existing flavor matchers infer love-expression style from indirect
+  // signals (Q-S2, Q-S3, Q-X4, etc.); Q-L1 anchors the read directly by
+  // asking how the user's love becomes visible to the people closest to
+  // them. Card: `sacred` (Compass-anchored; pairs with Q-S1, Q-S2).
+  // Type: ranking, top 2 preferred.
+  //
+  // Per spec memo §3 wiring: each item maps to a Love Map flavor (or
+  // composite). The 7 new signals feed the existing flavor predicates as
+  // PRIMARY direct measurement; the existing inferred-from-Q-S2/Q-X4
+  // signal contributions stay as supporting context. Q-L1 signals do NOT
+  // tag Drive distribution (per spec memo §4).
+  {
+    question_id: "Q-L1",
+    card_id: "sacred",
+    type: "ranking",
+    text: "The people closest to you are most likely to know you love them because you:",
+    helper: "Rank from most-true to least.",
+    items: [
+      { id: "presence",          label: "Stay present over time.",                                       gloss: "the durability register — your love shows up as showing up, season after season.",                          signal: "love_presence"          },
+      { id: "problem_solving",   label: "Solve problems that burden them.",                              gloss: "the practical register — your love shows up as removing what's heavy from their day.",                       signal: "love_problem_solving"   },
+      { id: "verbal_expression", label: "Say what they mean to you.",                                    gloss: "the spoken register — your love shows up in naming, telling them directly what you see.",                    signal: "love_verbal_expression" },
+      { id: "protection",        label: "Protect them from risk or harm.",                               gloss: "the guardian register — your love shows up as standing between them and what could hurt them.",              signal: "love_protection"        },
+      { id: "co_construction",   label: "Build conditions where they can flourish.",                     gloss: "the co-construction register — your love shows up as making the ground where they can grow.",                signal: "love_co_construction"   },
+      { id: "quiet_sacrifice",   label: "Sacrifice quietly without making it visible.",                  gloss: "the silent register — your love shows up as bearing cost without naming it.",                                signal: "love_quiet_sacrifice"   },
+      { id: "shared_experience", label: "Create beauty, humor, or shared experience with them.",        gloss: "the shared-aliveness register — your love shows up as making moments to be alive together.",                signal: "love_shared_experience" },
+    ],
+  },
   {
     // CC-024 — Q-Stakes1. Compass card extension: concrete stakes ranking.
     // Pairs with Q-S1/Q-S2 (abstract sacred values) to give Compass a second
@@ -476,6 +612,39 @@ export const questions: Question[] = [
       // ("coverage_drive") are canon-locked.
       { id: "coverage",   label: "Caring for people, service, and society", gloss: "the people you love, the work you give, and the world you contribute to.", signal: "coverage_drive"   },
       { id: "compliance", label: "Managing risk and uncertainty",    gloss: "guarding against loss, protecting what could be taken.", signal: "compliance_drive" },
+    ],
+  },
+  {
+    // CC-Q3 — Q-3C2 revealed Drive priority under crowding. Pairs with
+    // Q-3C1 (claimed Drive). Where Q-3C1 captures *what guides you when
+    // you have to choose*, Q-3C2 captures *what your behavior protects
+    // first when life gets crowded* — the revealed-drive register that
+    // Q-3C1's claimed-drive ranking cross-checks against. Direct
+    // measurement on both sides sharpens the CC-083 DriveCase classifier.
+    //
+    // Per spec memo §4, the 6 items map to Drive buckets:
+    //   - revealed_cost_priority → Cost
+    //   - revealed_coverage_priority → Coverage
+    //   - revealed_compliance_priority → Compliance
+    //   - revealed_goal_priority → Cost (50%) + Coverage (50%)
+    //   - revealed_recovery_priority → Compliance (50%) + Coverage (50%)
+    //   - revealed_reputation_priority → Cost (75%) + Compliance (25%)
+    //
+    // The 75/25 asymmetric split is canon-locked at this question; the
+    // implementation extends MULTI_TAG_SPLITS in lib/drive.ts with an
+    // asymmetric variant for this single signal.
+    question_id: "Q-3C2",
+    card_id: "role",
+    type: "ranking",
+    text: "When life gets crowded, what do you protect first in practice?",
+    helper: "Rank from most-protected to least. The model reads behavior, not intention.",
+    items: [
+      { id: "cost_priority",       label: "Money, margin, and financial options.",                  gloss: "what you protect when the calendar gets tight — the financial floor and optionality.",                                  signal: "revealed_cost_priority"       },
+      { id: "coverage_priority",   label: "Time and presence with people who depend on me.",        gloss: "what you protect when bandwidth gets thin — relational presence with the specific people who count on you.",            signal: "revealed_coverage_priority"   },
+      { id: "compliance_priority", label: "Safety, rules, risk control, and avoiding exposure.",    gloss: "what you protect against — the loss-mitigation register, rules followed, exposure avoided.",                              signal: "revealed_compliance_priority" },
+      { id: "goal_priority",       label: "Progress on the thing I am building.",                   gloss: "what you protect when crowded — forward motion on the project / arc you're carrying.",                                    signal: "revealed_goal_priority"       },
+      { id: "recovery_priority",   label: "Rest, health, and recovery.",                            gloss: "what you protect when depleted — sleep, the body, the recovery that lets you keep going.",                                  signal: "revealed_recovery_priority"   },
+      { id: "reputation_priority", label: "Reputation or standing with important people.",          gloss: "what you protect against being seen badly — how this looks to specific people whose read of you matters.",                signal: "revealed_reputation_priority" },
     ],
   },
   {
