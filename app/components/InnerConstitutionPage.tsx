@@ -152,6 +152,12 @@ export default function InnerConstitutionPage({
   // brief inline confirmation after navigator.clipboard.writeText.
   const [includeBeliefAnchor, setIncludeBeliefAnchor] = useState(true);
   const [copiedFlash, setCopiedFlash] = useState(false);
+  // CC-LLM-RENDER-PRODUCTION-POLISH — visible loading state on the
+  // share buttons. Set true while `/api/render` is resolving; set false
+  // on success / failure / 30s safety timeout. Disables the button +
+  // swaps the label so the user knows work is happening server-side.
+  const [isCopying, setIsCopying] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   // CC-REACT-ON-SCREEN-LLM-RENDER — on-screen LLM rewrites for the four
   // scoped body cards + Keystone. Initial render uses engine prose (the
@@ -168,7 +174,9 @@ export default function InnerConstitutionPage({
     path: string | null;
     keystone: string | null;
   }>({ lens: null, compass: null, hands: null, path: null, keystone: null });
-  const [liveRewritesResolving, setLiveRewritesResolving] = useState(true);
+  // CC-LLM-RENDER-PRODUCTION-POLISH — no `liveRewritesResolving` flag.
+  // Engine prose is the visible default; the LLM swap happens silently
+  // once the fetch resolves. No "refining…" kicker on the card surface.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -178,10 +186,7 @@ export default function InnerConstitutionPage({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ answers, demographics }),
         });
-        if (!res.ok) {
-          if (!cancelled) setLiveRewritesResolving(false);
-          return;
-        }
+        if (!res.ok) return;
         const body = (await res.json()) as {
           lens?: string | null;
           compass?: string | null;
@@ -197,12 +202,10 @@ export default function InnerConstitutionPage({
           path: body.path ?? null,
           keystone: body.keystone ?? null,
         });
-        setLiveRewritesResolving(false);
       } catch (e) {
         console.warn(
           `[on-screen-llm-render] /api/report-cards fetch failed: ${(e as Error).message}`
         );
-        if (!cancelled) setLiveRewritesResolving(false);
       }
     })();
     return () => {
@@ -242,32 +245,77 @@ export default function InnerConstitutionPage({
     }
   }
 
+  // CC-LLM-RENDER-PRODUCTION-POLISH — 30 s safety timeout so a stuck
+  // fetch never leaves the button stuck in a "Generating…" state. If
+  // the server is genuinely slow, the user sees the button revert and
+  // can retry; we'd rather degrade visibly than appear hung.
+  const LIVE_MARKDOWN_SAFETY_MS = 30_000;
+  function withSafetyTimeout<T>(p: Promise<T>): Promise<T | null> {
+    return new Promise<T | null>((resolve) => {
+      let settled = false;
+      const t = window.setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          resolve(null);
+        }
+      }, LIVE_MARKDOWN_SAFETY_MS);
+      p.then(
+        (v) => {
+          if (!settled) {
+            settled = true;
+            window.clearTimeout(t);
+            resolve(v);
+          }
+        },
+        () => {
+          if (!settled) {
+            settled = true;
+            window.clearTimeout(t);
+            resolve(null);
+          }
+        }
+      );
+    });
+  }
+
   async function handleCopyMarkdown() {
-    const md = await fetchLiveMarkdown();
-    if (!md) return;
+    if (isCopying) return;
+    setIsCopying(true);
     try {
-      await navigator.clipboard.writeText(md);
-      setCopiedFlash(true);
-      window.setTimeout(() => setCopiedFlash(false), 2000);
-    } catch {
-      // Clipboard write can fail in sandboxed iframes or non-secure
-      // contexts. Surface a soft fallback by leaving copiedFlash false
-      // and letting the user fall back to Download.
+      const md = await withSafetyTimeout(fetchLiveMarkdown());
+      if (!md) return;
+      try {
+        await navigator.clipboard.writeText(md);
+        setCopiedFlash(true);
+        window.setTimeout(() => setCopiedFlash(false), 2000);
+      } catch {
+        // Clipboard write can fail in sandboxed iframes or non-secure
+        // contexts. Surface a soft fallback by leaving copiedFlash false
+        // and letting the user fall back to Download.
+      }
+    } finally {
+      setIsCopying(false);
     }
   }
 
   async function handleDownloadMarkdown() {
-    const md = await fetchLiveMarkdown();
-    if (!md) return;
-    const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = buildFilename(demographics, sessionDate);
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    if (isDownloading) return;
+    setIsDownloading(true);
+    try {
+      const md = await withSafetyTimeout(fetchLiveMarkdown());
+      if (!md) return;
+      const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = buildFilename(demographics, sessionDate);
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } finally {
+      setIsDownloading(false);
+    }
   }
 
   function setStatus(tension_id: string, status: TensionStatus) {
@@ -992,7 +1040,6 @@ export default function InnerConstitutionPage({
           constitution={constitution}
           demographics={demographics}
           liveScopedRewrites={liveScopedRewrites}
-          liveRewritesResolving={liveRewritesResolving}
         />
 
         {/* CC-SYNTHESIS-1-FINISH Section A — Growth Path section removed
@@ -1130,6 +1177,8 @@ export default function InnerConstitutionPage({
               <button
                 type="button"
                 onClick={handleCopyMarkdown}
+                disabled={isCopying}
+                aria-busy={isCopying}
                 data-focus-ring
                 className="font-mono uppercase"
                 style={{
@@ -1137,18 +1186,21 @@ export default function InnerConstitutionPage({
                   letterSpacing: "0.08em",
                   padding: "10px 16px",
                   background: "transparent",
-                  color: "var(--ink)",
+                  color: isCopying ? "var(--ink-mute)" : "var(--ink)",
                   border: "1px solid var(--rule)",
                   borderRadius: 6,
-                  cursor: "pointer",
+                  cursor: isCopying ? "wait" : "pointer",
                   minHeight: 40,
+                  opacity: isCopying ? 0.7 : 1,
                 }}
               >
-                Copy as Markdown
+                {isCopying ? "Generating…" : "Copy as Markdown"}
               </button>
               <button
                 type="button"
                 onClick={handleDownloadMarkdown}
+                disabled={isDownloading}
+                aria-busy={isDownloading}
                 data-focus-ring
                 className="font-mono uppercase"
                 style={{
@@ -1156,14 +1208,15 @@ export default function InnerConstitutionPage({
                   letterSpacing: "0.08em",
                   padding: "10px 16px",
                   background: "transparent",
-                  color: "var(--ink)",
+                  color: isDownloading ? "var(--ink-mute)" : "var(--ink)",
                   border: "1px solid var(--rule)",
                   borderRadius: 6,
-                  cursor: "pointer",
+                  cursor: isDownloading ? "wait" : "pointer",
                   minHeight: 40,
+                  opacity: isDownloading ? 0.7 : 1,
                 }}
               >
-                Download Markdown
+                {isDownloading ? "Generating…" : "Download Markdown"}
               </button>
               {copiedFlash ? (
                 <span

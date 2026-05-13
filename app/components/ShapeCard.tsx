@@ -71,10 +71,11 @@ type CommonAccordionProps = {
   // stay the same. Only the scoped body cards (Lens / Compass) pass
   // this prop; the others (Conviction, Gravity, Trust, Weather, Fire)
   // are out of LLM-rewrite scope and remain engine-prose-only.
+  //
+  // CC-LLM-RENDER-PRODUCTION-POLISH — the prior "refining…" kicker
+  // prop (`llmResolving`) was removed. Engine prose is the visible
+  // default until the rewrite arrives; the swap happens silently.
   llmRewriteMarkdown?: string | null;
-  // CC-REACT-ON-SCREEN-LLM-RENDER — small italic kicker shown when the
-  // /api/report-cards fetch is in flight. Engine prose still renders.
-  llmResolving?: boolean;
 };
 
 type Props =
@@ -292,25 +293,13 @@ export default function ShapeCard(props: Props) {
 
   // ── full-swot ──────────────────────────────────────────────────
   if (props.variant === "full-swot") {
-    const { output, mbtiSlot, synthesisLine, llmRewriteMarkdown, llmResolving } = props;
+    const { output, mbtiSlot, synthesisLine, llmRewriteMarkdown } = props;
     const cardId = output.cardName.toLowerCase() as ShapeCardId;
     const header = (
       <>
         <CardKicker name={output.cardName} bodyPart={output.bodyPart} />
         <CardQuestion id={cardId} />
         <CardHeader text={output.cardHeader} />
-        {llmResolving && !llmRewriteMarkdown ? (
-          <p
-            style={{
-              fontSize: 11,
-              fontStyle: "italic",
-              color: "var(--ink-mute, #888)",
-              margin: 0,
-            }}
-          >
-            refining…
-          </p>
-        ) : null}
       </>
     );
 
@@ -454,24 +443,12 @@ export default function ShapeCard(props: Props) {
   }
 
   // ── path ───────────────────────────────────────────────────────
-  const { output, pathMasterSynthesis, llmRewriteMarkdown, llmResolving } = props;
+  const { output, pathMasterSynthesis, llmRewriteMarkdown } = props;
   const header = (
     <>
       <CardKicker name={output.cardName} bodyPart={output.bodyPart} />
       <CardQuestion id="path" />
       <CardHeader text="how this shape moves through work, love, and giving" />
-      {llmResolving && !llmRewriteMarkdown ? (
-        <p
-          style={{
-            fontSize: 11,
-            fontStyle: "italic",
-            color: "var(--ink-mute, #888)",
-            margin: 0,
-          }}
-        >
-          refining…
-        </p>
-      ) : null}
     </>
   );
 

@@ -45,6 +45,11 @@ type Props = {
   // card body renders the LLM rewrite via `<LlmProseBlock>` instead of
   // the engine-prose structured fields. When null (pending / failed /
   // miss), the existing engine-prose render stays.
+  //
+  // CC-LLM-RENDER-PRODUCTION-POLISH — the prior `liveRewritesResolving`
+  // prop (which threaded a "refining…" kicker into the body cards) was
+  // removed. Engine prose is the visible default; the LLM swap is
+  // silent.
   liveScopedRewrites?: {
     lens: string | null;
     compass: string | null;
@@ -52,9 +57,6 @@ type Props = {
     path: string | null;
     keystone: string | null;
   };
-  // CC-REACT-ON-SCREEN-LLM-RENDER — show a subtle "refining…" hint on
-  // scoped card headers while the fetch is in flight.
-  liveRewritesResolving?: boolean;
 };
 
 const CARD_KEYS = [
@@ -75,7 +77,6 @@ export default function MapSection({
   mbtiSlot,
   demographics,
   liveScopedRewrites,
-  liveRewritesResolving,
 }: Props) {
   const [expanded, setExpanded] = useState<Record<CardKey, boolean>>({
     lens: false,
@@ -280,7 +281,6 @@ export default function MapSection({
         onToggle={() => toggle("lens")}
         synthesisLine={synthLines.lens}
         llmRewriteMarkdown={liveScopedRewrites?.lens ?? null}
-        llmResolving={liveRewritesResolving}
       />
       <CrossCardPatternBlock
         cardId="lens"
@@ -296,7 +296,6 @@ export default function MapSection({
         onToggle={() => toggle("compass")}
         synthesisLine={synthLines.compass}
         llmRewriteMarkdown={liveScopedRewrites?.compass ?? null}
-        llmResolving={liveRewritesResolving}
       />
       {/* CC-054 — Peace + Faith cross-signal disambiguation. Renders
           inside the expanded Compass card body (gated on expanded.compass)
@@ -388,18 +387,6 @@ export default function MapSection({
           >
             What you build and carry
           </p>
-          {liveRewritesResolving && !liveScopedRewrites?.hands ? (
-            <p
-              style={{
-                fontSize: 11,
-                fontStyle: "italic",
-                margin: 0,
-                color: "var(--ink-mute, #888)",
-              }}
-            >
-              refining…
-            </p>
-          ) : null}
           {/* CC-REACT-ON-SCREEN-LLM-RENDER — when the LLM rewrite is
               available, the entire structured body (opener / Strength /
               Growth Edge / Under Pressure / Practice / movementNote /
@@ -530,7 +517,6 @@ export default function MapSection({
         onToggle={() => toggle("path")}
         pathMasterSynthesis={synthLines.pathMaster}
         llmRewriteMarkdown={liveScopedRewrites?.path ?? null}
-        llmResolving={liveRewritesResolving}
       />
       <CrossCardPatternBlock
         cardId="path"
