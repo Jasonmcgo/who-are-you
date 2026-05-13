@@ -43,6 +43,11 @@ type Props = {
   demographics?: DemographicSet | null;
   answers?: Answer[];
   constitution?: InnerConstitution;
+  // CC-REACT-ON-SCREEN-LLM-RENDER — when set, overrides the committed-
+  // cache keystone lookup. Live users whose belief misses the cohort
+  // cache get their on-demand-resolved keystone prose surfaced
+  // on-screen, matching what the markdown export already produces.
+  liveKeystoneRewriteProse?: string | null;
 };
 
 function SectionLabel({ children }: { children: ReactNode }) {
@@ -180,6 +185,7 @@ export default function MirrorSection({
   demographics,
   answers,
   constitution,
+  liveKeystoneRewriteProse,
 }: Props) {
   // CC-025 Step 2.6 — pronoun register pinned to second-person throughout
   // the Mirror body. The Synthesis section (rendered separately below) keeps
@@ -218,7 +224,14 @@ export default function MirrorSection({
   // CC-KEYSTONE-RENDER — read the LLM Keystone rewrite from cache when
   // belief is present + engine inputs derivable. Cache miss falls through
   // (KeystoneReflection renders the legacy metadata+prose path).
+  //
+  // CC-REACT-ON-SCREEN-LLM-RENDER — when the parent passes
+  // `liveKeystoneRewriteProse` (from the `/api/report-cards` fetch), it
+  // takes precedence over the local committed-cache lookup. This is
+  // how live sessions whose belief misses the cohort cache get LLM
+  // prose on-screen — same content the markdown export already shows.
   const keystoneRewriteProse: string | null = (() => {
+    if (liveKeystoneRewriteProse) return liveKeystoneRewriteProse;
     if (!belief || !constitution) return null;
     const topCompassRefs = getTopCompassValues(constitution.signals);
     const topCompassValueLabels = topCompassRefs

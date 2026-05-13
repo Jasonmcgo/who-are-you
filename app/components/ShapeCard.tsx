@@ -12,6 +12,7 @@ import {
 } from "../../lib/identityEngine";
 import { SHAPE_CARD_QUESTION } from "../../lib/cardAssets";
 import PathExpanded from "./PathExpanded";
+import LlmProseBlock from "./LlmProseBlock";
 
 // Pre-CC-025 saved sessions don't carry patternNote on output. Map cardName
 // back to ShapeCardId so the render layer can fall back to the canonical
@@ -64,6 +65,16 @@ type CommonAccordionProps = {
   // Weather gets State-vs-Shape qualifier (Section C); Conviction gets
   // its own Movement Note (Section E).
   synthesisLine?: string | null;
+  // CC-REACT-ON-SCREEN-LLM-RENDER — when set, the body is rendered
+  // from the LLM rewrite markdown instead of the engine-prose cells
+  // (Strength / Growth Edge / Practice). Header + accordion behavior
+  // stay the same. Only the scoped body cards (Lens / Compass) pass
+  // this prop; the others (Conviction, Gravity, Trust, Weather, Fire)
+  // are out of LLM-rewrite scope and remain engine-prose-only.
+  llmRewriteMarkdown?: string | null;
+  // CC-REACT-ON-SCREEN-LLM-RENDER — small italic kicker shown when the
+  // /api/report-cards fetch is in flight. Engine prose still renders.
+  llmResolving?: boolean;
 };
 
 type Props =
@@ -281,20 +292,49 @@ export default function ShapeCard(props: Props) {
 
   // ── full-swot ──────────────────────────────────────────────────
   if (props.variant === "full-swot") {
-    const { output, mbtiSlot, synthesisLine } = props;
+    const { output, mbtiSlot, synthesisLine, llmRewriteMarkdown, llmResolving } = props;
     const cardId = output.cardName.toLowerCase() as ShapeCardId;
     const header = (
       <>
         <CardKicker name={output.cardName} bodyPart={output.bodyPart} />
         <CardQuestion id={cardId} />
         <CardHeader text={output.cardHeader} />
+        {llmResolving && !llmRewriteMarkdown ? (
+          <p
+            style={{
+              fontSize: 11,
+              fontStyle: "italic",
+              color: "var(--ink-mute, #888)",
+              margin: 0,
+            }}
+          >
+            refining…
+          </p>
+        ) : null}
       </>
     );
 
     const patternNoteText =
       output.patternNote?.text ?? patternNoteFromCardName(output.cardName);
 
-    const body = (
+    // CC-REACT-ON-SCREEN-LLM-RENDER — when the LLM rewrite is
+    // available, render its markdown in place of the structured
+    // Strength / Growth Edge / Practice cells. Pattern Note + synthesis
+    // line still render after, preserving the per-card structural
+    // close. The Cell-based engine-prose body falls through when the
+    // rewrite is null (pending, failed, or out-of-scope card).
+    const body = llmRewriteMarkdown ? (
+      <div className="flex flex-col" style={{ gap: 22 }}>
+        {mbtiSlot}
+        <LlmProseBlock markdown={llmRewriteMarkdown} />
+        {synthesisLine && synthesisLine.length > 0 ? (
+          <SynthesisParagraph text={synthesisLine} />
+        ) : null}
+        {patternNoteText ? (
+          <Cell label="Pattern Note" text={patternNoteText} variant="aphorism" />
+        ) : null}
+      </div>
+    ) : (
       <div className="flex flex-col" style={{ gap: 22 }}>
         {mbtiSlot}
         <Cell label="Strength" text={output.gift.text} />
@@ -414,19 +454,41 @@ export default function ShapeCard(props: Props) {
   }
 
   // ── path ───────────────────────────────────────────────────────
-  const { output, pathMasterSynthesis } = props;
+  const { output, pathMasterSynthesis, llmRewriteMarkdown, llmResolving } = props;
   const header = (
     <>
       <CardKicker name={output.cardName} bodyPart={output.bodyPart} />
       <CardQuestion id="path" />
       <CardHeader text="how this shape moves through work, love, and giving" />
+      {llmResolving && !llmRewriteMarkdown ? (
+        <p
+          style={{
+            fontSize: 11,
+            fontStyle: "italic",
+            color: "var(--ink-mute, #888)",
+            margin: 0,
+          }}
+        >
+          refining…
+        </p>
+      ) : null}
     </>
   );
 
   const pathPatternNoteText =
     output.patternNote ?? patternNoteFromCardName(output.cardName);
 
-  const body = (
+  // CC-REACT-ON-SCREEN-LLM-RENDER — when the LLM rewrite is available,
+  // replace the engine PathExpanded body with the LlmProseBlock. The
+  // Pattern Note still renders below as a structural close.
+  const body = llmRewriteMarkdown ? (
+    <div className="flex flex-col" style={{ gap: 22 }}>
+      <LlmProseBlock markdown={llmRewriteMarkdown} />
+      {pathPatternNoteText ? (
+        <Cell label="Pattern Note" text={pathPatternNoteText} variant="aphorism" />
+      ) : null}
+    </div>
+  ) : (
     <div className="flex flex-col" style={{ gap: 22 }}>
       <PathExpanded
         output={output}

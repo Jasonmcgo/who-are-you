@@ -8,6 +8,7 @@ import type {
   PathOutput,
 } from "../../lib/types";
 import ShapeCard from "./ShapeCard";
+import LlmProseBlock from "./LlmProseBlock";
 import {
   ageWeatherHook,
   detectCrossCardPatterns,
@@ -39,6 +40,21 @@ type Props = {
   // interpolation (profession hook on Path Work; marital hook on Love;
   // age hook on Weather), and cross-card pattern prose insertion.
   demographics?: DemographicSet | null;
+  // CC-REACT-ON-SCREEN-LLM-RENDER — LLM-resolved per-section markdown
+  // for the four scoped body cards. When a card's slot is set, the
+  // card body renders the LLM rewrite via `<LlmProseBlock>` instead of
+  // the engine-prose structured fields. When null (pending / failed /
+  // miss), the existing engine-prose render stays.
+  liveScopedRewrites?: {
+    lens: string | null;
+    compass: string | null;
+    hands: string | null;
+    path: string | null;
+    keystone: string | null;
+  };
+  // CC-REACT-ON-SCREEN-LLM-RENDER — show a subtle "refining…" hint on
+  // scoped card headers while the fetch is in flight.
+  liveRewritesResolving?: boolean;
 };
 
 const CARD_KEYS = [
@@ -58,6 +74,8 @@ export default function MapSection({
   constitution,
   mbtiSlot,
   demographics,
+  liveScopedRewrites,
+  liveRewritesResolving,
 }: Props) {
   const [expanded, setExpanded] = useState<Record<CardKey, boolean>>({
     lens: false,
@@ -261,6 +279,8 @@ export default function MapSection({
         expanded={expanded.lens}
         onToggle={() => toggle("lens")}
         synthesisLine={synthLines.lens}
+        llmRewriteMarkdown={liveScopedRewrites?.lens ?? null}
+        llmResolving={liveRewritesResolving}
       />
       <CrossCardPatternBlock
         cardId="lens"
@@ -275,6 +295,8 @@ export default function MapSection({
         expanded={expanded.compass}
         onToggle={() => toggle("compass")}
         synthesisLine={synthLines.compass}
+        llmRewriteMarkdown={liveScopedRewrites?.compass ?? null}
+        llmResolving={liveRewritesResolving}
       />
       {/* CC-054 — Peace + Faith cross-signal disambiguation. Renders
           inside the expanded Compass card body (gated on expanded.compass)
@@ -366,31 +388,55 @@ export default function MapSection({
           >
             What you build and carry
           </p>
-          <p style={{ fontStyle: "italic", margin: 0, lineHeight: 1.55 }}>
-            {constitution.handsCard.openingLine}
-          </p>
-          <p style={{ margin: 0, lineHeight: 1.55 }}>
-            <strong>Strength</strong> — {constitution.handsCard.strength}
-          </p>
-          <p style={{ margin: 0, lineHeight: 1.55 }}>
-            <strong>Growth Edge</strong> —{" "}
-            {constitution.handsCard.growthEdge}
-          </p>
-          <p style={{ margin: 0, lineHeight: 1.55 }}>
-            <strong>Under Pressure</strong> — In health:{" "}
-            {constitution.handsCard.underPressure.healthRegister} Under load:{" "}
-            {constitution.handsCard.underPressure.pressureRegister}{" "}
-            {constitution.handsCard.underPressure.integrationLine}
-          </p>
-          <p style={{ margin: 0, lineHeight: 1.55 }}>
-            <strong>Practice</strong> — {constitution.handsCard.practice}
-          </p>
-          <p style={{ fontStyle: "italic", margin: 0, lineHeight: 1.55 }}>
-            {constitution.handsCard.movementNote}
-          </p>
-          <p style={{ fontStyle: "italic", margin: 0, lineHeight: 1.55 }}>
-            {constitution.handsCard.closingLine}
-          </p>
+          {liveRewritesResolving && !liveScopedRewrites?.hands ? (
+            <p
+              style={{
+                fontSize: 11,
+                fontStyle: "italic",
+                margin: 0,
+                color: "var(--ink-mute, #888)",
+              }}
+            >
+              refining…
+            </p>
+          ) : null}
+          {/* CC-REACT-ON-SCREEN-LLM-RENDER — when the LLM rewrite is
+              available, the entire structured body (opener / Strength /
+              Growth Edge / Under Pressure / Practice / movementNote /
+              closingLine) is replaced by the LLM markdown rendered via
+              LlmProseBlock. The Work Map distinction trail stays at
+              the bottom regardless. */}
+          {liveScopedRewrites?.hands ? (
+            <LlmProseBlock markdown={liveScopedRewrites.hands} />
+          ) : (
+            <>
+              <p style={{ fontStyle: "italic", margin: 0, lineHeight: 1.55 }}>
+                {constitution.handsCard.openingLine}
+              </p>
+              <p style={{ margin: 0, lineHeight: 1.55 }}>
+                <strong>Strength</strong> — {constitution.handsCard.strength}
+              </p>
+              <p style={{ margin: 0, lineHeight: 1.55 }}>
+                <strong>Growth Edge</strong> —{" "}
+                {constitution.handsCard.growthEdge}
+              </p>
+              <p style={{ margin: 0, lineHeight: 1.55 }}>
+                <strong>Under Pressure</strong> — In health:{" "}
+                {constitution.handsCard.underPressure.healthRegister} Under load:{" "}
+                {constitution.handsCard.underPressure.pressureRegister}{" "}
+                {constitution.handsCard.underPressure.integrationLine}
+              </p>
+              <p style={{ margin: 0, lineHeight: 1.55 }}>
+                <strong>Practice</strong> — {constitution.handsCard.practice}
+              </p>
+              <p style={{ fontStyle: "italic", margin: 0, lineHeight: 1.55 }}>
+                {constitution.handsCard.movementNote}
+              </p>
+              <p style={{ fontStyle: "italic", margin: 0, lineHeight: 1.55 }}>
+                {constitution.handsCard.closingLine}
+              </p>
+            </>
+          )}
           <p
             style={{
               fontStyle: "italic",
@@ -483,6 +529,8 @@ export default function MapSection({
         expanded={expanded.path}
         onToggle={() => toggle("path")}
         pathMasterSynthesis={synthLines.pathMaster}
+        llmRewriteMarkdown={liveScopedRewrites?.path ?? null}
+        llmResolving={liveRewritesResolving}
       />
       <CrossCardPatternBlock
         cardId="path"

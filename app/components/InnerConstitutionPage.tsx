@@ -14,7 +14,7 @@
 const POLISH_FLAG = process.env.NEXT_PUBLIC_POLISH_ENABLED === "true";
 void POLISH_FLAG; // Reserved for CC-057c activation; pass-through at v1.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type {
   Answer,
   DemographicSet,
@@ -152,6 +152,63 @@ export default function InnerConstitutionPage({
   // brief inline confirmation after navigator.clipboard.writeText.
   const [includeBeliefAnchor, setIncludeBeliefAnchor] = useState(true);
   const [copiedFlash, setCopiedFlash] = useState(false);
+
+  // CC-REACT-ON-SCREEN-LLM-RENDER — on-screen LLM rewrites for the four
+  // scoped body cards + Keystone. Initial render uses engine prose (the
+  // page is fully visible before the LLM resolver returns). The
+  // useEffect fires `POST /api/report-cards` on mount; when the response
+  // arrives, the rewrites swap into the affected card bodies via prop
+  // threading (see `liveScopedRewrites` / `liveKeystoneRewrite` props
+  // below). Failure modes (timeout, error, budget exhaustion) leave
+  // `liveScopedRewrites` empty; engine prose continues to render.
+  const [liveScopedRewrites, setLiveScopedRewrites] = useState<{
+    lens: string | null;
+    compass: string | null;
+    hands: string | null;
+    path: string | null;
+    keystone: string | null;
+  }>({ lens: null, compass: null, hands: null, path: null, keystone: null });
+  const [liveRewritesResolving, setLiveRewritesResolving] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/report-cards", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ answers, demographics }),
+        });
+        if (!res.ok) {
+          if (!cancelled) setLiveRewritesResolving(false);
+          return;
+        }
+        const body = (await res.json()) as {
+          lens?: string | null;
+          compass?: string | null;
+          hands?: string | null;
+          path?: string | null;
+          keystone?: string | null;
+        };
+        if (cancelled) return;
+        setLiveScopedRewrites({
+          lens: body.lens ?? null,
+          compass: body.compass ?? null,
+          hands: body.hands ?? null,
+          path: body.path ?? null,
+          keystone: body.keystone ?? null,
+        });
+        setLiveRewritesResolving(false);
+      } catch (e) {
+        console.warn(
+          `[on-screen-llm-render] /api/report-cards fetch failed: ${(e as Error).message}`
+        );
+        if (!cancelled) setLiveRewritesResolving(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [answers, demographics]);
 
   function handlePrint() {
     if (typeof window !== "undefined") window.print();
@@ -336,6 +393,7 @@ export default function InnerConstitutionPage({
             demographics={demographics}
             answers={answers}
             constitution={constitution}
+            liveKeystoneRewriteProse={liveScopedRewrites.keystone}
           />
         </div>
 
@@ -930,7 +988,12 @@ export default function InnerConstitutionPage({
         {/* MAP — eight cards as accordions, default collapsed.
             CC-022b — demographics threaded for cross-card-pattern prose
             insertion + Path/Weather demographic interpolation. */}
-        <MapSection constitution={constitution} demographics={demographics} />
+        <MapSection
+          constitution={constitution}
+          demographics={demographics}
+          liveScopedRewrites={liveScopedRewrites}
+          liveRewritesResolving={liveRewritesResolving}
+        />
 
         {/* CC-SYNTHESIS-1-FINISH Section A — Growth Path section removed
             (duplicated Path · Gait opening in compressed form). Section
