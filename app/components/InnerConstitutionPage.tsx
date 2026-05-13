@@ -33,7 +33,6 @@ import { getTopCompassValues, valueListPhrase } from "../../lib/identityEngine";
 import {
   buildFilename,
   composeDispositionSummaryLine,
-  renderMirrorAsMarkdown,
 } from "../../lib/renderMirror";
 import { generateTrajectoryChartSvgFromConstitution } from "../../lib/trajectoryChart";
 import {
@@ -158,13 +157,37 @@ export default function InnerConstitutionPage({
     if (typeof window !== "undefined") window.print();
   }
 
+  // CC-PRODUCTION-RENDER-PATH-WIRING — the live Copy / Download
+  // handlers no longer render the markdown client-side via the sync
+  // `renderMirrorAsMarkdown`. They POST the user's answers +
+  // demographics to `/api/render`, which calls
+  // `renderMirrorAsMarkdownLive` on the server (committed cache →
+  // process-scoped runtime cache → on-demand LLM resolution under a
+  // per-session budget → Tier C fallback). The live wrapper is
+  // server-only because it needs ANTHROPIC_API_KEY + the Anthropic
+  // SDK; the API route is the bridge.
+  async function fetchLiveMarkdown(): Promise<string | null> {
+    try {
+      const res = await fetch("/api/render", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          answers,
+          demographics,
+          includeBeliefAnchor,
+        }),
+      });
+      if (!res.ok) return null;
+      const body = (await res.json()) as { markdown?: unknown };
+      return typeof body.markdown === "string" ? body.markdown : null;
+    } catch {
+      return null;
+    }
+  }
+
   async function handleCopyMarkdown() {
-    const md = renderMirrorAsMarkdown({
-      constitution,
-      demographics,
-      answers,
-      includeBeliefAnchor,
-    });
+    const md = await fetchLiveMarkdown();
+    if (!md) return;
     try {
       await navigator.clipboard.writeText(md);
       setCopiedFlash(true);
@@ -176,13 +199,9 @@ export default function InnerConstitutionPage({
     }
   }
 
-  function handleDownloadMarkdown() {
-    const md = renderMirrorAsMarkdown({
-      constitution,
-      demographics,
-      answers,
-      includeBeliefAnchor,
-    });
+  async function handleDownloadMarkdown() {
+    const md = await fetchLiveMarkdown();
+    if (!md) return;
     const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
