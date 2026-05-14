@@ -11,6 +11,8 @@
     "audit:ocean": "tsx tests/audit/oceanDashboard.audit.ts",
     "audit:ocean:diagnose": "tsx tests/audit/oceanDashboard.audit.ts --diagnose",
     "audit:react-user-mode-parity": "tsx tests/audit/reactUserModeParity.audit.ts",
+    "audit:prose-leak-cleanup-v3": "tsx tests/audit/proseLeakCleanupV3.audit.ts",
+    "audit:launch-voice-polish-v3": "tsx tests/audit/launchVoicePolishV3.audit.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio"
