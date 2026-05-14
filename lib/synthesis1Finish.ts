@@ -581,9 +581,19 @@ export function composePathMasterSynthesis(
     `The next movement is not more output. It is to ${nextMoveDescriptor(direction, goal, soul)}.`
   );
   if (closingPhrase) {
-    // Capitalize first letter for sentence head and add a period.
-    const head = closingPhrase.charAt(0).toUpperCase() + closingPhrase.slice(1);
-    parts.push(`${head}.`);
+    // CC-LAUNCH-VOICE-POLISH-V2 Bug 3 bonus — the early-shape variant
+    // produced the fragment "The early shape of giving." which reads
+    // as an orphan noun phrase. Wrap it in a subject + linking verb
+    // so the engine-fallback Path master synthesis closes on a
+    // complete sentence. The arrived variant ("Giving is Work that
+    // has found its beloved object") already reads as a sentence
+    // and stays capitalized as-is.
+    if (closingPhrase === earlyShapePhrase) {
+      parts.push(`This is ${earlyShapePhrase}.`);
+    } else {
+      const head = closingPhrase.charAt(0).toUpperCase() + closingPhrase.slice(1);
+      parts.push(`${head}.`);
+    }
   }
 
   return parts.join(" ");

@@ -464,8 +464,16 @@ const JUNGIAN_FN = /\b(Ni|Te|Fe|Si|Ne|Se|Ti|Fi)\b/g;
 // Verdict phrases that should appear only in chart SVG and the
 // dedicated Movement/Quadrant/Risk Form metric labels — never in prose
 // echoes elsewhere.
+//
+// CC-LAUNCH-VOICE-POLISH-V2 Bug 1 — the negative lookbehind preserves
+// verdict labels when they follow "reads as " (the Path master
+// synthesis Risk Form integration line: "Your Risk Form reads as
+// Open-Handed Aim — the governor is doing its work"). Without this,
+// the strip leaves "Risk Form reads as — the governor…" which the
+// live render symptom flagged. Other contexts (verdict echoes in
+// non-Risk-Form prose) still get stripped.
 const VERDICT_PHRASES: RegExp = new RegExp(
-  "\\b(Goal-led Presence|Soul-led Presence|Strained Integration|Driven Output|Burdened Care|Pressed Output|Anxious Caring|Giving / Presence|Ungoverned Movement|White-Knuckled Aim|Open-Handed Aim|Grip-Governed|Lightly Governed Movement)\\b",
+  "(?<!reads as )\\b(Goal-led Presence|Soul-led Presence|Strained Integration|Driven Output|Burdened Care|Pressed Output|Anxious Caring|Giving / Presence|Ungoverned Movement|White-Knuckled Aim|Open-Handed Aim|Grip-Governed|Lightly Governed Movement)\\b",
   "g"
 );
 
@@ -491,6 +499,40 @@ function isProtectedLine(line: string): boolean {
   // that dedicated context.
   if (/^\*Your Risk Form reads as /.test(line.trim())) return true;
   return false;
+}
+
+// CC-LAUNCH-VOICE-POLISH-V2 Bug 2 — conjugate third-person-singular
+// verbs back to base form after a `${name}` → `you` substitution in
+// the mask. Engine templates that interpolate
+// `${subj} ${verb}${s}` produce "Jason says" / "Jason believes" when
+// a name is present. The mask substitutes "Jason" → "you", leaving
+// "you says" / "you believes". This helper rewrites those back to
+// "you say" / "you believe" using a small set of irregular rules
+// plus a generic -s strip for regular verbs.
+function conjugateYouVerbs(line: string): string {
+  return line.replace(/\byou ([a-z]+(?:s|es))\b/g, (full, conjugated: string) => {
+    // Irregular special cases first.
+    if (conjugated === "is") return "you are";
+    if (conjugated === "has") return "you have";
+    if (conjugated === "does") return "you do";
+    if (conjugated === "goes") return "you go";
+    // verbs ending in -ies → -y (carries → carry, tries → try).
+    if (/[a-z]ies$/.test(conjugated)) {
+      return "you " + conjugated.slice(0, -3) + "y";
+    }
+    // sibilant + -es (wishes → wish, fixes → fix, kisses → kiss, watches → watch).
+    if (/(?:ss|sh|ch|x|z)es$/.test(conjugated)) {
+      return "you " + conjugated.slice(0, -2);
+    }
+    // Generic case: strip the trailing -s. Covers says/believes/
+    // makes/wants/needs/knows/tells/gets/takes/gives/finds/sees/
+    // feels/holds/protects/extends/commits/trusts/defends/reads/
+    // builds/moves/keeps.
+    if (conjugated.endsWith("s")) {
+      return "you " + conjugated.slice(0, -1);
+    }
+    return full;
+  });
 }
 
 function applyUserModeMask(md: string, userName?: string | null): string {
@@ -523,6 +565,13 @@ function applyUserModeMask(md: string, userName?: string | null): string {
     // masthead "For: {name}" line is excluded.
     if (nameSubs.length > 0 && !s.includes(`For: ${userName}`)) {
       for (const [re, rep] of nameSubs) s = s.replace(re, rep);
+      // CC-LAUNCH-VOICE-POLISH-V2 Bug 2 — engine templates that build
+      // sentences like `${subj} say${s} ${subj} believe${s}` produce
+      // "Jason says Jason believes" when a name is present. The name
+      // swap above turns that into the ungrammatical "you says you
+      // believes". Conjugate the third-person-singular verb back to
+      // base form right after the name swap.
+      s = conjugateYouVerbs(s);
     }
     // CC-SUBSTITUTION-LEAK-CLEANUP — context-aware phrase rewrites run
     // BEFORE the bare strips, so the strip's pattern is no longer present
