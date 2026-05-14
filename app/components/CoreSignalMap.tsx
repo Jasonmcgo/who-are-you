@@ -17,10 +17,25 @@ import type { InnerConstitution } from "../../lib/types";
 
 type Props = {
   constitution: InnerConstitution;
+  // CC-REACT-USER-MODE-PARITY — mirror the markdown `renderCore
+  // SignalMapMarkdown` user/clinician split so the "Surface label"
+  // cell doesn't leak the MBTI four-letter code on the user surface.
+  // User mode replaces the cell value with "provisional" (same as
+  // markdown user-mode behavior); clinician keeps the full "<MBTI>,
+  // provisional" form for audit.
+  renderMode?: "user" | "clinician";
 };
 
-export default function CoreSignalMap({ constitution }: Props) {
+export default function CoreSignalMap({ constitution, renderMode }: Props) {
+  const mode = renderMode ?? "user";
   const cells = buildCoreSignalCells(constitution);
+  if (mode === "user") {
+    for (const cell of cells) {
+      if (cell.label === "Surface label" && cell.value.length > 0) {
+        cell.value = "provisional";
+      }
+    }
+  }
 
   return (
     <div

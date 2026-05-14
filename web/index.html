@@ -86,6 +86,13 @@
     text-transform:uppercase;
     color:var(--ink-mute);
   }
+  .top-meta a{
+    color:inherit;
+    text-decoration:none;
+    transition:color 180ms ease;
+  }
+  .top-meta a:hover{ color:var(--ink); }
+  html{ scroll-behavior:smooth; }
   @media (max-width:720px){ .top-meta{display:none;} }
 
   /* ─────────────────────────────────────────────────────────────── */
@@ -738,14 +745,16 @@
 <body>
 
 <!-- ───────────────────────── HEADER ───────────────────────── -->
-<header class="top">
+<header class="top" id="top">
   <div class="wrap">
     <div class="top-row">
       <div class="mark">Who Are You<span class="deg">?</span></div>
       <div class="top-meta">
-        <span>The 50° Life</span>
-        <span>50 Questions</span>
-        <span>One Trajectory</span>
+        <a href="#top">The 50° Life</a>
+        <a href="#trajectory">One Trajectory</a>
+        <a href="#four-forces">Four Forces</a>
+        <a href="#body-cards">8 Body Cards</a>
+        <a href="#vignettes">10 Patterns</a>
       </div>
     </div>
   </div>
@@ -833,7 +842,7 @@
 </section>
 
 <!-- ───────────────────────── TRAJECTORY DIAGRAM ───────────────────────── -->
-<section data-screen-label="03 Trajectory">
+<section data-screen-label="03 Trajectory" id="trajectory">
   <div class="wrap">
     <div class="section-head">
       <span class="kicker">§ 01 · The Trajectory</span>
@@ -910,7 +919,7 @@
 </section>
 
 <!-- ───────────────────────── FOUR FORCES ───────────────────────── -->
-<section data-screen-label="04 Four Forces">
+<section data-screen-label="04 Four Forces" id="four-forces">
   <div class="wrap">
     <div class="section-head">
       <span class="kicker">§ 02 · The Four Forces</span>
@@ -965,7 +974,7 @@
 </section>
 
 <!-- ───────────────────────── BODY CARDS ───────────────────────── -->
-<section data-screen-label="05 Body Cards">
+<section data-screen-label="05 Body Cards" id="body-cards">
   <div class="wrap">
     <div class="section-head">
       <span class="kicker">§ 03 · The 8 Body Cards</span>

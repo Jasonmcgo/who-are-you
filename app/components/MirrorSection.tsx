@@ -104,6 +104,10 @@ type Props = {
   // cache get their on-demand-resolved keystone prose surfaced
   // on-screen, matching what the markdown export already produces.
   liveKeystoneRewriteProse?: string | null;
+  // CC-REACT-USER-MODE-PARITY — threaded down to <CoreSignalMap> so the
+  // Surface label cell mirrors the markdown export's user/clinician
+  // split (user mode replaces "<MBTI>, provisional" with "provisional").
+  renderMode?: "user" | "clinician";
 };
 
 function SectionLabel({ children }: { children: ReactNode }) {
@@ -242,6 +246,7 @@ export default function MirrorSection({
   answers,
   constitution,
   liveKeystoneRewriteProse,
+  renderMode,
 }: Props) {
   // CC-025 Step 2.6 — pronoun register pinned to second-person throughout
   // the Mirror body. The Synthesis section (rendered separately below) keeps
@@ -360,7 +365,10 @@ export default function MirrorSection({
           <HairlineRule />
           <div className="flex flex-col" style={{ gap: 12 }}>
             <SectionLabel>Core Signal Map</SectionLabel>
-            <CoreSignalMap constitution={constitution} />
+            <CoreSignalMap
+              constitution={constitution}
+              renderMode={renderMode}
+            />
           </div>
         </>
       ) : null}

@@ -2,9 +2,20 @@
 
 import type { LensStack } from "../../lib/types";
 
-type Props = { stack: LensStack };
+type Props = {
+  stack: LensStack;
+  // CC-REACT-USER-MODE-PARITY — render-mode gate matching the markdown
+  // export's user/clinician split. User-facing surfaces suppress the
+  // borrowed-system MBTI disclosure line; clinician/admin keeps it.
+  renderMode?: "user" | "clinician";
+};
 
-export default function MbtiDisclosure({ stack }: Props) {
+export default function MbtiDisclosure({ stack, renderMode }: Props) {
+  // CC-REACT-USER-MODE-PARITY — default to "user" so any surface that
+  // hasn't been explicitly opted into clinician mode hides the MBTI
+  // disclosure line. Admin/clinician must pass renderMode="clinician".
+  const mode = renderMode ?? "user";
+  if (mode === "user") return null;
   // Gating: only mount when the stack is high-confidence AND a code is present.
   if (stack.confidence !== "high" || !stack.mbtiCode) return null;
 

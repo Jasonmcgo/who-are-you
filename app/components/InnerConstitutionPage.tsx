@@ -84,6 +84,12 @@ type Props = {
   // Omitted (or null) for in-progress / pre-save renders; the section
   // silently hides.
   sessionId?: string | null;
+  // CC-REACT-USER-MODE-PARITY — render-mode gate matching the markdown
+  // export's user/clinician split. Default "user": child components that
+  // emit engine-only artifacts (MBTI disclosure line, "INTJ, provisional"
+  // Surface Label cell) suppress those artifacts. Admin/clinician surfaces
+  // must pass renderMode="clinician" explicitly to retain the artifacts.
+  renderMode?: "user" | "clinician";
 };
 
 function SectionRule() {
@@ -153,7 +159,13 @@ export default function InnerConstitutionPage({
   hideShareBlock,
   answers,
   sessionId,
+  renderMode,
 }: Props) {
+  // CC-REACT-USER-MODE-PARITY — default to "user" so any surface that
+  // hasn't been explicitly opted into clinician mode hides the borrowed-
+  // system MBTI disclosure line + replaces the "Surface label" cell
+  // value. Admin/clinician must pass renderMode="clinician".
+  const mode = renderMode ?? "user";
   // CC-020 — Share block local state. The toggle defaults on (the user
   // owns their own data); flipping it off omits the belief anchor from
   // both the markdown export and the print render. Copy-flash is a
@@ -466,7 +478,12 @@ export default function InnerConstitutionPage({
         <div style={{ paddingTop: 32 }}>
           <MirrorSection
             mirror={constitution.mirror}
-            mbtiSlot={<MbtiDisclosure stack={constitution.lens_stack} />}
+            mbtiSlot={
+              <MbtiDisclosure
+                stack={constitution.lens_stack}
+                renderMode={mode}
+              />
+            }
             belief={constitution.belief_under_tension}
             beliefValueListPhrase={valueListPhrase(
               getTopCompassValues(constitution.signals),
@@ -476,6 +493,7 @@ export default function InnerConstitutionPage({
             answers={answers}
             constitution={constitution}
             liveKeystoneRewriteProse={liveScopedRewrites.keystone}
+            renderMode={mode}
           />
         </div>
 

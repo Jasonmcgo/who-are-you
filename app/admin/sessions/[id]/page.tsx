@@ -494,6 +494,12 @@ export default function SessionDetailPage({
             hideShareBlock
             demographics={toDemographicSet(data.demographics)}
             answers={data.answers}
+            // CC-REACT-USER-MODE-PARITY — admin/clinician surface
+            // retains MBTI disclosure line + "<MBTI>, provisional"
+            // Surface Label cell for audit reference. The user-facing
+            // /report/[sessionId] + /assessment paths omit this prop
+            // and default to user mode (suppression on).
+            renderMode="clinician"
           />
         </div>
         <aside

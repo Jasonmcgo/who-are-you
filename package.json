@@ -10,6 +10,7 @@
     "audit:goal-soul-give": "tsx tests/audit/goalSoulGive.audit.ts",
     "audit:ocean": "tsx tests/audit/oceanDashboard.audit.ts",
     "audit:ocean:diagnose": "tsx tests/audit/oceanDashboard.audit.ts --diagnose",
+    "audit:react-user-mode-parity": "tsx tests/audit/reactUserModeParity.audit.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio"
