@@ -6,6 +6,13 @@
 //   ANTHROPIC_API_KEY=... npx tsx scripts/buildProseRewrites.ts --force
 //   ANTHROPIC_API_KEY=... npx tsx scripts/buildProseRewrites.ts --fixture=ocean/07-jason-real-session.json
 
+// CC-LLM-REWRITES-PERSISTED-ON-SESSION — opt this script into the
+// runtime LLM branch. `resolveProseRewriteLive` (and the other
+// per-layer resolvers) gate the API call on this env var; without
+// the opt-in they return null. Build scripts set it to "on" before
+// any LlmServer import so the regen path stays callable.
+process.env.LLM_REWRITE_RUNTIME = "on";
+
 import {
   existsSync,
   mkdirSync,

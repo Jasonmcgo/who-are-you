@@ -1,0 +1,100 @@
+Wave-1 catch-up: persistence + stale-shape + calibration audit + pre-Wave-1 prose cleanup
+
+CCs landed in this commit:
+
+CC-LLM-REWRITES-PERSISTED-ON-SESSION (the load-bearing change)
+  - Add sessions.llm_rewrites jsonb + sessions.llm_rewrites_engine_hash text
+    columns (migration 0003_strong_nuke.sql).
+  - New lib/llmRewritesBundle.ts (LlmRewritesBundle interface, bundleLookup,
+    hashEngineForLlmBundle, emptyLlmRewritesBundle) and lib/sessionLlmBundleStore.ts
+    (server-only loadSessionLlmBundle).
+  - All 5 *LlmServer.ts modules rewired to cache -> bundle -> runtime gate ->
+    composer. Render path is now structurally cache-or-engine; the Anthropic
+    SDK is reachable only from build* scripts that explicitly set
+    LLM_REWRITE_RUNTIME=on.
+  - app/api/render, app/api/report-cards, InnerConstitutionPage.tsx now
+    thread sessionId so loadSessionLlmBundle can resolve the persisted bundle.
+  - scripts/backfillLlmRewritesOnSessions.ts: pure cache-to-DB transcoder
+    (zero SDK/LlmServer imports, idempotent). Backfilled 11/13 local rows;
+    2 skipped as stale-shape (resolved by CC-STALE-SHAPE-DETECTOR below).
+  - LLM_REWRITE_RUNTIME=off default everywhere; .env.example documents it;
+    README.md adds Vercel-env deployment requirements.
+  - 3 audits (liveSessionLlmWiring, productionRenderPathWiring,
+    reactOnScreenLlmRender) flipped to set LLM_REWRITE_RUNTIME=on at top
+    since they exercise the now-gated composer path.
+  - New tests/audit/llmRewritesPersistedOnSession.audit.ts: 7/7 assertions
+    (schema, migration, exports, guards, backfill grep, round-trip smoke,
+    hash stability).
+
+CC-STALE-SHAPE-DETECTOR (render-time guard for engine version drift)
+  - Add sessions.engine_shape_version integer column (migration
+    0004_tiny_medusa.sql).
+  - New lib/staleShape.ts: ENGINE_SHAPE_VERSION constant + isFreshConstitution
+    predicate + hashEngineShape (schema-only, not content) + three-branch
+    routing (fresh / re-derivable / un-rerenderable). Re-derivation is
+    engine-only; module never imports any *LlmServer.ts.
+  - app/report/[sessionId]/page.tsx now calls detectStaleShape before any
+    buildInnerConstitution invocation. Re-derives engine prose from
+    persisted answers when version mismatch + answers present; renders a
+    graceful "needs re-test" message when answers absent.
+  - New tests/audit/staleShapeDetector.audit.ts: 8/8 assertions.
+
+CC-CALIBRATION-PHASE-1-DISTRIBUTION-AUDIT (Wave-4 evidence base)
+  - New scripts/calibrationPhase1DistributionAudit.ts: read-only analytics
+    over fixtures cohort + live cohort. No *LlmServer imports, no SDK,
+    no DB mutations, no cache writes. Materializes via buildInnerConstitution
+    only. Deterministic output (byte-identical across re-runs).
+  - Produces docs/calibration/phase-1-distribution-audit.md: 15-section
+    artifact testing F1-F7 hypotheses (engine-version amplifier regression,
+    Grip compression, Soul ceiling cluster, cause/person-Soul vector,
+    cohort-cache zero-match-rate, JasonDMcG self-report anchor, Grip
+    Pattern render gate). Side-by-side fixtures-vs-live with delta column.
+  - New tests/audit/calibrationPhase1DistributionAudit.audit.ts: 6/6
+    assertions (script-exists, no-llm-server-imports, no-sdk, no-forbidden-
+    writes, artifact-structural-sections, histograms-side-by-side).
+  - npm script: audit:calibration-phase-1.
+
+CC-TYPO-TRIPLET-FIX (no-op closure)
+  - Filed as no-op: typos observed in live renders never existed in
+    tracked source (git log --all -S returned zero commits for all three
+    pre-fix byte sequences). Likely from a code state rebased out of
+    history. Prompt moved to completed/.
+
+Pre-Wave-1 catch-up (May 13-14 work that landed locally but never pushed):
+
+CC-PROSE-LEAK-CLEANUP-V3
+  - lib/renderMirror.ts (+43 lines): idempotent Hands template post-processor
+    with header / sub-header / Work Map trail dedup. Triggered baseline
+    drift in twoTierRenderSurfaceCleanup audit; baseline snapshot regenerated
+    in this commit to reflect new canonical clinician output.
+  - New tests/audit/proseLeakCleanupV3.audit.ts.
+
+CC-HANDS-9TH-CARD-PARITY
+  - New tests/audit/hands9thCardParity.audit.ts.
+
+CC-LAUNCH-VOICE-POLISH-V3 (cleanup)
+  - lib/launchPolishV3LlmServer.ts + scripts/buildLaunchPolishV3.ts surfaced
+    (these support the persistence CC's launchPolishV3 layer).
+  - Prompt moved to completed/.
+
+Ambient:
+  - .routines/output/2026-05-1[4-6]*.md: 6 daily auto-generated routine
+    artifacts (audit-health, cc-queue, canon-freshness).
+  - .gitignore: now excludes .claude/ (local config), Harry_*.md / Harry_*.docx
+    (per-user report exports), tsconfig.tsbuildinfo (sandbox EPERM artifact).
+  - tests/audit/twoTierBaseline.snapshot.json regenerated for all 24 cohort
+    fixtures to reflect post-CC-PROSE-LEAK-CLEANUP-V3 expected output.
+  - Various componentry edits (ShapeCard.tsx, MapSection.tsx, MirrorSection.tsx,
+    PathExpanded.tsx, app/admin/sessions/page.tsx, lib/identityEngine.ts,
+    lib/cacheObservability.ts, lib/saveSession.ts) supporting the above.
+
+Audit state at commit:
+  57/59 audits passing.
+  Failing: aimMigrationFinish (sandbox EPERM on tsbuildinfo; now gitignored),
+  proseRegister (pre-existing 24h cache freshness window; last regen
+  2026-05-11; resolved on next opt-in cache regeneration).
+
+Deploy precondition (must hold before push):
+  Vercel env: LLM_REWRITE_RUNTIME=off (or absent), ANTHROPIC_API_KEY
+  removed. Architecture is structurally cache-or-engine regardless, but
+  belt-and-suspenders per public-deploy cost guards canon.

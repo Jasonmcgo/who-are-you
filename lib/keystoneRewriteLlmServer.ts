@@ -15,6 +15,7 @@ import {
   logCacheResolution,
   SessionLlmBudget,
 } from "./cacheObservability";
+import { bundleLookup, type LlmRewritesBundle } from "./llmRewritesBundle";
 
 const CLAUDE_MODEL = "claude-sonnet-4-5";
 const DEFAULT_API_TIMEOUT_MS = 60_000;
@@ -118,17 +119,38 @@ export interface KeystoneLiveResolveOptions {
     inputs: KeystoneRewriteInputs,
     timeoutMs: number
   ) => Promise<string | null>;
+  /**
+   * CC-LLM-REWRITES-PERSISTED-ON-SESSION — per-session bundle from
+   * `sessions.llm_rewrites`. Consulted after the committed-cache
+   * check, before the runtime gate.
+   */
+  sessionLlmBundle?: LlmRewritesBundle | null;
 }
 
 export async function resolveKeystoneRewriteLive(
   inputs: KeystoneRewriteInputs,
   options: KeystoneLiveResolveOptions
 ): Promise<string | null> {
+  // 1. Committed-cache check.
   const cached = readCachedKeystoneRewrite(inputs);
   if (cached !== null) return cached;
+
+  // 2. CC-LLM-REWRITES-PERSISTED-ON-SESSION — session bundle check.
+  const key = keystoneRewriteHash(inputs);
+  const fromBundle = bundleLookup(
+    options.sessionLlmBundle ?? null,
+    "keystone",
+    key
+  );
+  if (fromBundle !== null) return fromBundle;
+
+  // 3. Cohort/audit run — engine fallback.
   if (!options.liveSession) return null;
 
-  const key = keystoneRewriteHash(inputs);
+  // 4. CC-LLM-REWRITES-PERSISTED-ON-SESSION — runtime gate. Render
+  //    path is off by default; only `build*` scripts opt in.
+  if (process.env.LLM_REWRITE_RUNTIME !== "on") return null;
+
   const fingerprint = fingerprintBody(inputs.beliefText);
   const namespace = "keystone-rewrites";
   const section = "keystone";

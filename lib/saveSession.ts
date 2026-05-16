@@ -13,6 +13,7 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "../db";
 import { sessions, demographics } from "../db/schema";
+import { ENGINE_SHAPE_VERSION } from "./staleShape";
 import type {
   Answer,
   BeliefUnderTension,
@@ -50,6 +51,12 @@ export async function saveSession(
         meta_signals: args.metaSignals,
         allocation_overlays: args.allocationOverlays ?? null,
         belief_under_tension: args.beliefUnderTension ?? null,
+        // CC-STALE-SHAPE-DETECTOR — stamp the engine schema version
+        // every new row was produced against. The render path's
+        // `detectStaleShape` predicate reads this column and falls
+        // into the re-derivable branch when it doesn't match
+        // `ENGINE_SHAPE_VERSION`. NULL is reserved for pre-CC rows.
+        engine_shape_version: ENGINE_SHAPE_VERSION,
       })
       .returning({ id: sessions.id });
 

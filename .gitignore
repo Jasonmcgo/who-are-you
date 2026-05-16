@@ -49,3 +49,22 @@ next-env.d.ts
 .~lock.*#
 ~$*
 question-bank-relationship-table-v[3-9]*.xlsx
+
+# Local-only Claude settings (per-machine, not shared)
+/.claude/
+
+# Workspace personal copies of report exports (per-user, not shared)
+/Harry_*.md
+/Harry_*.docx
+/Kevin_*.pdf
+/Kevin_*.md
+/Cindy_*.md
+/Daniel_*.md
+/Michele_*.md
+/Ashley_*.md
+/Jason*_*.md
+/Jason*_*.pdf
+/Jason*_*.docx
+
+# tsconfig build info (regenerated locally, sandbox-permission issues)
+tsconfig.tsbuildinfo

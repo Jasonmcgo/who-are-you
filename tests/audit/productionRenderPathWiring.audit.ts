@@ -90,6 +90,9 @@ function listFixtures(): Array<{ set: string; file: string }> {
 }
 
 async function runAudit(): Promise<void> {
+  // CC-LLM-REWRITES-PERSISTED-ON-SESSION — opt this audit into the
+  // runtime LLM branch so the live-resolver assertions can fire.
+  process.env.LLM_REWRITE_RUNTIME = "on";
   const results: AssertionResult[] = [];
 
   // ── 1. live-call-site-inventory ────────────────────────────────────

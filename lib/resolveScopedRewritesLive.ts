@@ -20,6 +20,15 @@ import {
   resolveKeystoneRewriteLive,
   type KeystoneLiveResolveOptions,
 } from "./keystoneRewriteLlmServer";
+import {
+  resolveV3RewriteLive,
+  type V3LiveResolveOptions,
+} from "./launchPolishV3LlmServer";
+import {
+  V3_SECTION_IDS,
+  type V3RewriteInputs,
+  type V3SectionId,
+} from "./launchPolishV3Llm";
 import { COMPASS_LABEL, getTopCompassValues } from "./identityEngine";
 import {
   summarizeQI2Selections,
@@ -31,6 +40,7 @@ import type {
 } from "./proseRewriteLlm";
 import type { KeystoneRewriteInputs } from "./keystoneRewriteLlm";
 import { SessionLlmBudget } from "./cacheObservability";
+import type { LlmRewritesBundle } from "./llmRewritesBundle";
 import type { Answer, DemographicSet, InnerConstitution } from "./types";
 
 const SCOPED_HEADERS: Record<ProseCardId, string> = {
@@ -39,6 +49,53 @@ const SCOPED_HEADERS: Record<ProseCardId, string> = {
   hands: "### Hands — Work",
   path: "## Path — Gait",
 };
+
+// CC-LAUNCH-VOICE-POLISH-V3 — markdown header per V3 section. Used to
+// slice the clinician-mode markdown into per-section bodies that the
+// V3 LLM rewrites consume.
+const V3_HEADERS: Record<V3SectionId, string> = {
+  executiveRead: "## Executive Read",
+  corePattern: "## Your Core Pattern",
+  whatOthersMayExperience: "## What Others May Experience",
+  whenTheLoadGetsHeavy: "## When the Load Gets Heavy",
+  synthesis: "## A Synthesis",
+  closingRead: "## Closing Read",
+  // pathTriptych is special — extracted from inside the Path · Gait card
+  // (level 2 section), not at its own top-level header. Handled below.
+  pathTriptych: "",
+};
+
+// Extract the Work/Love/Give triptych from inside the Path · Gait card.
+// Pattern: lines starting with `**Work** — ...`, `**Love** — ...`,
+// `**Give** — ...`. Returns concatenated block, or null if all three
+// are absent.
+function extractPathTriptych(md: string): string | null {
+  const lines = md.split("\n");
+  const blocks: string[] = [];
+  for (const label of ["**Work**", "**Love**", "**Give**"]) {
+    const idx = lines.findIndex((l) => l.startsWith(label));
+    if (idx < 0) continue;
+    // Collect this line + any continuation lines until the next blank +
+    // bold marker, or end of file.
+    const chunk: string[] = [lines[idx]];
+    for (let i = idx + 1; i < lines.length; i++) {
+      const next = lines[i];
+      if (
+        /^\*\*(?:Work|Love|Give|Practice|Pattern Note|Pattern in motion|Movement Note)\*\*/.test(
+          next
+        ) ||
+        /^## /.test(next) ||
+        /^### /.test(next)
+      ) {
+        break;
+      }
+      chunk.push(next);
+    }
+    blocks.push(chunk.join("\n").trimEnd());
+  }
+  if (blocks.length === 0) return null;
+  return blocks.join("\n\n");
+}
 
 const RESERVED_CANON_LINES = [
   "visible, revisable, present-tense structure",
@@ -69,8 +126,18 @@ export interface ResolveScopedRewritesOptions {
   proseComposer?: ProseLiveResolveOptions["composer"];
   /** Test seam — inject a mock keystone composer. */
   keystoneComposer?: KeystoneLiveResolveOptions["composer"];
+  /** Test seam — inject a mock V3 composer. */
+  v3Composer?: V3LiveResolveOptions["composer"];
   /** Override the per-call LLM timeout. */
   timeoutMs?: number;
+  /**
+   * CC-LLM-REWRITES-PERSISTED-ON-SESSION — per-session rewrite bundle
+   * loaded from `sessions.llm_rewrites`. When present, the per-layer
+   * resolvers check the bundle before falling through to the runtime
+   * gate. Null on un-backfilled rows (which is the default for any
+   * caller that doesn't have a saved session in scope).
+   */
+  sessionLlmBundle?: LlmRewritesBundle | null;
 }
 
 export interface ScopedRewritesResult {
@@ -81,6 +148,14 @@ export interface ScopedRewritesResult {
   path: string | null;
   /** Full LLM rewrite for the Keystone Reflection body, or null on miss. */
   keystone: string | null;
+  // CC-LAUNCH-VOICE-POLISH-V3 — seven additional sections.
+  executiveRead: string | null;
+  corePattern: string | null;
+  whatOthersMayExperience: string | null;
+  whenTheLoadGetsHeavy: string | null;
+  synthesis: string | null;
+  closingRead: string | null;
+  pathTriptych: string | null;
 }
 
 /**
@@ -136,6 +211,7 @@ export async function resolveScopedRewritesLive(
         budget,
         timeoutMs: options.timeoutMs,
         composer: options.proseComposer,
+        sessionLlmBundle: options.sessionLlmBundle ?? null,
       }),
     });
   }
@@ -170,15 +246,89 @@ export async function resolveScopedRewritesLive(
       budget,
       timeoutMs: options.timeoutMs,
       composer: options.keystoneComposer,
+      sessionLlmBundle: options.sessionLlmBundle ?? null,
     });
   }
 
-  const [lens, compass, hands, path, keystone] = await Promise.all([
+  // CC-LAUNCH-VOICE-POLISH-V3 — seven additional section resolutions,
+  // dispatched in parallel with the prose card + keystone resolutions.
+  const topCompassValueLabels = getTopCompassValues(args.constitution.signals)
+    .map((r) => COMPASS_LABEL[r.signal_id] ?? r.signal_id)
+    .filter((s) => s.length > 0);
+  const v3Tasks: Array<{
+    sectionId: V3SectionId;
+    promise: Promise<string | null>;
+  }> = [];
+  for (const sectionId of V3_SECTION_IDS) {
+    const body =
+      sectionId === "pathTriptych"
+        ? extractPathTriptych(clinMd)
+        : extractSection(clinMd, V3_HEADERS[sectionId]);
+    if (!body) {
+      v3Tasks.push({
+        sectionId,
+        promise: Promise.resolve<string | null>(null),
+      });
+      continue;
+    }
+    const inputs: V3RewriteInputs = {
+      sectionId,
+      archetype,
+      engineSectionBody: body,
+      topCompassValueLabels,
+      reservedCanonLines: RESERVED_CANON_LINES,
+    };
+    v3Tasks.push({
+      sectionId,
+      promise: resolveV3RewriteLive(inputs, {
+        liveSession: true,
+        budget,
+        timeoutMs: options.timeoutMs,
+        composer: options.v3Composer,
+        sessionLlmBundle: options.sessionLlmBundle ?? null,
+      }),
+    });
+  }
+
+  const [
+    lens,
+    compass,
+    hands,
+    path,
+    keystone,
+    executiveRead,
+    corePattern,
+    whatOthersMayExperience,
+    whenTheLoadGetsHeavy,
+    synthesis,
+    closingRead,
+    pathTriptych,
+  ] = await Promise.all([
     proseTasks[0]!.promise,
     proseTasks[1]!.promise,
     proseTasks[2]!.promise,
     proseTasks[3]!.promise,
     keystonePromise,
+    v3Tasks[0]!.promise,
+    v3Tasks[1]!.promise,
+    v3Tasks[2]!.promise,
+    v3Tasks[3]!.promise,
+    v3Tasks[4]!.promise,
+    v3Tasks[5]!.promise,
+    v3Tasks[6]!.promise,
   ]);
-  return { lens, compass, hands, path, keystone };
+  return {
+    lens,
+    compass,
+    hands,
+    path,
+    keystone,
+    executiveRead,
+    corePattern,
+    whatOthersMayExperience,
+    whenTheLoadGetsHeavy,
+    synthesis,
+    closingRead,
+    pathTriptych,
+  };
 }

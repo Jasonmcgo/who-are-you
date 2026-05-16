@@ -196,7 +196,28 @@ export default function InnerConstitutionPage({
     hands: string | null;
     path: string | null;
     keystone: string | null;
-  }>({ lens: null, compass: null, hands: null, path: null, keystone: null });
+    // CC-LAUNCH-VOICE-POLISH-V3 — seven additional LLM-rewrite slots.
+    executiveRead: string | null;
+    corePattern: string | null;
+    whatOthersMayExperience: string | null;
+    whenTheLoadGetsHeavy: string | null;
+    synthesis: string | null;
+    closingRead: string | null;
+    pathTriptych: string | null;
+  }>({
+    lens: null,
+    compass: null,
+    hands: null,
+    path: null,
+    keystone: null,
+    executiveRead: null,
+    corePattern: null,
+    whatOthersMayExperience: null,
+    whenTheLoadGetsHeavy: null,
+    synthesis: null,
+    closingRead: null,
+    pathTriptych: null,
+  });
   // CC-LLM-RENDER-PRODUCTION-POLISH — no `liveRewritesResolving` flag.
   // Engine prose is the visible default; the LLM swap happens silently
   // once the fetch resolves. No "refining…" kicker on the card surface.
@@ -207,7 +228,11 @@ export default function InnerConstitutionPage({
         const res = await fetch("/api/report-cards", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ answers, demographics }),
+          // CC-LLM-REWRITES-PERSISTED-ON-SESSION — thread sessionId
+          // so the API route can load the persisted bundle from
+          // `sessions.llm_rewrites` instead of taking the runtime
+          // path.
+          body: JSON.stringify({ answers, demographics, sessionId }),
         });
         if (!res.ok) return;
         const body = (await res.json()) as {
@@ -216,6 +241,13 @@ export default function InnerConstitutionPage({
           hands?: string | null;
           path?: string | null;
           keystone?: string | null;
+          executiveRead?: string | null;
+          corePattern?: string | null;
+          whatOthersMayExperience?: string | null;
+          whenTheLoadGetsHeavy?: string | null;
+          synthesis?: string | null;
+          closingRead?: string | null;
+          pathTriptych?: string | null;
         };
         if (cancelled) return;
         setLiveScopedRewrites({
@@ -224,6 +256,13 @@ export default function InnerConstitutionPage({
           hands: body.hands ?? null,
           path: body.path ?? null,
           keystone: body.keystone ?? null,
+          executiveRead: body.executiveRead ?? null,
+          corePattern: body.corePattern ?? null,
+          whatOthersMayExperience: body.whatOthersMayExperience ?? null,
+          whenTheLoadGetsHeavy: body.whenTheLoadGetsHeavy ?? null,
+          synthesis: body.synthesis ?? null,
+          closingRead: body.closingRead ?? null,
+          pathTriptych: body.pathTriptych ?? null,
         });
       } catch (e) {
         console.warn(
@@ -234,7 +273,7 @@ export default function InnerConstitutionPage({
     return () => {
       cancelled = true;
     };
-  }, [answers, demographics]);
+  }, [answers, demographics, sessionId]);
 
   function handlePrint() {
     if (typeof window !== "undefined") window.print();
@@ -258,6 +297,9 @@ export default function InnerConstitutionPage({
           answers,
           demographics,
           includeBeliefAnchor,
+          // CC-LLM-REWRITES-PERSISTED-ON-SESSION — bundle lookup
+          // by sessionId.
+          sessionId,
         }),
       });
       if (!res.ok) return null;
@@ -408,8 +450,14 @@ export default function InnerConstitutionPage({
   // phrase substitution. Single source of truth shared with the
   // markdown render path.
   const closingReadProseRaw = composeClosingReadProse(constitution);
+  // CC-LAUNCH-VOICE-POLISH-V3 — when the live LLM rewrite for Closing
+  // Read is available, prefer it over the engine prose.
   const closingReadProse =
-    closingReadProseRaw.length > 0 ? closingReadProseRaw : null;
+    liveScopedRewrites.closingRead && liveScopedRewrites.closingRead.length > 0
+      ? liveScopedRewrites.closingRead
+      : closingReadProseRaw.length > 0
+        ? closingReadProseRaw
+        : null;
   const movement = constitution.goalSoulMovement;
   const movementDashboard = movement?.dashboard;
 
@@ -493,6 +541,15 @@ export default function InnerConstitutionPage({
             answers={answers}
             constitution={constitution}
             liveKeystoneRewriteProse={liveScopedRewrites.keystone}
+            liveExecutiveReadRewrite={liveScopedRewrites.executiveRead}
+            liveCorePatternRewrite={liveScopedRewrites.corePattern}
+            liveWhatOthersMayExperienceRewrite={
+              liveScopedRewrites.whatOthersMayExperience
+            }
+            liveWhenTheLoadGetsHeavyRewrite={
+              liveScopedRewrites.whenTheLoadGetsHeavy
+            }
+            liveSynthesisRewrite={liveScopedRewrites.synthesis}
             renderMode={mode}
           />
         </div>

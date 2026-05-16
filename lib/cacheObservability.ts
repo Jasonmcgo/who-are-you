@@ -10,7 +10,12 @@
 // prose. Logs surface in dev terminals and aggregated production sinks
 // via the standard `console.warn` channel (no new transport).
 
-export type CacheMissNamespace = "prose-rewrites" | "keystone-rewrites";
+export type CacheMissNamespace =
+  | "prose-rewrites"
+  | "keystone-rewrites"
+  // CC-LAUNCH-VOICE-POLISH-V3 — seven additional sections share a single
+  // namespace; the section ID disambiguates per-event.
+  | "launch-polish-v3-rewrites";
 
 export interface CacheMissEvent {
   /** Cache namespace — one of the LLM-rewrite caches. */

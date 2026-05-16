@@ -27,6 +27,13 @@ import type {
   InnerConstitution,
   MetaSignal,
 } from "../../../lib/types";
+import {
+  ENGINE_SHAPE_VERSION,
+  detectStaleShape,
+  diffShape,
+  logStaleShapeReDerived,
+} from "../../../lib/staleShape";
+import { buildInnerConstitution } from "../../../lib/identityEngine";
 import ReportView from "./ReportView";
 
 // UUID v4 canonical shape — the saved session IDs are uuid().defaultRandom()
@@ -107,11 +114,21 @@ type FetchedSession = {
   demographics: DemographicSet | null;
   metaSignals: MetaSignal[];
   createdAt: Date;
+  // CC-STALE-SHAPE-DETECTOR — populated when the detector falls into
+  // the re-derivable branch. NULL in the fresh branch.
+  staleShapeBranch: "fresh" | "re-derivable";
 };
+
+// CC-STALE-SHAPE-DETECTOR — branch-3 verdict surfaced to the page.
+// When the detector says un-rerenderable (stale shape + missing
+// answers), fetchSession returns this discriminated value instead of
+// FetchedSession so the page can render the graceful-error card
+// rather than throwing on the stale bundle.
+type UnRerenderable = { kind: "un-rerenderable"; reason: string };
 
 async function fetchSession(
   sessionId: string
-): Promise<FetchedSession | null> {
+): Promise<FetchedSession | UnRerenderable | null> {
   if (!UUID_RE.test(sessionId)) return null;
   let db: ReturnType<typeof getDb>;
   try {
@@ -134,19 +151,137 @@ async function fetchSession(
       .where(eq(demographicsTable.session_id, sessionId))
       .limit(1);
     const demoRow = (demoRows[0] ?? null) as DemographicsRow | null;
+    const demographics = rowToDemographicSet(demoRow);
+    const answers = (row.answers ?? []) as Answer[];
+    // CC-STALE-SHAPE-DETECTOR — three-branch render-path detector.
+    // The detector inspects the stored bundle + engine_shape_version
+    // and returns one of:
+    //   - fresh: stored constitution matches the current engine
+    //     shape; render directly.
+    //   - re-derivable: shape drift (e.g., older row missing the
+    //     `ocean.dispositionSignalMix.bands` field that the renderer
+    //     now reads); re-derive via buildInnerConstitution from the
+    //     stored `answers` and emit `[stale-shape:re-derived]`.
+    //   - un-rerenderable: shape drift AND `answers` missing/empty;
+    //     bubble up the graceful-error card. Never throw.
+    const verdict = detectStaleShape({
+      sessionId,
+      engineShapeVersion: row.engine_shape_version,
+      innerConstitution: row.inner_constitution,
+      answers,
+    });
+    let constitution: InnerConstitution;
+    let branch: "fresh" | "re-derivable";
+    if (verdict.branch === "fresh") {
+      constitution = verdict.constitution;
+      branch = "fresh";
+    } else if (verdict.branch === "re-derivable") {
+      // Re-derive via the engine entry. Engine-only — no LLM path.
+      try {
+        constitution = buildInnerConstitution(answers, [], demographics);
+      } catch {
+        return {
+          kind: "un-rerenderable",
+          reason: "re-derivation-throw",
+        };
+      }
+      const fieldDiffs = diffShape(verdict.storedConstitution, constitution);
+      logStaleShapeReDerived({
+        sessionId,
+        storedVersion: row.engine_shape_version,
+        currentVersion: ENGINE_SHAPE_VERSION,
+        reason: verdict.reason,
+        fieldDiffs,
+      });
+      branch = "re-derivable";
+    } else {
+      return { kind: "un-rerenderable", reason: verdict.reason };
+    }
     return {
       sessionId,
-      constitution: row.inner_constitution as InnerConstitution,
-      answers: row.answers as Answer[],
-      demographics: rowToDemographicSet(demoRow),
+      constitution,
+      answers,
+      demographics,
       metaSignals: (row.meta_signals ?? []) as MetaSignal[],
       createdAt: row.created_at,
+      staleShapeBranch: branch,
     };
   } catch {
-    // Query failed (DB unreachable, schema drift, malformed JSONB).
-    // Treat as not-found so the user sees a friendly page.
+    // Query failed (DB unreachable, malformed JSONB). Treat as not-
+    // found so the user sees a friendly page rather than a server
+    // error.
     return null;
   }
+}
+
+function ReportRetakeRequired({ reason }: { reason: string }) {
+  // CC-STALE-SHAPE-DETECTOR — branch (3) graceful-error card. Renders
+  // when the stored bundle is stale-shape AND `answers` is missing/
+  // incomplete (so re-derivation is impossible). User-facing copy is
+  // soft; the diagnostic reason hides in a data-attribute for admin
+  // inspection without leaking detail to the reader.
+  return (
+    <main
+      className="min-h-screen flex items-center justify-center"
+      style={{ background: "var(--paper)", color: "var(--ink)" }}
+      data-stale-shape-reason={reason}
+    >
+      <div
+        className="flex flex-col items-center"
+        style={{ gap: 16, maxWidth: 520, padding: 32, textAlign: "center" }}
+      >
+        <p
+          className="font-mono uppercase"
+          style={{
+            fontSize: 11,
+            letterSpacing: "0.16em",
+            color: "var(--ink-mute)",
+            margin: 0,
+          }}
+        >
+          Reading needs a refresh
+        </p>
+        <h1
+          className="font-serif"
+          style={{
+            fontSize: 28,
+            fontWeight: 500,
+            color: "var(--ink)",
+            margin: 0,
+            lineHeight: 1.2,
+          }}
+        >
+          We can&apos;t render this report
+        </h1>
+        <p
+          className="font-serif italic"
+          style={{
+            fontSize: 16,
+            color: "var(--ink-soft)",
+            lineHeight: 1.55,
+            margin: 0,
+          }}
+        >
+          This report was saved against an older version of the model and
+          can&apos;t be rebuilt from the stored answers. Please re-take the
+          assessment to generate a fresh reading.
+        </p>
+        <Link
+          href="/"
+          className="font-mono uppercase"
+          style={{
+            fontSize: 11,
+            letterSpacing: "0.12em",
+            color: "var(--umber, var(--ink))",
+            textDecoration: "underline",
+            marginTop: 12,
+          }}
+        >
+          Take the assessment →
+        </Link>
+      </div>
+    </main>
+  );
 }
 
 function ReportNotFound() {
@@ -222,13 +357,18 @@ export default async function ReportPermalinkPage({
   if (!fetched) {
     return <ReportNotFound />;
   }
+  if ("kind" in fetched && fetched.kind === "un-rerenderable") {
+    return <ReportRetakeRequired reason={fetched.reason} />;
+  }
+  // Narrow to FetchedSession (branch-1 fresh / branch-2 re-derivable).
+  const session = fetched as FetchedSession;
   return (
     <ReportView
-      sessionId={fetched.sessionId}
-      constitution={fetched.constitution}
-      answers={fetched.answers}
-      demographics={fetched.demographics}
-      sessionDate={fetched.createdAt}
+      sessionId={session.sessionId}
+      constitution={session.constitution}
+      answers={session.answers}
+      demographics={session.demographics}
+      sessionDate={session.createdAt}
     />
   );
 }

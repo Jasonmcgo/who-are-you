@@ -13,6 +13,7 @@ import {
   readCachedGripParagraph,
   type GripParagraphInputs,
 } from "./gripTaxonomyLlm";
+import { bundleLookup, type LlmRewritesBundle } from "./llmRewritesBundle";
 
 const CLAUDE_MODEL = "claude-sonnet-4-5";
 const API_TIMEOUT_MS = 60_000;
@@ -136,21 +137,30 @@ export async function persistGripCache(
 }
 
 export async function lookupOrComputeGripParagraph(
-  inputs: GripParagraphInputs
+  inputs: GripParagraphInputs,
+  sessionLlmBundle: LlmRewritesBundle | null = null
 ): Promise<string | null> {
   // 1. Static cache lookup.
   const cached = readCachedGripParagraph(inputs);
   if (cached) return cached;
 
-  // 2. Defensive: never run the API fallback in a browser bundle.
+  // 2. CC-LLM-REWRITES-PERSISTED-ON-SESSION — session bundle check.
+  const key = gripInputsHash(inputs);
+  const fromBundle = bundleLookup(sessionLlmBundle, "grip", key);
+  if (fromBundle !== null) return fromBundle;
+
+  // 3. Defensive: never run the API fallback in a browser bundle.
   if (typeof window !== "undefined") return null;
+
+  // 4. CC-LLM-REWRITES-PERSISTED-ON-SESSION — runtime gate.
+  if (process.env.LLM_REWRITE_RUNTIME !== "on") return null;
   if (!process.env.ANTHROPIC_API_KEY) return null;
 
-  // 3. Cache miss + server env + key → call API.
+  // 5. Cache miss + runtime opt-in + key → call API.
   const paragraph = await composeGripParagraph(inputs);
   if (!paragraph) return null;
 
-  // 4. Persist for future renders.
+  // 6. Persist for future renders.
   await persistGripCache(inputs, paragraph);
   return paragraph;
 }

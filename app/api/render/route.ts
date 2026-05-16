@@ -16,6 +16,7 @@ import { NextResponse } from "next/server";
 
 import { buildInnerConstitution } from "../../../lib/identityEngine";
 import { renderMirrorAsMarkdownLive } from "../../../lib/renderMirrorLive";
+import { loadSessionLlmBundle } from "../../../lib/sessionLlmBundleStore";
 import type {
   Answer,
   DemographicSet,
@@ -29,6 +30,11 @@ interface RenderRequestBody {
   demographics?: DemographicSet | null;
   metaSignals?: MetaSignal[];
   includeBeliefAnchor?: boolean;
+  // CC-LLM-REWRITES-PERSISTED-ON-SESSION — when present, the route
+  // loads the per-session rewrite bundle from `sessions.llm_rewrites`
+  // and threads it into the live renderer. Live renders served from
+  // a saved session use this to bypass any runtime LLM call.
+  sessionId?: string;
 }
 
 function isRenderRequestBody(v: unknown): v is RenderRequestBody {
@@ -59,22 +65,32 @@ export async function POST(request: Request): Promise<NextResponse> {
   const metaSignals = payload.metaSignals ?? [];
   const includeBeliefAnchor = payload.includeBeliefAnchor ?? false;
 
+  const sessionId = payload.sessionId ?? null;
+
   try {
     const constitution = buildInnerConstitution(
       answers,
       metaSignals,
       demographics
     );
+    // CC-LLM-REWRITES-PERSISTED-ON-SESSION — load the per-session
+    // bundle when sessionId is present. Null on un-backfilled rows.
+    const sessionLlmBundle = sessionId
+      ? await loadSessionLlmBundle(sessionId)
+      : null;
     // CC-LIVE-SESSION-LLM-WIRING semantics: the async wrapper pre-
     // resolves the four scoped body cards + Keystone before invoking
     // the synchronous user-mode renderer. Hits / runtime-cached
     // resolutions / Tier C fallback are all handled transparently.
-    const markdown = await renderMirrorAsMarkdownLive({
-      constitution,
-      answers,
-      demographics,
-      includeBeliefAnchor,
-    });
+    const markdown = await renderMirrorAsMarkdownLive(
+      {
+        constitution,
+        answers,
+        demographics,
+        includeBeliefAnchor,
+      },
+      { sessionLlmBundle }
+    );
     return NextResponse.json({ markdown });
   } catch (e) {
     console.error(`[api/render] failure: ${(e as Error).message}`);

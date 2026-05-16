@@ -13,6 +13,10 @@
     "audit:react-user-mode-parity": "tsx tests/audit/reactUserModeParity.audit.ts",
     "audit:prose-leak-cleanup-v3": "tsx tests/audit/proseLeakCleanupV3.audit.ts",
     "audit:launch-voice-polish-v3": "tsx tests/audit/launchVoicePolishV3.audit.ts",
+    "audit:llm-rewrites-persisted-on-session": "tsx tests/audit/llmRewritesPersistedOnSession.audit.ts",
+    "audit:calibration-phase-1": "tsx scripts/calibrationPhase1DistributionAudit.ts",
+    "audit:stale-shape-detector": "tsx tests/audit/staleShapeDetector.audit.ts",
+    "backfill:llm-rewrites": "tsx scripts/backfillLlmRewritesOnSessions.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio"

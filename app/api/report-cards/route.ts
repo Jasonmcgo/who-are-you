@@ -21,6 +21,7 @@ import {
   resolveScopedRewritesLive,
   type ScopedRewritesResult,
 } from "../../../lib/resolveScopedRewritesLive";
+import { loadSessionLlmBundle } from "../../../lib/sessionLlmBundleStore";
 import type {
   Answer,
   DemographicSet,
@@ -33,6 +34,11 @@ interface ReportCardsRequestBody {
   answers?: Answer[];
   demographics?: DemographicSet | null;
   metaSignals?: MetaSignal[];
+  // CC-LLM-REWRITES-PERSISTED-ON-SESSION — when present, the route
+  // loads the per-session rewrite bundle from `sessions.llm_rewrites`
+  // and threads it into the resolver. Live sessions whose row has
+  // been backfilled serve every layer from the bundle.
+  sessionId?: string;
 }
 
 function isReportCardsRequestBody(v: unknown): v is ReportCardsRequestBody {
@@ -47,6 +53,14 @@ const EMPTY_RESULT: ScopedRewritesResult = {
   hands: null,
   path: null,
   keystone: null,
+  // CC-LAUNCH-VOICE-POLISH-V3 — seven additional sections.
+  executiveRead: null,
+  corePattern: null,
+  whatOthersMayExperience: null,
+  whenTheLoadGetsHeavy: null,
+  synthesis: null,
+  closingRead: null,
+  pathTriptych: null,
 };
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -68,6 +82,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   const answers = payload.answers ?? [];
   const demographics = payload.demographics ?? null;
   const metaSignals = payload.metaSignals ?? [];
+  const sessionId = payload.sessionId ?? null;
 
   try {
     const constitution = buildInnerConstitution(
@@ -75,11 +90,18 @@ export async function POST(request: Request): Promise<NextResponse> {
       metaSignals,
       demographics
     );
-    const rewrites = await resolveScopedRewritesLive({
-      constitution,
-      answers,
-      demographics,
-    });
+    // CC-LLM-REWRITES-PERSISTED-ON-SESSION — bundle load + thread.
+    const sessionLlmBundle = sessionId
+      ? await loadSessionLlmBundle(sessionId)
+      : null;
+    const rewrites = await resolveScopedRewritesLive(
+      {
+        constitution,
+        answers,
+        demographics,
+      },
+      { sessionLlmBundle }
+    );
     return NextResponse.json(rewrites);
   } catch (e) {
     console.error(`[api/report-cards] failure: ${(e as Error).message}`);

@@ -7,6 +7,10 @@
 //   ANTHROPIC_API_KEY=... npx tsx scripts/buildKeystoneRewrites.ts --force
 //   ANTHROPIC_API_KEY=... npx tsx scripts/buildKeystoneRewrites.ts --fixture=ocean/07-jason-real-session.json
 
+// CC-LLM-REWRITES-PERSISTED-ON-SESSION — opt in to the runtime LLM
+// branch. The render path leaves this off; only build* scripts flip it.
+process.env.LLM_REWRITE_RUNTIME = "on";
+
 import {
   existsSync,
   mkdirSync,

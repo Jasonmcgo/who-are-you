@@ -1764,13 +1764,23 @@ function enforceHandsTemplate(
     stopRel < 0 ? raw.length - headerIdx : 20 + stopRel;
   let section = raw.slice(headerIdx, headerIdx + sectionEnd);
 
+  // CC-PROSE-LEAK-CLEANUP-V3 Rule 1 — idempotent post-processors. When
+  // the section already carries the full canonical header + sub-header,
+  // header injection must be a no-op. (The replace below preserves a
+  // single header at the original position even when sub-header is
+  // missing — but the explicit guard documents intent for future
+  // readers.) Header dedup handled defensively below regardless.
+  const hasHeader = section.startsWith("### Hands — Work");
+  const hasSubHeader = section.includes("**What you build and carry**");
+
   // 1. Inject sub-header + italic opener if the sub-header is missing.
-  if (!section.includes("**What you build and carry**")) {
+  if (!hasSubHeader) {
     section = section.replace(
       /^### Hands — Work\s*\n+/,
       `### Hands — Work\n\n**What you build and carry**\n\n*${handsCard.openingLine}*\n\n`
     );
   }
+  void hasHeader;
 
   // 2. Italicize the Work Map distinction trail if not already italic.
   const trailRe = /(\n)(Hands is what your life makes real\. Work Map is where that making may fit\.)(\s*$|\n)/;
@@ -1795,5 +1805,34 @@ function enforceHandsTemplate(
       section = section.slice(0, trailIdx) + canonLine + section.slice(trailIdx);
     }
   }
+
+  // CC-PROSE-LEAK-CLEANUP-V3 Fix 2 — dedupe the Work Map trail. The
+  // unmappedType handsCard template sets `closingLine` to the same
+  // string as the canonical Work Map trail, so the engine emits
+  //   *Hands is what your life makes real. Work Map is where…*
+  //   *Hands is what your life makes real. Work Map is where…*
+  // back-to-back. (Other archetypes' closingLine prose is distinct,
+  // but the LLM rewrites can also coincidentally repeat the trail.)
+  // Idempotent dedup: collapse any consecutive duplicate occurrences
+  // of the italic trail line, separated only by whitespace.
+  const trailDupRe = /(\*Hands is what your life makes real\. Work Map is where that making may fit\.\*)(\s*\n\s*)\1/g;
+  while (trailDupRe.test(section)) {
+    section = section.replace(trailDupRe, "$1");
+  }
+
+  // CC-PROSE-LEAK-CLEANUP-V3 Fix 2 — dedupe the header + sub-header
+  // pair defensively. If anything upstream (LLM rewrite, future
+  // refactor) reintroduces a second `### Hands — Work` block within
+  // the section, collapse to the first. Keeps the post-processor
+  // idempotent even when callers don't.
+  const headerDupRe = /(### Hands — Work\s*\n+)([\s\S]*?)\n### Hands — Work\s*\n+/;
+  while (headerDupRe.test(section)) {
+    section = section.replace(headerDupRe, "$1$2\n");
+  }
+  const subHeaderDupRe = /(\*\*What you build and carry\*\*\s*\n+)([\s\S]*?)\n\*\*What you build and carry\*\*\s*\n+/;
+  while (subHeaderDupRe.test(section)) {
+    section = section.replace(subHeaderDupRe, "$1$2\n");
+  }
+
   return raw.slice(0, headerIdx) + section + raw.slice(headerIdx + sectionEnd);
 }

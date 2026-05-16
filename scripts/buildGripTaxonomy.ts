@@ -8,6 +8,9 @@
 //   ANTHROPIC_API_KEY=... npx tsx scripts/buildGripTaxonomy.ts --force
 //   ANTHROPIC_API_KEY=... npx tsx scripts/buildGripTaxonomy.ts --fixture=ocean/07-jason-real-session.json
 
+// CC-LLM-REWRITES-PERSISTED-ON-SESSION — opt in to the runtime LLM branch.
+process.env.LLM_REWRITE_RUNTIME = "on";
+
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";

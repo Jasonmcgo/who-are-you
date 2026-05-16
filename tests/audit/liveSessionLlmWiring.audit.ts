@@ -90,6 +90,11 @@ function listFixtures(): Array<{ set: string; file: string }> {
 }
 
 async function runAudit(): Promise<void> {
+  // CC-LLM-REWRITES-PERSISTED-ON-SESSION — this audit exercises the
+  // live-LLM resolver path, which is now gated by
+  // `LLM_REWRITE_RUNTIME=on`. The render-path default is "off"
+  // (structurally cache-or-engine). Build/live audits flip it on.
+  process.env.LLM_REWRITE_RUNTIME = "on";
   const results: AssertionResult[] = [];
 
   // ── 1. live-session-on-demand-fires-and-caches ─────────────────────

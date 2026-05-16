@@ -38,6 +38,7 @@ import type {
 } from "./proseRewriteLlm";
 import type { KeystoneRewriteInputs } from "./keystoneRewriteLlm";
 import { SessionLlmBudget } from "./cacheObservability";
+import type { LlmRewritesBundle } from "./llmRewritesBundle";
 
 const SCOPED_HEADERS: Record<ProseCardId, string> = {
   lens: "### Lens — Eyes",
@@ -72,6 +73,12 @@ export interface LiveRenderOptions {
   keystoneComposer?: KeystoneLiveResolveOptions["composer"];
   /** Override the per-call LLM timeout. Default: 10 s. */
   timeoutMs?: number;
+  /**
+   * CC-LLM-REWRITES-PERSISTED-ON-SESSION — per-session bundle loaded
+   * from `sessions.llm_rewrites`. Threaded through to every per-layer
+   * resolver. Null on un-backfilled rows.
+   */
+  sessionLlmBundle?: LlmRewritesBundle | null;
 }
 
 /**
@@ -115,6 +122,7 @@ export async function renderMirrorAsMarkdownLive(
         budget,
         timeoutMs: options.timeoutMs,
         composer: options.proseComposer,
+        sessionLlmBundle: options.sessionLlmBundle ?? null,
       })
     );
   }
@@ -147,6 +155,7 @@ export async function renderMirrorAsMarkdownLive(
       budget,
       timeoutMs: options.timeoutMs,
       composer: options.keystoneComposer,
+      sessionLlmBundle: options.sessionLlmBundle ?? null,
     });
   }
 

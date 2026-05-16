@@ -69,3 +69,28 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+### Runtime LLM gate (CC-LLM-REWRITES-PERSISTED-ON-SESSION)
+
+The render path is structurally cache-or-engine: every request reads
+LLM rewrites from `lib/cache/*.json` (committed) or from the per-session
+`sessions.llm_rewrites` JSONB column. The Anthropic API is reachable
+only from explicit `build*` scripts.
+
+Required Vercel env-var state (and any other production deploy):
+
+- `LLM_REWRITE_RUNTIME` — **unset, or set to `off`**. Setting it to
+  `on` re-enables runtime API calls and is forbidden in production.
+- `ANTHROPIC_API_KEY` — **absent**. The key only belongs in the local
+  developer machine running `npm run build:*` scripts. A key in
+  Vercel's env, combined with `LLM_REWRITE_RUNTIME=on`, is the only
+  configuration that re-opens the spend surface.
+
+Backfill flow:
+
+1. Locally, with `DATABASE_URL` pointing at production: run
+   `npm run backfill:llm-rewrites` to populate `sessions.llm_rewrites`
+   from the committed cache. The script makes zero API calls.
+2. Deploy. The render path now serves the per-session bundle for any
+   row that's been backfilled; un-backfilled rows fall through to
+   engine prose.

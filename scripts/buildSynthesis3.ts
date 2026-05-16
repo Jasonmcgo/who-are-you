@@ -21,6 +21,10 @@
 // infrastructure-only state and exits cleanly. The cache file stays
 // whatever it was — empty {} or whatever entries already exist.
 
+// CC-LLM-REWRITES-PERSISTED-ON-SESSION — opt this build script into
+// the runtime LLM branch. The render path leaves it off.
+process.env.LLM_REWRITE_RUNTIME = "on";
+
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";

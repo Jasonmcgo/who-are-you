@@ -56,12 +56,18 @@ type Props = {
     hands: string | null;
     path: string | null;
     keystone: string | null;
+    // CC-LAUNCH-VOICE-POLISH-V3 — pathTriptych is the only V3 field
+    // consumed inside the Map (others land in Mirror / Closing Read).
+    pathTriptych?: string | null;
   };
 };
 
 const CARD_KEYS = [
   "lens",
   "compass",
+  // CC-HANDS-9TH-CARD-PARITY — Hands enters the collapse/expand register
+  // as a peer of the other 8 (3rd slot, between Compass and Voice).
+  "hands",
   "conviction",
   "gravity",
   "trust",
@@ -81,6 +87,8 @@ export default function MapSection({
   const [expanded, setExpanded] = useState<Record<CardKey, boolean>>({
     lens: false,
     compass: false,
+    // CC-HANDS-9TH-CARD-PARITY — collapse-by-default like the other 8.
+    hands: false,
     conviction: false,
     gravity: false,
     trust: false,
@@ -97,6 +105,7 @@ export default function MapSection({
     setExpanded({
       lens: value,
       compass: value,
+      hands: value,
       conviction: value,
       gravity: value,
       trust: value,
@@ -352,91 +361,164 @@ export default function MapSection({
         proses={patternsByCard.get("compass")}
       />
       {/* CC-HANDS-CARD — 9th body card. Inserts after Heart/Compass and
-          before the next card (Voice/Conviction in this React render
-          order). Existential Goal-axis card with dual-mode read. */}
+          before Voice/Conviction. Existential Goal-axis card with dual-
+          mode read.
+          CC-HANDS-9TH-CARD-PARITY — collapsed-by-default accordion
+          treatment mirroring the other 8 body cards' AccordionToggle
+          pattern (▸/▾ on the right, click-to-expand header on the
+          left). Header renamed to "Hands · Work" (middle-dot) to match
+          the 8-card naming convention. Engine markdown emission stays
+          "### Hands — Work" for cache-key stability; the user-visible
+          rename happens only at the React surface (and in the
+          user-mode markdown post-process — see lib/renderMirror.ts).
+          A placeholder slot (`data-card-svg="hands"`) sits above the
+          card for the design-studio body-part icon delivery. */}
       {constitution.handsCard ? (
-        <section
-          className="font-serif"
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 10,
-            padding: "20px 22px",
-            margin: "6px 0",
-            borderLeft: "2px solid var(--rule, #d4c8a8)",
-            background: "var(--paper, #f7f1e6)",
-          }}
-        >
-          <h3
+        <>
+          <div
+            data-card-svg="hands"
             style={{
-              fontSize: 17,
-              fontWeight: 600,
-              margin: 0,
-              color: "var(--ink, #2b2417)",
+              display: "flex",
+              justifyContent: "center",
+              marginTop: 24,
+              marginBottom: 12,
+              minHeight: 8,
+            }}
+          />
+          <section
+            data-card="hands"
+            className="font-serif"
+            style={{
+              borderBottom: "1px solid var(--rule-soft)",
             }}
           >
-            Hands — Work
-          </h3>
-          <p
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              margin: 0,
-              color: "var(--ink-soft, #6f6555)",
-            }}
-          >
-            What you build and carry
-          </p>
-          {/* CC-REACT-ON-SCREEN-LLM-RENDER — when the LLM rewrite is
-              available, the entire structured body (opener / Strength /
-              Growth Edge / Under Pressure / Practice / movementNote /
-              closingLine) is replaced by the LLM markdown rendered via
-              LlmProseBlock. The Work Map distinction trail stays at
-              the bottom regardless. */}
-          {liveScopedRewrites?.hands ? (
-            <LlmProseBlock markdown={liveScopedRewrites.hands} />
-          ) : (
-            <>
-              <p style={{ fontStyle: "italic", margin: 0, lineHeight: 1.55 }}>
-                {constitution.handsCard.openingLine}
-              </p>
-              <p style={{ margin: 0, lineHeight: 1.55 }}>
-                <strong>Strength</strong> — {constitution.handsCard.strength}
-              </p>
-              <p style={{ margin: 0, lineHeight: 1.55 }}>
-                <strong>Growth Edge</strong> —{" "}
-                {constitution.handsCard.growthEdge}
-              </p>
-              <p style={{ margin: 0, lineHeight: 1.55 }}>
-                <strong>Under Pressure</strong> — In health:{" "}
-                {constitution.handsCard.underPressure.healthRegister} Under load:{" "}
-                {constitution.handsCard.underPressure.pressureRegister}{" "}
-                {constitution.handsCard.underPressure.integrationLine}
-              </p>
-              <p style={{ margin: 0, lineHeight: 1.55 }}>
-                <strong>Practice</strong> — {constitution.handsCard.practice}
-              </p>
-              <p style={{ fontStyle: "italic", margin: 0, lineHeight: 1.55 }}>
-                {constitution.handsCard.movementNote}
-              </p>
-              <p style={{ fontStyle: "italic", margin: 0, lineHeight: 1.55 }}>
-                {constitution.handsCard.closingLine}
-              </p>
-            </>
-          )}
-          <p
-            style={{
-              fontStyle: "italic",
-              margin: 0,
-              lineHeight: 1.55,
-              fontSize: 13,
-              color: "var(--ink-soft, #6f6555)",
-            }}
-          >
-            Hands is what your life makes real. Work Map is where that making
-            may fit.
-          </p>
-        </section>
+            <button
+              type="button"
+              onClick={() => toggle("hands")}
+              data-focus-ring
+              aria-expanded={expanded.hands}
+              className="text-left w-full"
+              style={{
+                background: "transparent",
+                border: "none",
+                padding: "12px 0",
+                cursor: "pointer",
+                display: "flex",
+                flexDirection: "row",
+                alignItems: "flex-start",
+                justifyContent: "space-between",
+                gap: 16,
+                color: "var(--ink)",
+              }}
+            >
+              <div
+                className="flex flex-col"
+                style={{ gap: 6, minWidth: 0, flex: 1 }}
+              >
+                <p
+                  className="font-mono uppercase"
+                  style={{
+                    fontSize: 11,
+                    letterSpacing: "0.08em",
+                    color: "var(--ink-mute)",
+                    margin: 0,
+                  }}
+                >
+                  Hands · Work
+                </p>
+                <p
+                  className="font-mono uppercase"
+                  style={{
+                    fontSize: 10.5,
+                    letterSpacing: "0.1em",
+                    color: "var(--ink-mute)",
+                    lineHeight: 1.5,
+                    margin: 0,
+                  }}
+                >
+                  What you build and carry
+                </p>
+              </div>
+              <span
+                aria-hidden="true"
+                style={{
+                  color: "var(--ink-mute)",
+                  fontSize: 14,
+                  lineHeight: 1.5,
+                  flex: "0 0 auto",
+                  paddingTop: 2,
+                  fontFamily: "var(--font-mono)",
+                }}
+              >
+                {expanded.hands ? "▾" : "▸"}
+              </span>
+            </button>
+            {expanded.hands ? (
+              <div
+                className="flex flex-col"
+                style={{ gap: 10, padding: "8px 0 20px 0" }}
+              >
+                {/* CC-REACT-ON-SCREEN-LLM-RENDER — when the LLM rewrite
+                    is available, the entire structured body (opener /
+                    Strength / Growth Edge / Under Pressure / Practice
+                    / movementNote / closingLine) is replaced by the
+                    LLM markdown rendered via LlmProseBlock. The Work
+                    Map distinction trail stays at the bottom
+                    regardless. */}
+                {liveScopedRewrites?.hands ? (
+                  <LlmProseBlock markdown={liveScopedRewrites.hands} />
+                ) : (
+                  <>
+                    <p
+                      style={{ fontStyle: "italic", margin: 0, lineHeight: 1.55 }}
+                    >
+                      {constitution.handsCard.openingLine}
+                    </p>
+                    <p style={{ margin: 0, lineHeight: 1.55 }}>
+                      <strong>Strength</strong> — {constitution.handsCard.strength}
+                    </p>
+                    <p style={{ margin: 0, lineHeight: 1.55 }}>
+                      <strong>Growth Edge</strong> —{" "}
+                      {constitution.handsCard.growthEdge}
+                    </p>
+                    <p style={{ margin: 0, lineHeight: 1.55 }}>
+                      <strong>Under Pressure</strong> — In health:{" "}
+                      {constitution.handsCard.underPressure.healthRegister}{" "}
+                      Under load:{" "}
+                      {constitution.handsCard.underPressure.pressureRegister}{" "}
+                      {constitution.handsCard.underPressure.integrationLine}
+                    </p>
+                    <p style={{ margin: 0, lineHeight: 1.55 }}>
+                      <strong>Practice</strong> — {constitution.handsCard.practice}
+                    </p>
+                    <p
+                      style={{ fontStyle: "italic", margin: 0, lineHeight: 1.55 }}
+                    >
+                      {constitution.handsCard.movementNote}
+                    </p>
+                    <p
+                      style={{ fontStyle: "italic", margin: 0, lineHeight: 1.55 }}
+                    >
+                      {constitution.handsCard.closingLine}
+                    </p>
+                  </>
+                )}
+                <p
+                  style={{
+                    fontStyle: "italic",
+                    margin: 0,
+                    lineHeight: 1.55,
+                    fontSize: 13,
+                    color: "var(--ink-soft, #6f6555)",
+                  }}
+                >
+                  Hands is what your life makes real. Work Map is where that
+                  making may fit.
+                </p>
+              </div>
+            ) : null}
+          </section>
+        </>
       ) : null}
       <CardSvgPlate cardId="conviction" />
       <ShapeCard
@@ -517,6 +599,7 @@ export default function MapSection({
         onToggle={() => toggle("path")}
         pathMasterSynthesis={synthLines.pathMaster}
         llmRewriteMarkdown={liveScopedRewrites?.path ?? null}
+        pathTriptychOverride={liveScopedRewrites?.pathTriptych ?? null}
       />
       <CrossCardPatternBlock
         cardId="path"

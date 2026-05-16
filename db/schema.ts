@@ -55,6 +55,21 @@ export const sessions = pgTable("sessions", {
   // CC-017 — BeliefUnderTension. Present only if Q-I1 / Q-I1b produced an
   // anchor and Q-I2 / Q-I3 produced selections.
   belief_under_tension: jsonb("belief_under_tension"),
+  // CC-LLM-REWRITES-PERSISTED-ON-SESSION — render-path cache.
+  // `llm_rewrites` holds the full per-session rewrite bundle, keyed by
+  // layer (prose / keystone / synthesis3 / grip / launchPolishV3).
+  // `llm_rewrites_engine_hash` is a deterministic hash of the engine
+  // inputs used to produce the rewrites; the render path uses it to
+  // detect when a stored bundle is stale relative to current engine
+  // output. NULL on rows that have not yet been backfilled or that
+  // were saved before this column existed.
+  llm_rewrites: jsonb("llm_rewrites"),
+  llm_rewrites_engine_hash: text("llm_rewrites_engine_hash"),
+  // CC-STALE-SHAPE-DETECTOR — schema version of the engine output that
+  // produced inner_constitution / allocation_overlays / belief_under_tension.
+  // Compared to ENGINE_SHAPE_VERSION at render time; mismatch triggers
+  // re-derivation from `answers`. NULL on pre-CC rows (treated as stale).
+  engine_shape_version: integer("engine_shape_version"),
 });
 
 // Demographics table. One row per saved session, linked by session_id.

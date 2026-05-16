@@ -15,6 +15,7 @@ import {
   logCacheResolution,
   SessionLlmBudget,
 } from "./cacheObservability";
+import { bundleLookup, type LlmRewritesBundle } from "./llmRewritesBundle";
 
 const CLAUDE_MODEL = "claude-sonnet-4-5";
 const DEFAULT_API_TIMEOUT_MS = 60_000;
@@ -126,6 +127,14 @@ export interface ProseLiveResolveOptions {
     inputs: ProseRewriteInputs,
     timeoutMs: number
   ) => Promise<string | null>;
+  /**
+   * CC-LLM-REWRITES-PERSISTED-ON-SESSION — per-session rewrite bundle
+   * loaded from `sessions.llm_rewrites`. Consulted in Step 2 (after
+   * the committed-cache check, before the runtime gate). Null on
+   * un-backfilled rows; the layer falls through to engine fallback
+   * unless `LLM_REWRITE_RUNTIME=on`.
+   */
+  sessionLlmBundle?: LlmRewritesBundle | null;
 }
 
 /**
@@ -138,21 +147,39 @@ export async function resolveProseRewriteLive(
   inputs: ProseRewriteInputs,
   options: ProseLiveResolveOptions
 ): Promise<string | null> {
-  // 1. Cache hit (committed OR runtime) — return immediately. The
-  //    read also fires `[cache-miss]` on a true miss, so subsequent
-  //    diagnostic logs are correct.
+  // 1. Committed-cache check (cohort + runtime caches). On hit, return
+  //    immediately. On miss, `readCachedRewrite` emits a structured
+  //    [cache-miss] log so the diagnostic surface is correct.
   const cached = readCachedRewrite(inputs);
   if (cached !== null) return cached;
 
-  // 2. Cohort/audit run — engine fallback. No LLM call.
+  // 2. CC-LLM-REWRITES-PERSISTED-ON-SESSION — session bundle check.
+  //    The bundle is loaded from `sessions.llm_rewrites` and threaded
+  //    in by the live render entry points (api/render, api/report-
+  //    cards). On hit, return the persisted rewrite — no API call,
+  //    no engine fallback.
+  const key = proseRewriteHash(inputs);
+  const fromBundle = bundleLookup(
+    options.sessionLlmBundle ?? null,
+    "prose",
+    key
+  );
+  if (fromBundle !== null) return fromBundle;
+
+  // 3. Cohort/audit run — engine fallback. No LLM call.
   if (!options.liveSession) return null;
 
-  const key = proseRewriteHash(inputs);
+  // 4. CC-LLM-REWRITES-PERSISTED-ON-SESSION — runtime gate. Render
+  //    path defaults to OFF; only `build*` scripts opt in by setting
+  //    process.env.LLM_REWRITE_RUNTIME = "on" at script start. Any
+  //    runtime call past this guard is intentional.
+  if (process.env.LLM_REWRITE_RUNTIME !== "on") return null;
+
   const fingerprint = fingerprintBody(inputs.engineSectionBody);
   const namespace = "prose-rewrites";
   const section = inputs.cardId;
 
-  // 3. Budget check.
+  // 5. Budget check.
   if (options.budget && !options.budget.tryConsume()) {
     logCacheResolution({
       namespace,
@@ -166,7 +193,7 @@ export async function resolveProseRewriteLive(
     return null;
   }
 
-  // 4. LLM call under timeout. The composer itself enforces the
+  // 6. LLM call under timeout. The composer itself enforces the
   //    per-call timeout (real composer wraps `withTimeout`).
   const composer = options.composer ?? composeProseRewrite;
   const timeoutMs = options.timeoutMs ?? LIVE_SESSION_TIMEOUT_MS;
@@ -193,7 +220,7 @@ export async function resolveProseRewriteLive(
     return null;
   }
 
-  // 5. Success. Cache in runtime + log resolution + return.
+  // 7. Success. Cache in runtime + log resolution + return.
   writeRuntimeRewrite(inputs, rewrite);
   logCacheResolution({
     namespace,

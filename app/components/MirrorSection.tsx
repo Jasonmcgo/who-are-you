@@ -104,6 +104,16 @@ type Props = {
   // cache get their on-demand-resolved keystone prose surfaced
   // on-screen, matching what the markdown export already produces.
   liveKeystoneRewriteProse?: string | null;
+  // CC-LAUNCH-VOICE-POLISH-V3 — five additional per-section LLM rewrite
+  // overrides. Each is null on cache miss / pre-resolve; when present,
+  // overrides the engine prose for that section. Closing Read and
+  // Path triptych are threaded into InnerConstitutionPage + PathExpanded
+  // respectively (not here).
+  liveExecutiveReadRewrite?: string | null;
+  liveCorePatternRewrite?: string | null;
+  liveWhatOthersMayExperienceRewrite?: string | null;
+  liveWhenTheLoadGetsHeavyRewrite?: string | null;
+  liveSynthesisRewrite?: string | null;
   // CC-REACT-USER-MODE-PARITY — threaded down to <CoreSignalMap> so the
   // Surface label cell mirrors the markdown export's user/clinician
   // split (user mode replaces "<MBTI>, provisional" with "provisional").
@@ -246,6 +256,11 @@ export default function MirrorSection({
   answers,
   constitution,
   liveKeystoneRewriteProse,
+  liveExecutiveReadRewrite,
+  liveCorePatternRewrite,
+  liveWhatOthersMayExperienceRewrite,
+  liveWhenTheLoadGetsHeavyRewrite,
+  liveSynthesisRewrite,
   renderMode,
 }: Props) {
   // CC-025 Step 2.6 — pronoun register pinned to second-person throughout
@@ -353,7 +368,28 @@ export default function MirrorSection({
           <HairlineRule />
           <div className="flex flex-col" style={{ gap: 12 }}>
             <SectionLabel>Executive Read</SectionLabel>
+            {/* CC-LAUNCH-VOICE-POLISH-V3 — when a live LLM rewrite is
+                present, render the engine pull-quote in the callout AND
+                emit the rewrite's sustained-prose paragraphs below.
+                The LLM is instructed to preserve the engine pull-quote
+                as the first line of its output; we split on the first
+                blank line so the callout still carries the tight
+                summary and the body paragraphs carry the texture. */}
             <CalloutBlock text={executiveRead} />
+            {liveExecutiveReadRewrite ? (
+              <div className="flex flex-col" style={{ gap: 12 }}>
+                {liveExecutiveReadRewrite
+                  .split(/\n\n+/)
+                  .map((p) => p.trim())
+                  .filter((p) => p.length > 0 && p !== executiveRead.trim())
+                  .map((para, idx) => (
+                    <BodyParagraph
+                      key={`exec-${idx}`}
+                      text={para.replace(/^>\s*/, "").replace(/^\*+|\*+$/g, "")}
+                    />
+                  ))}
+              </div>
+            ) : null}
           </div>
         </>
       ) : null}
@@ -395,10 +431,22 @@ export default function MirrorSection({
 
       <HairlineRule />
 
-      {/* 2. Core Pattern */}
+      {/* 2. Core Pattern. CC-LAUNCH-VOICE-POLISH-V3 — live LLM rewrite
+          overrides the engine paragraph when present. */}
       <div className="flex flex-col" style={{ gap: 12 }}>
         <SectionLabel>Your Core Pattern</SectionLabel>
-        <BodyParagraph text={mirror.corePattern} />
+        {liveCorePatternRewrite
+          ? liveCorePatternRewrite
+              .split(/\n\n+/)
+              .map((p) => p.trim())
+              .filter((p) => p.length > 0)
+              .map((para, idx) => (
+                <BodyParagraph
+                  key={`corepat-${idx}`}
+                  text={para.replace(/^\*+|\*+$/g, "")}
+                />
+              ))
+          : <BodyParagraph text={mirror.corePattern} />}
       </div>
 
       <HairlineRule />
@@ -431,18 +479,42 @@ export default function MirrorSection({
 
       <HairlineRule />
 
-      {/* 5. What Others May Experience */}
+      {/* 5. What Others May Experience. CC-LAUNCH-VOICE-POLISH-V3 — live
+          LLM rewrite overrides the engine paragraph when present. */}
       <div className="flex flex-col" style={{ gap: 12 }}>
         <SectionLabel>What Others May Experience</SectionLabel>
-        <BodyParagraph text={mirror.whatOthersMayExperience} />
+        {liveWhatOthersMayExperienceRewrite
+          ? liveWhatOthersMayExperienceRewrite
+              .split(/\n\n+/)
+              .map((p) => p.trim())
+              .filter((p) => p.length > 0)
+              .map((para, idx) => (
+                <BodyParagraph
+                  key={`others-${idx}`}
+                  text={para.replace(/^\*+|\*+$/g, "")}
+                />
+              ))
+          : <BodyParagraph text={mirror.whatOthersMayExperience} />}
       </div>
 
       <HairlineRule />
 
-      {/* 6. When the Load Gets Heavy */}
+      {/* 6. When the Load Gets Heavy. CC-LAUNCH-VOICE-POLISH-V3 — live
+          LLM rewrite overrides the engine paragraph when present. */}
       <div className="flex flex-col" style={{ gap: 12 }}>
         <SectionLabel>When the Load Gets Heavy</SectionLabel>
-        <BodyParagraph text={mirror.whenTheLoadGetsHeavy} />
+        {liveWhenTheLoadGetsHeavyRewrite
+          ? liveWhenTheLoadGetsHeavyRewrite
+              .split(/\n\n+/)
+              .map((p) => p.trim())
+              .filter((p) => p.length > 0)
+              .map((para, idx) => (
+                <BodyParagraph
+                  key={`load-${idx}`}
+                  text={para.replace(/^\*+|\*+$/g, "")}
+                />
+              ))
+          : <BodyParagraph text={mirror.whenTheLoadGetsHeavy} />}
       </div>
 
       <HairlineRule />
@@ -492,12 +564,36 @@ export default function MirrorSection({
             >
               one cross-card read, with the parallel-line close.
             </p>
-            <p
-              className="font-serif text-[15.5px] md:text-[16px]"
-              style={{ color: "var(--ink)", lineHeight: 1.7, margin: 0 }}
-            >
-              {summaryParts.intro}
-            </p>
+            {/* CC-LAUNCH-VOICE-POLISH-V3 — live LLM rewrite replaces the
+                engine-composed intro paragraph. The deterministic
+                parallel-line tercet still renders below as the close
+                (per CC §"Scope §5": don't rewrite the tercet). */}
+            {liveSynthesisRewrite
+              ? liveSynthesisRewrite
+                  .split(/\n\n+/)
+                  .map((p) => p.trim())
+                  .filter((p) => p.length > 0)
+                  .map((para, idx) => (
+                    <p
+                      key={`synth-${idx}`}
+                      className="font-serif text-[15.5px] md:text-[16px]"
+                      style={{
+                        color: "var(--ink)",
+                        lineHeight: 1.7,
+                        margin: 0,
+                      }}
+                    >
+                      {para.replace(/^\*+|\*+$/g, "")}
+                    </p>
+                  ))
+              : (
+                <p
+                  className="font-serif text-[15.5px] md:text-[16px]"
+                  style={{ color: "var(--ink)", lineHeight: 1.7, margin: 0 }}
+                >
+                  {summaryParts.intro}
+                </p>
+              )}
             {summaryParts.tercet ? (
               <p
                 className="font-serif text-[15.5px] md:text-[16px]"

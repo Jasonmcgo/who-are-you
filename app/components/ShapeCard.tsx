@@ -87,6 +87,9 @@ type Props =
       variant: "path";
       output: PathOutput;
       pathMasterSynthesis?: string;
+      // CC-LAUNCH-VOICE-POLISH-V3 — when set, replaces the engine
+      // Work/Love/Give bodies in PathExpanded with the LLM rewrite.
+      pathTriptychOverride?: string | null;
     } & CommonAccordionProps);
 
 function CardKicker({ name, bodyPart }: { name: string; bodyPart: string }) {
@@ -443,7 +446,7 @@ export default function ShapeCard(props: Props) {
   }
 
   // ── path ───────────────────────────────────────────────────────
-  const { output, pathMasterSynthesis, llmRewriteMarkdown } = props;
+  const { output, pathMasterSynthesis, llmRewriteMarkdown, pathTriptychOverride } = props;
   const header = (
     <>
       <CardKicker name={output.cardName} bodyPart={output.bodyPart} />
@@ -470,6 +473,7 @@ export default function ShapeCard(props: Props) {
       <PathExpanded
         output={output}
         masterSynthesisOverride={pathMasterSynthesis}
+        pathTriptychOverride={pathTriptychOverride}
       />
       {pathPatternNoteText ? (
         <Cell label="Pattern Note" text={pathPatternNoteText} variant="aphorism" />

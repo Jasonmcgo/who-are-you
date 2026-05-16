@@ -11,7 +11,52 @@ type Props = {
   // behavior + next-move + closing canonical phrase). The Work / Love /
   // Give detailed blocks below stay verbatim.
   masterSynthesisOverride?: string;
+  // CC-LAUNCH-VOICE-POLISH-V3 — when present, replaces the engine
+  // `output.work` / `output.love` / `output.give` block bodies with
+  // the LLM rewrite. The rewrite preserves the **Work** / **Love** /
+  // **Give** bold field labels and is parsed here back into per-facet
+  // strings. Falls through silently to engine prose on absent /
+  // malformed rewrite.
+  pathTriptychOverride?: string | null;
 };
+
+// Split the LLM pathTriptych rewrite into per-facet strings keyed by
+// the bold field label. Returns {work, love, give} where each value is
+// either the LLM-rewritten body (sans label) or null. The MirrorSection
+// markdown extractor produces a triptych block that starts with
+// `**Work** — ...`, so the parser is shaped to that contract.
+function parsePathTriptych(
+  rewrite: string | null | undefined
+): { work: string | null; love: string | null; give: string | null } {
+  if (!rewrite) return { work: null, love: null, give: null };
+  const out: { work: string | null; love: string | null; give: string | null } = {
+    work: null,
+    love: null,
+    give: null,
+  };
+  const lines = rewrite.split("\n");
+  type Facet = "work" | "love" | "give";
+  const labels: Array<{ label: string; key: Facet }> = [
+    { label: "**Work**", key: "work" },
+    { label: "**Love**", key: "love" },
+    { label: "**Give**", key: "give" },
+  ];
+  for (const { label, key } of labels) {
+    const idx = lines.findIndex((l) => l.startsWith(label));
+    if (idx < 0) continue;
+    const chunk: string[] = [];
+    chunk.push(lines[idx].replace(/^\*\*(?:Work|Love|Give)\*\*\s*[—-]?\s*/, ""));
+    for (let i = idx + 1; i < lines.length; i++) {
+      const next = lines[i];
+      if (/^\*\*(?:Work|Love|Give|Practice|Pattern Note|Pattern in motion|Movement Note)\*\*/.test(next) || /^## /.test(next) || /^### /.test(next)) {
+        break;
+      }
+      chunk.push(next);
+    }
+    out[key] = chunk.join("\n").trim() || null;
+  }
+  return out;
+}
 
 function SubsectionLabel({ children }: { children: ReactNode }) {
   return (
@@ -63,8 +108,10 @@ function Subsection({ label, text }: { label: string; text: string }) {
 export default function PathExpanded({
   output,
   masterSynthesisOverride,
+  pathTriptychOverride,
 }: Props) {
   const drive = output.drive;
+  const triptych = parsePathTriptych(pathTriptychOverride);
   // CC-SYNTHESIS-3 — prefer the cached LLM Path master synthesis when it
   // reaches this component directly or via MapSection's override prop.
   // Missing cache falls back to the legacy mechanical opening.
@@ -144,9 +191,9 @@ export default function PathExpanded({
           ) : null}
         </section>
       ) : null}
-      <Subsection label="Work" text={output.work} />
-      <Subsection label="Love" text={output.love} />
-      <Subsection label="Give" text={output.give} />
+      <Subsection label="Work" text={triptych.work ?? output.work} />
+      <Subsection label="Love" text={triptych.love ?? output.love} />
+      <Subsection label="Give" text={triptych.give ?? output.give} />
       <Subsection label="Growth move" text={output.growthCounterweight} />
     </div>
   );

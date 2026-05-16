@@ -18,12 +18,14 @@ import {
   sessions as sessionsTable,
 } from "../../../db/schema";
 import type {
+  Answer,
   CognitiveFunctionId,
   EpistemicPosture,
   InnerConstitution,
   SessionSummary,
   ValueDomain,
 } from "../../../lib/types";
+import { detectStaleShape } from "../../../lib/staleShape";
 import { DEMOGRAPHIC_FIELDS } from "../../../data/demographics";
 
 const ALLOCATION_TENSION_IDS = new Set(["T-013", "T-014", "T-015"]);
@@ -235,6 +237,60 @@ function cmpNullable(a: string | null, b: string | null): number {
   return a.localeCompare(b);
 }
 
+// CC-STALE-SHAPE-DETECTOR — admin observability tally. Walks every
+// row in `sessions` once, runs `detectStaleShape` against the stored
+// bundle + answers + engine_shape_version, and returns per-branch
+// counts for the header banner.
+async function loadStaleShapeTally(): Promise<{
+  total: number;
+  fresh: number;
+  reDerivable: number;
+  unRerenderable: number;
+} | null> {
+  let db: ReturnType<typeof getDb>;
+  try {
+    db = getDb();
+  } catch {
+    return null;
+  }
+  let rows: Array<{
+    id: string;
+    engine_shape_version: number | null;
+    inner_constitution: unknown;
+    answers: unknown;
+  }>;
+  try {
+    rows = (await db
+      .select({
+        id: sessionsTable.id,
+        engine_shape_version: sessionsTable.engine_shape_version,
+        inner_constitution: sessionsTable.inner_constitution,
+        answers: sessionsTable.answers,
+      })
+      .from(sessionsTable)) as Array<{
+      id: string;
+      engine_shape_version: number | null;
+      inner_constitution: unknown;
+      answers: unknown;
+    }>;
+  } catch {
+    return null;
+  }
+  const tally = { total: rows.length, fresh: 0, reDerivable: 0, unRerenderable: 0 };
+  for (const r of rows) {
+    const verdict = detectStaleShape({
+      sessionId: r.id,
+      engineShapeVersion: r.engine_shape_version,
+      innerConstitution: r.inner_constitution,
+      answers: (r.answers ?? []) as Answer[],
+    });
+    if (verdict.branch === "fresh") tally.fresh++;
+    else if (verdict.branch === "re-derivable") tally.reDerivable++;
+    else tally.unRerenderable++;
+  }
+  return tally;
+}
+
 function formatRelative(iso: string): string {
   const then = Date.parse(iso);
   if (Number.isNaN(then)) return iso;
@@ -330,6 +386,11 @@ export default async function SessionsPage({
     loadError =
       e instanceof Error ? e.message : "Failed to load sessions.";
   }
+  // CC-STALE-SHAPE-DETECTOR — render-time observability tally for the
+  // header banner. Soft-fails to null if the DB is unreachable; the
+  // banner then renders without counts rather than crashing the
+  // sessions list.
+  const staleTally = await loadStaleShapeTally();
 
   const professionField = DEMOGRAPHIC_FIELDS.find((f) => f.field_id === "profession");
   const professionOptions = professionField?.options ?? [];
@@ -370,6 +431,22 @@ export default async function SessionsPage({
             {summaries.length}{" "}
             {summaries.length === 1 ? "session" : "sessions"} saved
           </p>
+          {staleTally ? (
+            <p
+              className="font-mono"
+              data-stale-shape-counter
+              style={{
+                fontSize: 11,
+                letterSpacing: "0.04em",
+                color: "var(--ink-mute)",
+                margin: 0,
+                marginTop: 4,
+              }}
+            >
+              Stale-shape sessions: {staleTally.reDerivable + staleTally.unRerenderable}{" "}
+              (re-derived: {staleTally.reDerivable}, un-rerenderable: {staleTally.unRerenderable})
+            </p>
+          ) : null}
         </div>
         {/* Logout: a small form POSTing to the logout API which clears the
             cookie and redirects to /admin. No client-side JS needed. */}

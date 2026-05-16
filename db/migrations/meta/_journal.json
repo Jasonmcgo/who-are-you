@@ -22,6 +22,20 @@
       "when": 1778707877793,
       "tag": "0002_clumsy_rocket_raccoon",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1778934701791,
+      "tag": "0003_strong_nuke",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1778942801655,
+      "tag": "0004_tiny_medusa",
+      "breakpoints": true
     }
   ]
 }
