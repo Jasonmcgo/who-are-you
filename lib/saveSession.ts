@@ -12,7 +12,11 @@
 
 import { eq } from "drizzle-orm";
 import { getDb } from "../db";
-import { sessions, demographics } from "../db/schema";
+import {
+  sessions,
+  demographics,
+  ghostMappingAudit,
+} from "../db/schema";
 import { ENGINE_SHAPE_VERSION } from "./staleShape";
 import type {
   Answer,
@@ -195,4 +199,113 @@ export async function updateSessionAnswer(
     .where(eq(sessions.id, sessionId));
 
   return { ok: true };
+}
+
+// CC-DEMOGRAPHICS-SAVE-WIRING — ghost-mapping admin action. Upserts the
+// demographics row for an existing session and writes a single audit-log
+// entry capturing what was changed and who changed it.
+//
+// Idempotent — re-running for the same session updates the existing
+// row rather than inserting a duplicate (the `demographics.session_id`
+// column carries a unique constraint, so we explicitly upsert).
+//
+// Auth: the caller is the `/admin/sessions/ghost-mapping` page, which
+// is already gated server-side; this action stays open the same way
+// `updateSessionAnswer` does.
+
+export interface AttachDemographicsToSessionArgs {
+  sessionId: string;
+  demographicAnswers: DemographicAnswer[];
+  contactEmail: string | null;
+  contactMobile: string | null;
+  adminLabel: string;
+  note?: string;
+}
+
+export async function attachDemographicsToSession(
+  args: AttachDemographicsToSessionArgs
+): Promise<{ ok: true; created: boolean }> {
+  const db = getDb();
+  return await db.transaction(async (tx) => {
+    const existingRows = await tx
+      .select({
+        session_id: demographics.session_id,
+        name_value: demographics.name_value,
+        contact_email: demographics.contact_email,
+        gender_value: demographics.gender_value,
+        age_decade: demographics.age_decade,
+        profession_value: demographics.profession_value,
+      })
+      .from(demographics)
+      .where(eq(demographics.session_id, args.sessionId))
+      .limit(1);
+    const before = existingRows[0] ?? null;
+
+    const demoRow = buildDemographicsRow(
+      args.sessionId,
+      args.demographicAnswers
+    );
+    demoRow.contact_email = args.contactEmail;
+    demoRow.contact_mobile = args.contactMobile;
+
+    let created = false;
+    if (before === null) {
+      await tx.insert(demographics).values(demoRow);
+      created = true;
+    } else {
+      // Upsert via UPDATE — session_id stays unique. Only overwrite
+      // columns the admin actually provided; defaults handle the gaps.
+      await tx
+        .update(demographics)
+        .set({
+          name_value: demoRow.name_value ?? before.name_value,
+          name_state: demoRow.name_state ?? "specified",
+          gender_value: demoRow.gender_value ?? before.gender_value,
+          gender_state: demoRow.gender_state ?? "specified",
+          age_decade: demoRow.age_decade ?? before.age_decade,
+          age_state: demoRow.age_state ?? "specified",
+          marital_status_value: demoRow.marital_status_value,
+          marital_status_state: demoRow.marital_status_state ?? "not_answered",
+          education_value: demoRow.education_value,
+          education_state: demoRow.education_state ?? "not_answered",
+          political_value: demoRow.political_value,
+          political_state: demoRow.political_state ?? "not_answered",
+          religious_value: demoRow.religious_value,
+          religious_state: demoRow.religious_state ?? "not_answered",
+          profession_value:
+            demoRow.profession_value ?? before.profession_value,
+          profession_state: demoRow.profession_state ?? "specified",
+          location_country: demoRow.location_country,
+          location_region: demoRow.location_region,
+          location_state: demoRow.location_state ?? "not_answered",
+          contact_email: demoRow.contact_email,
+          contact_mobile: demoRow.contact_mobile,
+        })
+        .where(eq(demographics.session_id, args.sessionId));
+    }
+
+    await tx.insert(ghostMappingAudit).values({
+      session_id: args.sessionId,
+      admin_label: args.adminLabel,
+      note: args.note ?? null,
+      before_snapshot: before
+        ? {
+            name_value: before.name_value,
+            contact_email: before.contact_email,
+            gender_value: before.gender_value,
+            age_decade: before.age_decade,
+            profession_value: before.profession_value,
+          }
+        : null,
+      after_snapshot: {
+        name_value: demoRow.name_value ?? null,
+        contact_email: demoRow.contact_email ?? null,
+        gender_value: demoRow.gender_value ?? null,
+        age_decade: demoRow.age_decade ?? null,
+        profession_value: demoRow.profession_value ?? null,
+      },
+    });
+
+    return { ok: true, created };
+  });
 }

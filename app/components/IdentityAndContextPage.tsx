@@ -25,7 +25,18 @@ type Props = {
     answers: DemographicAnswer[],
     contact: { email: string; mobile: string | null }
   ) => void;
-  onSkip: () => void;
+  // CC-DEMOGRAPHICS-SAVE-WIRING — Skip now carries whatever partial
+  // state the user has typed (answers + email + mobile). If the user
+  // got blocked by the email gate but had already filled their name,
+  // gender, profession, etc., Skip preserves it rather than dropping
+  // the lot. The `partial` arg is optional so prior callers (none
+  // outside this file) continue to compile.
+  onSkip: (
+    partial?: {
+      answers: DemographicAnswer[];
+      contact: { email: string | null; mobile: string | null };
+    }
+  ) => void;
   isSubmitting?: boolean;
 };
 
@@ -280,7 +291,48 @@ export default function IdentityAndContextPage({
           </button>
           <button
             type="button"
-            onClick={onSkip}
+            onClick={() => {
+              // CC-DEMOGRAPHICS-SAVE-WIRING — Skip preserves whatever
+              // partial state the user has typed: demographic answers
+              // they filled, email (if it looks valid), mobile (if it
+              // looks phone-ish). Lets users who get blocked by the
+              // email gate still save the rest.
+              const partialAnswers: DemographicAnswer[] = DEMOGRAPHIC_FIELDS
+                .map((f) => {
+                  const s = get(f.field_id);
+                  if (s.state === "prefer_not_to_say") {
+                    return {
+                      field_id: f.field_id,
+                      state: "prefer_not_to_say",
+                    } as DemographicAnswer;
+                  }
+                  if (s.state === "specified" && s.value) {
+                    return {
+                      field_id: f.field_id,
+                      state: "specified",
+                      value: s.value,
+                      ...(s.other_text ? { other_text: s.other_text } : {}),
+                    } as DemographicAnswer;
+                  }
+                  return null;
+                })
+                .filter((x): x is DemographicAnswer => x !== null);
+              const trimmedEmail = email.trim();
+              const trimmedMobile = mobile.trim();
+              onSkip({
+                answers: partialAnswers,
+                contact: {
+                  email:
+                    trimmedEmail.length > 0 && emailValid
+                      ? trimmedEmail
+                      : null,
+                  mobile:
+                    trimmedMobile.length > 0 && mobileValid
+                      ? trimmedMobile
+                      : null,
+                },
+              });
+            }}
             disabled={isSubmitting}
             data-focus-ring
             className="font-mono uppercase"

@@ -129,6 +129,7 @@ export async function GET(req: NextRequest) {
       profession_value: demographicsTable.profession_value,
       gender_state: demographicsTable.gender_state,
       gender_value: demographicsTable.gender_value,
+      contact_email: demographicsTable.contact_email,
     })
     .from(sessionsTable)
     .leftJoin(
@@ -163,6 +164,7 @@ export async function GET(req: NextRequest) {
       gender_state:
         (r.gender_state ?? "not_answered") as SessionSummary["gender_state"],
       gender_value: r.gender_value,
+      contact_email: r.contact_email,
       dominant_function: (ic.lens_stack?.dominant ?? null) as
         | CognitiveFunctionId
         | null,

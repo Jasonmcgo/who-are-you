@@ -664,11 +664,26 @@ export default function Home() {
     void commitSave(answers, contact);
   }
 
-  function handleSkipDemographics() {
-    // Skip = save with all fields not_answered. Per the amended Rule 5
-    // (research mode), Skip means "skip the demographic disclosure," not
-    // "skip the save."
-    void commitSave([]);
+  function handleSkipDemographics(
+    partial?: {
+      answers: DemographicAnswer[];
+      contact: { email: string | null; mobile: string | null };
+    }
+  ) {
+    // CC-DEMOGRAPHICS-SAVE-WIRING — Skip preserves whatever the user
+    // typed before bailing on the gate. Previously this called
+    // `commitSave([])` and threw away the form state entirely, which
+    // was the proximate cause of the prod cohort being 13/13 anonymous:
+    // every user who got blocked by the email gate hit Skip and lost
+    // the demographics they'd already filled.
+    const partialEmail = partial?.contact.email ?? null;
+    const partialMobile = partial?.contact.mobile ?? null;
+    void commitSave(
+      partial?.answers ?? [],
+      partialEmail !== null || partialMobile !== null
+        ? { email: partialEmail ?? "", mobile: partialMobile }
+        : undefined
+    );
   }
 
   // CC-022a Item 7 — Identity & Context phase renders after the test

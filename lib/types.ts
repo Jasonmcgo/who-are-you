@@ -1184,6 +1184,10 @@ export type SessionSummary = {
   profession_value: string | null;
   gender_state: _FieldState;
   gender_value: string | null;
+  // CC-HEADER-NAV-AND-EMAIL-GATE — contact_email surfaced on the admin
+  // list so admins can spot anonymous-vs-identified rows at a glance.
+  // null when no demographics row exists or email was never collected.
+  contact_email: string | null;
   // Derived from inner_constitution.
   dominant_function: CognitiveFunctionId | null;
   top_compass: ValueDomain | string | null;

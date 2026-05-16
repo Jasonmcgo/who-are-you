@@ -138,6 +138,35 @@ export const demographics = pgTable("demographics", {
   contact_mobile: text("contact_mobile"),
 });
 
+// CC-DEMOGRAPHICS-SAVE-WIRING — ghost-mapping audit log. One row per
+// admin-initiated ghost-mapping write (attaching a name/email/etc. to
+// a previously anonymous session via `/admin/sessions/ghost-mapping`).
+// Surfaces who changed what, when, and what the row looked like
+// before and after the write — so any later "why does this session
+// have an email" question has an answer in the DB.
+//
+// Cascade-deletes when the underlying session is deleted; the audit
+// is meaningless without the row it pertains to.
+export const ghostMappingAudit = pgTable("ghost_mapping_audit", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  session_id: uuid("session_id")
+    .notNull()
+    .references(() => sessions.id, { onDelete: "cascade" }),
+  recorded_at: timestamp("recorded_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  // Free-text identifier for the admin user. The admin route is gated
+  // upstream, but the CC explicitly asks for "who" in the audit log;
+  // since the admin surface has no auth-bound identity yet, the
+  // caller passes whatever string they want (typed at submit time).
+  admin_label: text("admin_label").notNull(),
+  note: text("note"),
+  // JSONB snapshots of the demographic fields the admin can touch.
+  // `null` when no demographics row existed before the write.
+  before_snapshot: jsonb("before_snapshot"),
+  after_snapshot: jsonb("after_snapshot").notNull(),
+});
+
 // CC-021a — Attachments table. One row per uploaded file associated with a
 // session. The file bytes live on disk under attachments/<session_id>/; only
 // the metadata + relative path live in Postgres. Cascade-deletes on session

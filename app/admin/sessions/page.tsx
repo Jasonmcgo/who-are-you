@@ -137,6 +137,7 @@ async function loadSessions(filters: {
       profession_value: demographicsTable.profession_value,
       gender_state: demographicsTable.gender_state,
       gender_value: demographicsTable.gender_value,
+      contact_email: demographicsTable.contact_email,
     })
     .from(sessionsTable)
     .leftJoin(
@@ -169,6 +170,7 @@ async function loadSessions(filters: {
       gender_state:
         (r.gender_state ?? "not_answered") as SessionSummary["gender_state"],
       gender_value: r.gender_value,
+      contact_email: r.contact_email,
       dominant_function: (ic.lens_stack?.dominant ?? null) as
         | CognitiveFunctionId
         | null,
@@ -622,6 +624,7 @@ export default async function SessionsPage({
                   }}
                 >
                   <SortableHeader label="Name" sortKey="name" current={sort} dir={dir} sp={sp} />
+                  <th style={cellStyle}>Email</th>
                   <SortableHeader label="Saved" sortKey="saved_at" current={sort} dir={dir} sp={sp} />
                   <SortableHeader label="Age" sortKey="age" current={sort} dir={dir} sp={sp} />
                   <SortableHeader label="Profession" sortKey="profession" current={sort} dir={dir} sp={sp} />
@@ -667,6 +670,15 @@ export default async function SessionsPage({
                         <span style={{ fontStyle: name.isItalic ? "italic" : "normal", color: name.isItalic ? "var(--ink-soft)" : "var(--ink)" }}>
                           {name.text}
                         </span>
+                      </td>
+                      <td style={cellStyle}>
+                        {s.contact_email ? (
+                          <span style={{ fontFamily: "monospace", fontSize: 12 }}>
+                            {s.contact_email}
+                          </span>
+                        ) : (
+                          <span style={{ fontStyle: "italic", color: "var(--ink-soft)" }}>—</span>
+                        )}
                       </td>
                       <td
                         style={cellStyle}
