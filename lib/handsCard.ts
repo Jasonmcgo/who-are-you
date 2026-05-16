@@ -65,6 +65,11 @@ export interface HandsCardInputs {
   qA2EnergyDirection: string | null;
   qGS1TopReward: string | null;
   qV1TopMeaning: string | null;
+  // CC-086 Site 1 — Compass signal ids (top-N priority labels) used
+  // by the driver/archetype consistency check as a secondary signal.
+  // Optional so pre-CC callers continue to compile; absent when
+  // omitted, the override falls back to driver-only routing.
+  topCompassSignalIds?: string[];
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -170,6 +175,92 @@ const TEMPLATES: Record<ProfileArchetype, Template> = {
 // Composer
 // ─────────────────────────────────────────────────────────────────────
 
+// CC-086 Site 1 — driver/archetype consistency check.
+//
+// The Hands card TEMPLATES are keyed by ProfileArchetype, but the
+// archetype router occasionally lands sessions whose driver function
+// disagrees with the archetype's coded template (Kevin: Se driver +
+// Faith compass routed to cindyType caregiver in prod). When the
+// driver-shape and archetype-shape disagree, the driver-aligned
+// `unmappedType` general template is more honest than asserting a
+// caregiver/steward/architect frame the dominant function doesn't
+// support.
+//
+// Caregiver template (cindyType) is driver-coded for Fe + Fi (relational
+// presence); steward template (danielType) is driver-coded for Si
+// (continuity-of-form); architect template (jasonType) is driver-coded
+// for Ni + Te + Ti (long-arc / structure / systems). When archetype
+// asserts one of these but the driver isn't on its list, fall through
+// to the unmapped template.
+const CAREGIVER_DRIVERS = new Set(["fe", "fi"]);
+const STEWARD_DRIVERS = new Set(["si"]);
+const ARCHITECT_DRIVERS = new Set(["ni", "te", "ti"]);
+// Compass anchors that, when present in the user's top Compass, keep
+// the caregiver template valid even with a non-caregiver driver. The
+// CC's example: Cindy-shape sessions with Se driver + Family compass
+// SHOULD stay on the caregiver template (it's the Compass alignment
+// that makes caregiver correct). Kevin's Se driver + Faith compass
+// has no caregiver-compass alignment, so it falls through to unmapped.
+const CAREGIVER_COMPASS_ANCHORS = new Set([
+  "family_priority",
+  "compassion_priority",
+  "mercy_priority",
+  "loyalty_priority",
+]);
+const STEWARD_COMPASS_ANCHORS = new Set([
+  "stability_priority",
+  "honor_priority",
+  "faith_priority",
+]);
+const ARCHITECT_COMPASS_ANCHORS = new Set([
+  "knowledge_priority",
+  "truth_priority",
+]);
+
+function compassSupportsArchetype(
+  archetype: ProfileArchetype,
+  topCompassSignalIds: string[] | undefined
+): boolean {
+  if (!topCompassSignalIds || topCompassSignalIds.length === 0) return false;
+  const set =
+    archetype === "cindyType"
+      ? CAREGIVER_COMPASS_ANCHORS
+      : archetype === "danielType"
+        ? STEWARD_COMPASS_ANCHORS
+        : archetype === "jasonType"
+          ? ARCHITECT_COMPASS_ANCHORS
+          : null;
+  if (!set) return false;
+  return topCompassSignalIds.some((s) => set.has(s));
+}
+
+function resolveTemplateArchetype(
+  archetype: ProfileArchetype,
+  lensDriver: string,
+  topCompassSignalIds: string[] | undefined
+): ProfileArchetype {
+  const d = lensDriver.toLowerCase();
+  const driverSet =
+    archetype === "cindyType"
+      ? CAREGIVER_DRIVERS
+      : archetype === "danielType"
+        ? STEWARD_DRIVERS
+        : archetype === "jasonType"
+          ? ARCHITECT_DRIVERS
+          : null;
+  if (driverSet === null) return archetype;
+  if (driverSet.has(d)) return archetype;
+  // Driver disagrees with archetype. Per CC-086 Site 1: keep the
+  // archetype template when the Compass top supports it (lived
+  // pattern signals align even when the driver doesn't); fall back
+  // to unmapped when neither driver nor compass supports the
+  // archetype's coded template.
+  if (compassSupportsArchetype(archetype, topCompassSignalIds)) {
+    return archetype;
+  }
+  return "unmappedType";
+}
+
 export function computeHandsCard(inputs: HandsCardInputs): HandsCardReading {
   const {
     archetype,
@@ -183,11 +274,17 @@ export function computeHandsCard(inputs: HandsCardInputs): HandsCardReading {
     qGS1TopReward,
     qV1TopMeaning,
   } = inputs;
-  const t = TEMPLATES[archetype] ?? TEMPLATES.unmappedType;
+  const templateArchetype = resolveTemplateArchetype(
+    archetype,
+    lensDriver,
+    inputs.topCompassSignalIds
+  );
+  const t = TEMPLATES[templateArchetype] ?? TEMPLATES.unmappedType;
 
   // Diagnostic rationale — names the inputs that fired.
   const rationaleParts = [
     `archetype=${archetype}`,
+    `templateArchetype=${templateArchetype}`,
     `gripPattern=${gripPatternBucket}`,
     `goalScore=${goalScore.toFixed(0)}`,
     `costStrength=${costStrength.toFixed(0)}`,

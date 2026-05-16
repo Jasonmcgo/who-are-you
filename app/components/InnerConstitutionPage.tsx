@@ -1445,7 +1445,10 @@ export default function InnerConstitutionPage({
         )}
 
         <SectionRule />
-        <UseCasesSection archetype={constitution.profileArchetype?.primary} />
+        <UseCasesSection
+          archetype={constitution.profileArchetype?.primary}
+          driver={constitution.lens_stack?.dominant}
+        />
 
         {/* CC-PROSE-1B Layer 5C — Final Line callout. Closing-of-the-
             closing, mechanically recombined from shapeDescriptor +

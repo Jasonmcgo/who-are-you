@@ -19,6 +19,8 @@
     "audit:demographics-save-wiring": "tsx tests/audit/demographicsSaveWiring.audit.ts",
     "audit:admin-demographic-edit": "tsx tests/audit/adminDemographicEdit.audit.ts",
     "audit:risk-form-5th-band": "tsx tests/audit/riskForm5thBandAndPathConsistency.audit.ts",
+    "audit:grip-pattern-render-for-mixed-buckets": "tsx tests/audit/gripPatternRenderForMixedBuckets.audit.ts",
+    "audit:shape-aware-prose-routing-v2": "tsx tests/audit/shapeAwareProseRoutingV2.audit.ts",
     "backfill:llm-rewrites": "tsx scripts/backfillLlmRewritesOnSessions.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",

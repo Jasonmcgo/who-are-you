@@ -270,6 +270,72 @@ export function generateUnderlyingQuestion(
 // Layer 1 — Classifier
 // ─────────────────────────────────────────────────────────────────────
 
+// CC-085 — disambiguator chain. When the surface-based classifier
+// would return "low" confidence (mixed-bucket surface grips or
+// no archetype/compass anchor), consult this chain to confirm or
+// override the bucket assignment and promote confidence to "medium".
+//
+// Canon order (most-to-least authoritative):
+//   1. Lived Primal cluster (`livedPrimalRegister`) — when present,
+//      the engine-internal Primal question is the shape-aware truth.
+//   2. Driver function (`dominant`) — Ni/Ne/Fi → Worth, Si/Te →
+//      Security, Se/Fe → Belonging, Ti → Control.
+//   3. Compass top (`compassTop4`) — Family/Compassion → Belonging,
+//      Honor/Faith → Security, Truth/Knowledge → Worth.
+//
+// Returns a bucket the disambiguator chain suggests, or `null` when
+// no rule resolves. Per CC-085 spec, the classifier promotes "low"
+// → "medium" only when the chain produces SOME bucket (confirming
+// the surface bucket OR replacing it). When the chain stays silent
+// (no signals), confidence stays "low" rather than fabricating an
+// answer.
+function disambiguateBucket(
+  inputs: GripPatternInputs
+): GripPatternKey | null {
+  const { livedPrimalRegister, dominant, compassTop4 } = inputs;
+
+  // 1. Lived Primal cluster.
+  if (livedPrimalRegister) {
+    const p = livedPrimalRegister.toLowerCase();
+    if (p.includes("safe")) return "safety";
+    if (p.includes("secure")) return "security";
+    if (p.includes("wanted") || p.includes("loved")) return "belonging";
+    if (p.includes("good enough")) return "worth";
+    if (p.includes("successful")) return "recognition";
+    if (p.includes("purpose")) return "purpose";
+  }
+
+  // 2. Driver function.
+  if (dominant) {
+    switch (dominant) {
+      case "ni":
+      case "ne":
+      case "fi":
+        return "worth";
+      case "si":
+      case "te":
+        return "security";
+      case "se":
+      case "fe":
+        return "belonging";
+      case "ti":
+        return "control";
+    }
+  }
+
+  // 3. Compass top — canonical anchor mapping. The order below mirrors
+  // the existing `*_ANCHORS` predicates so the chain stays internally
+  // consistent with the rest of the classifier.
+  if (hasAny(compassTop4, FAMILY_ANCHORS)) return "belonging";
+  if (hasAny(compassTop4, FAITH_ANCHORS)) return "security";
+  if (hasAny(compassTop4, KNOWLEDGE_ANCHORS)) return "worth";
+  if (hasAny(compassTop4, RECOGNITION_ANCHORS)) return "recognition";
+  if (hasAny(compassTop4, PURPOSE_ANCHORS)) return "purpose";
+  if (hasAny(compassTop4, SAFETY_ANCHORS)) return "safety";
+
+  return null;
+}
+
 export function classifyGripPattern(
   inputs: GripPatternInputs
 ): GripPatternReading {
@@ -299,9 +365,44 @@ export function classifyGripPattern(
     rationale: rationaleParts.join("; "),
   });
 
+  // CC-085 — wrap every `decide()` call so "low" confidence reads
+  // get one more shape-aware pass through the disambiguator chain
+  // before being returned. When the chain agrees with the
+  // surface-routed bucket, confidence promotes to "medium" (the
+  // render gate widens to render at medium). When the chain
+  // disagrees, the disambiguator's bucket wins and confidence is
+  // "medium" (the chain is more authoritative than the
+  // no-archetype-no-anchor fallback that produced the "low" in the
+  // first place). When the chain produces no result at all,
+  // confidence stays "low" — the surface signal is genuinely
+  // ambiguous and there's nothing better to assert.
+  const decideWithDisambiguator = (
+    bucket: GripPatternKey,
+    confidence: "high" | "medium" | "low",
+    rationaleParts: string[]
+  ): GripPatternReading => {
+    if (confidence !== "low" || bucket === "unmapped") {
+      return decide(bucket, confidence, rationaleParts);
+    }
+    const disambiguatorBucket = disambiguateBucket(inputs);
+    if (disambiguatorBucket === null) {
+      return decide(bucket, confidence, rationaleParts);
+    }
+    if (disambiguatorBucket === bucket) {
+      return decide(bucket, "medium", [
+        ...rationaleParts,
+        `disambiguator confirms ${bucket} via Primal/driver/compass chain`,
+      ]);
+    }
+    return decide(disambiguatorBucket, "medium", [
+      ...rationaleParts,
+      `surface routed to ${bucket}; disambiguator chain (Primal/driver/compass) overrides → ${disambiguatorBucket}`,
+    ]);
+  };
+
   // No surface signal — explicit unmapped fallback.
   if (!top1) {
-    return decide("unmapped", "low", [
+    return decideWithDisambiguator("unmapped", "low", [
       "no Q-GRIP1 top-1 signal",
     ]);
   }
@@ -364,7 +465,7 @@ export function classifyGripPattern(
         "Worth Grip rendered as Control/Mastery",
       ]);
     }
-    return decide("control", "low", [
+    return decideWithDisambiguator("control", "low", [
       `surface=${top1}`,
       "no anchor → default Control",
     ]);
@@ -401,7 +502,7 @@ export function classifyGripPattern(
         `compass recognition-anchored`,
       ]);
     }
-    return decide("belonging", "low", [
+    return decideWithDisambiguator("belonging", "low", [
       `surface=${top1} (relational)`,
       "no archetype/compass anchor",
     ]);
@@ -409,7 +510,7 @@ export function classifyGripPattern(
 
   // ── Comfort surface → Safety (avoidance register) ──────────────
   if (top1 === "grips_comfort") {
-    return decide("safety", "low", [
+    return decideWithDisambiguator("safety", "low", [
       `surface=grips_comfort (avoidance, not collapse)`,
     ]);
   }
@@ -417,13 +518,13 @@ export function classifyGripPattern(
   // ── Approval — handled in relational branch above; explicit ────
   // catch any miscellaneous unhandled cases.
   if (hasPurpose) {
-    return decide("purpose", "low", [
+    return decideWithDisambiguator("purpose", "low", [
       `surface=${top1}`,
       `compass purpose-anchored`,
     ]);
   }
 
-  return decide("unmapped", "low", [
+  return decideWithDisambiguator("unmapped", "low", [
     `surface=${top1}`,
     "no routing rule matched",
   ]);

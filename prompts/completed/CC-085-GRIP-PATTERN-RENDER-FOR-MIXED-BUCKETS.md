@@ -33,12 +33,14 @@ Do NOT run `npm install`, `git commit`, `git push`, `drizzle-kit push`, or any b
 
 ## Read First (Required)
 
-1. `lib/gripPattern.ts` — the classifier. Confirm current bucket-assignment logic + the render-gate confidence threshold.
-2. `lib/gripTaxonomy.ts` — Primal cluster derivation (per CC-GRIP-TAXONOMY-REPLACEMENT canon).
-3. `lib/handsCard.ts` — may consume Grip Pattern output; verify whether changes here ripple.
-4. `lib/renderMirror.ts` — the Grip Pattern card render site. Find where the card is rendered and the gate that suppresses it.
+1. `lib/gripTaxonomy.ts` — **the actual render-gate lives here**. Function `deriveProseMode` (~line 210) maps `(confidence, primary)` → `"rendered" | "hedged" | "omitted"`. Today: high/medium-high → rendered, medium → hedged, low/null → omitted. Confidence is assigned earlier in the same file (look ~line 280-325 for the `confidence = "X"` branches; calibration.hedgeMarker downgrades).
+2. `lib/gripPattern.ts` — the classifier. Confirm current bucket-assignment logic + the GripPatternReading interface (line 86 area). The `confidence` field is `"high" | "medium" | "low"` — note that's a DIFFERENT confidence scale from gripTaxonomy.ts's `"high" | "medium-high" | "medium" | "low"`. Two scales coexist; the disambiguator chain may need to coordinate across both.
+3. `lib/renderMirror.ts` — lines ~170-225 area renders the Grip Pattern card. References `pattern.renderedLabel`, `underlyingQuestion`, `distorted`, `healthy`. Confirm what mode (rendered vs hedged vs omitted) produces what visible output. Kevin/Michele/Ashley/Harry's reports today show ZERO card content — so they're likely in "omitted" mode (low/null), not "hedged". Promoting them to medium might still not produce a visible card if "hedged" mode renders nothing distinct.
+4. `lib/handsCard.ts` — may consume Grip Pattern output; verify whether changes here ripple.
 5. `feedback_grip_pattern_shape_aware_routing.md` (memory) — canon for the disambiguator chain.
 6. `data/questions.ts` — Q-GRIP1, Q-Stakes1, Q-3C2 mappings (the inputs the bucket router consumes).
+
+**Note from CC-084's experience**: hardcoded engine prose can live in non-obvious files (`lib/synthesis1Finish.ts` rather than `lib/renderMirror.ts`). If the Grip Pattern card's prose surface isn't where this CC scope predicts, follow the actual file path and flag the deviation in the report-back.
 
 ## Scope
 
@@ -88,7 +90,10 @@ New `tests/audit/gripPatternRenderForMixedBuckets.audit.ts` with assertions:
 ## Allowed to Modify
 
 - `lib/gripPattern.ts`
+- `lib/gripTaxonomy.ts` (the actual render-gate function `deriveProseMode` lives here; disambiguator chain may need to land here too)
 - `lib/renderMirror.ts` (Grip Pattern card render site only — leave Hands/Lens/Path/etc. alone)
+- `lib/synthesis1Finish.ts` (only if the card's prose template lives here per CC-084's pattern — verify before editing)
+- `lib/handsCard.ts` (only if Grip Pattern output cascades into Hands card composition and needs adjusting)
 - `lib/types.ts` (only if the confidence union needs widening)
 - `tests/audit/gripPatternRenderForMixedBuckets.audit.ts` (new)
 - `package.json` (add `audit:grip-pattern-render-for-mixed-buckets` script)

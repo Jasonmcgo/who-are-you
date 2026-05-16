@@ -1893,6 +1893,13 @@ function attachHandsCard(constitution: InnerConstitution): void {
       return hits[0]?.id ?? null;
     })();
     void surfaceById;
+    // CC-086 Site 1 — surface top Compass priority labels so the
+    // driver/archetype consistency override can check Compass support
+    // as a secondary signal (Family/Compassion compass keeps caregiver
+    // template valid even with Se driver).
+    const topCompassSignalIds = getTopCompassValues(constitution.signals).map(
+      (r) => r.signal_id
+    );
     constitution.handsCard = computeHandsCard({
       archetype,
       gripPatternBucket,
@@ -1904,6 +1911,7 @@ function attachHandsCard(constitution: InnerConstitution): void {
       qA2EnergyDirection,
       qGS1TopReward,
       qV1TopMeaning,
+      topCompassSignalIds,
     });
   } catch {
     // Silent fallback — handsCard stays undefined.
@@ -3239,6 +3247,179 @@ function categoryHasSupport(
   }
 }
 
+// CC-086 Sites 4-6 — shape-aware preference reordering for non-Hands
+// cards. When the dominant function is relational/present-tense
+// (Se/Fe/Fi/Si) AND the Compass cluster is relational
+// (family/loyalty/peace/compassion), the Trust/Gravity/Conviction
+// cards' Strength prose should prefer Action / Harmony / Stewardship /
+// Integrity rather than Builder / Precision / Pattern (which were
+// authored as architect/strategist-coded text in `GIFT_NOUN_PHRASE`).
+//
+// The tables `GIFT_NOUN_PHRASE` + `GIFT_DESCRIPTION` are untouched —
+// only the upstream route to them shape-aligns. Jason-shape (Ni +
+// Faith Compass) and Daniel-shape (Si + Faith Compass) routing is
+// preserved because neither matches the relational-shape predicate.
+const SHAPE_REORDER_CARDS: ReadonlySet<CardKey> = new Set([
+  "trust",
+  "gravity",
+  "conviction",
+]);
+const RELATIONAL_DRIVERS: ReadonlySet<CognitiveFunctionId> = new Set([
+  "se",
+  "fe",
+  "fi",
+  "si",
+]);
+const RELATIONAL_COMPASS_ANCHORS: ReadonlySet<string> = new Set([
+  "family_priority",
+  "loyalty_priority",
+  "peace_priority",
+  "compassion_priority",
+]);
+// CC-086 — Si is the steward driver: route to Stewardship first.
+// Se/Fe/Fi are the relational/present-tense drivers: route to Harmony
+// (relational attunement) or Action (in-the-moment) first.
+//
+// CC-086 FOLLOWUP (2026-05-16 — Daniel/Harry workshop) — the steward
+// shape splits by AUXILIARY function. Same dominant (Si), same compass
+// (Faith), but the auxiliary determines the secondary GiftCategory
+// thread:
+//
+//   - Si + Te = Daniel-shape (steward-builder). Built the family
+//     business; took the risk his brothers wouldn't. Drive contributes
+//     to goal. Builder secondary, not Advocacy.
+//   - Si + Fe = Harry-shape (steward-with-harmony). Faithful continuity
+//     in service of relationship. Softens to keep the room intact.
+//     Harmony on Conviction, Advocacy on Gravity, not Builder.
+//   - Si + Ti = principled-precision steward. Stewardship + Discernment.
+//   - Si + Fi = inner-compass steward. Stewardship + Integrity.
+//
+// Until this CC, `pickGiftCategoryForCard` consumed only `stack.dominant`
+// and threw away the auxiliary signal — even though `stack.auxiliary` is
+// derived from Q-T1–T8 and IS available on the constitution. The 8
+// ranking questions earned their keep at the data layer; the routing
+// layer wasn't using them. This CC closes that gap by branching the
+// preferred order + downweight set by `stack.auxiliary` for Si-dominant
+// shapes.
+const STEWARD_PREFERRED: ReadonlyArray<GiftCategory> = [
+  "Stewardship",
+  "Integrity",
+  "Harmony",
+  "Action",
+];
+// Si-Te (Daniel-shape) — keep Builder in the preferred set; he built
+// the business and took the risk. Builder is canonical secondary.
+const STEWARD_TE_PREFERRED: ReadonlyArray<GiftCategory> = [
+  "Stewardship",
+  "Builder",
+  "Integrity",
+  "Discernment",
+];
+// Si-Fe (Harry-shape) — keep faith with people via continuity. Advocacy
+// + Harmony as the relational expression of stewardship.
+const STEWARD_FE_PREFERRED: ReadonlyArray<GiftCategory> = [
+  "Stewardship",
+  "Advocacy",
+  "Harmony",
+  "Integrity",
+];
+// Si-Ti — principled clarity through tested form. Discernment +
+// Precision as the cognitive expression of stewardship.
+const STEWARD_TI_PREFERRED: ReadonlyArray<GiftCategory> = [
+  "Stewardship",
+  "Discernment",
+  "Precision",
+  "Integrity",
+];
+// Si-Fi — inner-compass steward. Integrity + Advocacy lead.
+const STEWARD_FI_PREFERRED: ReadonlyArray<GiftCategory> = [
+  "Stewardship",
+  "Integrity",
+  "Advocacy",
+  "Harmony",
+];
+const RELATIONAL_PREFERRED: ReadonlyArray<GiftCategory> = [
+  "Harmony",
+  "Action",
+  "Integrity",
+  "Stewardship",
+];
+const RELATIONAL_DOWNWEIGHTED: ReadonlySet<GiftCategory> = new Set<GiftCategory>([
+  "Builder",
+  "Precision",
+  "Pattern",
+]);
+// Si-Te (Daniel-shape) — Builder is CANONICAL, not downweighted. Only
+// Pattern stays downweighted (it's the Ni signature, not Si).
+const STEWARD_TE_DOWNWEIGHTED: ReadonlySet<GiftCategory> = new Set<GiftCategory>([
+  "Pattern",
+]);
+// Si-Ti — Precision is CANONICAL for Ti-aux. Only Builder + Pattern
+// stay downweighted.
+const STEWARD_TI_DOWNWEIGHTED: ReadonlySet<GiftCategory> = new Set<GiftCategory>([
+  "Builder",
+  "Pattern",
+]);
+
+function selectStewardPreferences(
+  aux: CognitiveFunctionId
+): {
+  preferred: ReadonlyArray<GiftCategory>;
+  downweighted: ReadonlySet<GiftCategory>;
+} {
+  switch (aux) {
+    case "te":
+      return { preferred: STEWARD_TE_PREFERRED, downweighted: STEWARD_TE_DOWNWEIGHTED };
+    case "fe":
+      return { preferred: STEWARD_FE_PREFERRED, downweighted: RELATIONAL_DOWNWEIGHTED };
+    case "ti":
+      return { preferred: STEWARD_TI_PREFERRED, downweighted: STEWARD_TI_DOWNWEIGHTED };
+    case "fi":
+      return { preferred: STEWARD_FI_PREFERRED, downweighted: RELATIONAL_DOWNWEIGHTED };
+    default:
+      return { preferred: STEWARD_PREFERRED, downweighted: RELATIONAL_DOWNWEIGHTED };
+  }
+}
+
+function isRelationalShape(
+  stack: LensStack,
+  topCompass: SignalRef[]
+): boolean {
+  if (!RELATIONAL_DRIVERS.has(stack.dominant)) return false;
+  return topCompass.some((r) => RELATIONAL_COMPASS_ANCHORS.has(r.signal_id));
+}
+
+function reorderPreferencesForRelationalShape(
+  card: CardKey,
+  stack: LensStack,
+  prefs: GiftCategory[]
+): GiftCategory[] {
+  if (!SHAPE_REORDER_CARDS.has(card)) return prefs;
+  // Si dominant → steward preference order, AUX-AWARE:
+  //   - Si-Te (Daniel) → Stewardship + Builder primary
+  //   - Si-Fe (Harry)  → Stewardship + Advocacy + Harmony primary
+  //   - Si-Ti          → Stewardship + Discernment + Precision
+  //   - Si-Fi          → Stewardship + Integrity
+  // Se/Fe/Fi dominant → relational preference order (Cindy/Michele:
+  // Harmony/Action).
+  let preferredOrder: ReadonlyArray<GiftCategory>;
+  let downweightedSet: ReadonlySet<GiftCategory>;
+  if (stack.dominant === "si") {
+    const params = selectStewardPreferences(stack.auxiliary);
+    preferredOrder = params.preferred;
+    downweightedSet = params.downweighted;
+  } else {
+    preferredOrder = RELATIONAL_PREFERRED;
+    downweightedSet = RELATIONAL_DOWNWEIGHTED;
+  }
+  const preferred = preferredOrder.filter((c) => prefs.includes(c));
+  const carriedRelational = prefs.filter(
+    (c) => !preferredOrder.includes(c) && !downweightedSet.has(c)
+  );
+  const downweighted = prefs.filter((c) => downweightedSet.has(c));
+  return [...preferred, ...carriedRelational, ...downweighted];
+}
+
 export function pickGiftCategoryForCard(
   card: CardKey,
   stack: LensStack,
@@ -3249,7 +3430,17 @@ export function pickGiftCategoryForCard(
   fire: FirePattern,
   context?: BuildContext
 ): GiftCategory {
-  const prefs = CARD_PREFERENCES[card];
+  const basePrefs = CARD_PREFERENCES[card];
+  // CC-086 — if the shape is relational AND this is a non-Hands card
+  // whose default preferences lead with Builder/Precision/Pattern,
+  // reorder the prefs so Harmony/Action/Stewardship/Integrity win
+  // before the architect-coded categories get the first scoring slot.
+  // Hands has its own card composer (lib/handsCard.ts) and never
+  // passes through this picker, so reordering Hands is a no-op
+  // regardless.
+  const prefs = isRelationalShape(stack, topCompass)
+    ? reorderPreferencesForRelationalShape(card, stack, [...basePrefs])
+    : basePrefs;
   type Scored = { cat: GiftCategory; score: number };
   const scored: Scored[] = [];
   prefs.forEach((cat, idx) => {
@@ -3258,15 +3449,34 @@ export function pickGiftCategoryForCard(
     let score = w;
     if (context) {
       const used = context.usedCategories.get(cat) ?? 0;
-      if (used >= 2) score = 0;
+      // CC-086 FOLLOWUP — cap raised 2 → 3 so canonical-shape categories
+      // (e.g., Stewardship for Si-dominant Daniel/Harry shapes) can land
+      // on 3 cards (Compass + Weather + Trust) before the cap triggers.
+      // Previously the cap zeroed Stewardship after Compass+Weather
+      // (2 uses), leaving Harmony or Advocacy to win Trust by score-
+      // weight default — which produced the Daniel-shape misrouting
+      // ("a relational-attunement gift" on Trust where canon is "a
+      // stewardship gift"). Raised to 3 to give the canonical primary
+      // room to express on its 3 native cards before the picker rotates.
+      if (used >= 3) score = 0;
     }
     scored.push({ cat, score });
   });
   scored.sort((a, b) => b.score - a.score);
+  // CC-086 Sites 4-6 — relational-shape fallback override. When no
+  // preference has support AND the shape is relational AND the card
+  // is Trust/Gravity/Conviction, force the fallback to Harmony rather
+  // than letting `pickGiftCategory()` route through to Builder/Precision
+  // via the Se+creator / Si+stability heuristics. Architect/steward
+  // shapes' fallback paths are unchanged.
+  const isRelationalFallback =
+    SHAPE_REORDER_CARDS.has(card) && isRelationalShape(stack, topCompass);
   const winner =
     scored.length > 0 && scored[0].score > 0
       ? scored[0].cat
-      : pickGiftCategory(stack, topCompass, topGravity, agency, weather, fire);
+      : isRelationalFallback
+        ? "Harmony"
+        : pickGiftCategory(stack, topCompass, topGravity, agency, weather, fire);
   if (context) {
     context.usedCategories.set(winner, (context.usedCategories.get(winner) ?? 0) + 1);
     context.cardCategoryByCard[card] = winner;
@@ -3989,9 +4199,31 @@ export function deriveLensOutput(
     `When this is operating in its native register, you tend to read the situation through ${FUNCTION_VOICE[dom]} and execute through ${FUNCTION_VOICE[aux]} — a combination that gives the shape its characteristic move. ` +
     `In health, this looks like the insight ${FUNCTION_VOICE[dom]} gives you, followed through by ${FUNCTION_VOICE[aux]}.`;
 
+  // CC-086 Site 3 — driver-keyed Lens growth-edge anchor. Pre-CC the
+  // Lens card's Sentence 2 came from `blindSpotFor` keyed by
+  // GiftCategory; for Se / Fi / Fe / Si dominants whose Lens routed to
+  // Precision / Pattern / Builder, the anchor used Ti/Te-coded language
+  // ("accuracy at the cost of audience"). The driver-keyed override
+  // below names each dominant's actual Lens-card growth edge — the
+  // shape's own "this lens, overused, becomes that" — so the prose
+  // matches the driver function instead of the category route.
+  const LENS_GROWTH_EDGE_BY_DRIVER: Record<CognitiveFunctionId, string> = {
+    ni: "long-arc certainty that closes early — what you've read toward becomes the thing you stop letting evidence touch.",
+    ne: "possibility becoming evasion — the lateral connection feels like progress when staying with one would have produced the actual move.",
+    si: "continuity becoming control — what worked before keeps doing duty past the conditions that made it work.",
+    se: "responsiveness becoming reactivity — the in-the-moment move runs past the moment that asked for it.",
+    ti: "precision becoming relational bluntness — being right and being heard sometimes require different moves.",
+    te: "structure becoming non-delegation — the system you built becomes one you can't let anyone else carry.",
+    fi: "conviction becoming over-sacrifice — the inner truth-test stops checking whether the cost is needed.",
+    fe: "tending becoming self-erasure — the room's weather becomes yours, and your own register goes quiet.",
+  };
+  const PREFIX = SECOND_SENTENCE_PREFIX_BLIND_SPOT;
+  const driverAnchor = LENS_GROWTH_EDGE_BY_DRIVER[dom];
   const blindText =
     `${capitalize(FUNCTION_VOICE[dom])}'s instinct, overused, can collapse into a smaller version of itself. ` +
-    `${blindSpotFor(cat, context, { stack, topCompass, topGravity, agency, weather, fire })}`;
+    (driverAnchor
+      ? `${BLIND_SPOT_TEXT_VARIANTS[cat][0]} ${PREFIX}${driverAnchor}`
+      : `${blindSpotFor(cat, context, { stack, topCompass, topGravity, agency, weather, fire })}`);
 
   const growthStem = buildGrowthStem(cardPos, context);
   const growthText =

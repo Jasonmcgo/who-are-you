@@ -1,8 +1,47 @@
 import type { ProfileArchetype } from "@/lib/profileArchetype";
+import type { CognitiveFunctionId } from "@/lib/types";
 
 export const USE_CASES_SECTION_TITLE = "What this is good for.";
 export const USE_CASES_SECTION_SUBHEAD =
   "This is not a verdict. It's a read you can return to. Here are ten places it earns its keep.";
+
+// CC-086 Site 2 — driver-keyed "Family and coworker explanations" body.
+// The archetype lookup below already routes the cohort's three named
+// archetypes (jasonType / cindyType / danielType / unmappedType); this
+// driver lookup is the more shape-specific layer (per CC canon: driver
+// function is the primary signal, archetype is secondary). When a
+// caller has the driver in hand, prefer driver-keyed text; the
+// `resolveFamilyExplanation` helper handles the fallback chain.
+export const FAMILY_EXPLANATION_BY_DRIVER: Record<CognitiveFunctionId, string> = {
+  ni: "When the people closest to you are confused by what you do, the read gives you something portable to hand them: 'I see the long arc of what I'm building, and the structure I'm carrying isn't the one this room is asking for, but it is the one I'm built to build.' Read it back to yourself first; share the parts that hold.",
+  ne: "When the people closest to you are confused by what you do, the read gives you something portable to hand them: 'I see what could be here, even when no one else does yet — that's how I work, and that's what I'm bringing.' Read it back to yourself first; share the parts that hold.",
+  si: "When the people closest to you are confused by what you do, the read gives you something portable to hand them: 'I keep the things that have worked, even when the room wants something new — that's where I'm load-bearing.' Read it back to yourself first; share the parts that hold.",
+  se: "When the people closest to you are confused by what you do, the read gives you something portable to hand them: 'I read the room and I move; I'm not the one who plans the meeting — I'm the one who notices what the meeting actually needed.' Read it back to yourself first; share the parts that hold.",
+  ti: "When the people closest to you are confused by what you do, the read gives you something portable to hand them: 'I clarify what's actually being claimed before the conversation moves — that's the work, and that's what I bring.' Read it back to yourself first; share the parts that hold.",
+  te: "When the people closest to you are confused by what you do, the read gives you something portable to hand them: 'I see the structure that would make this work, and the building of it is what I'm here to do.' Read it back to yourself first; share the parts that hold.",
+  fi: "When the people closest to you are confused by what you do, the read gives you something portable to hand them: 'I tend what I love, and I won't soften the conviction to keep the peace — that's how I know my care is real.' Read it back to yourself first; share the parts that hold.",
+  fe: "When the people closest to you are confused by what you do, the read gives you something portable to hand them: 'I tend the people in this room — that's how I know my job is going well.' Read it back to yourself first; share the parts that hold.",
+};
+
+/**
+ * Resolve the "Family and coworker explanations" body for a session.
+ * Driver-keyed wins when present; otherwise falls back to archetype-
+ * keyed (the cohort-tier mapping); otherwise the architect default.
+ */
+export function resolveFamilyExplanation(
+  driver: CognitiveFunctionId | null | undefined,
+  archetype: ProfileArchetype | null | undefined
+): string {
+  if (driver && FAMILY_EXPLANATION_BY_DRIVER[driver]) {
+    return FAMILY_EXPLANATION_BY_DRIVER[driver];
+  }
+  if (archetype && FAMILY_EXPLANATION_BY_ARCHETYPE[archetype]) {
+    return FAMILY_EXPLANATION_BY_ARCHETYPE[archetype];
+  }
+  // CC-086 — when both driver and archetype are unknown, fall back to
+  // the architect default (least-bad concrete example).
+  return FAMILY_EXPLANATION_BY_ARCHETYPE.jasonType;
+}
 
 // CC-SHAPE-AWARE-PROSE-ROUTING — the "Family and coworker explanations"
 // item is the canonical "translate your shape into a sentence someone
@@ -69,18 +108,18 @@ export const USE_CASES: ReadonlyArray<{
 
 export default function UseCasesSection({
   archetype,
+  driver,
 }: {
   archetype?: ProfileArchetype;
+  driver?: CognitiveFunctionId;
 } = {}) {
-  // CC-SHAPE-AWARE-PROSE-ROUTING — when an archetype is provided
-  // (InnerConstitutionPage context), substitute the "Family and
-  // coworker explanations" body with the archetype-routed text. When
-  // no archetype is provided (home page / marketing pages), keep the
-  // default architect text so the example remains concrete.
-  const resolved = archetype ?? "jasonType";
+  // CC-086 Site 2 — driver-keyed substitution wins; archetype-keyed is
+  // the fallback (cohort-tier mapping); architect default is the final
+  // fallback (home-page / marketing renders that have no shape signal).
+  const familyBody = resolveFamilyExplanation(driver, archetype);
   const useCases = USE_CASES.map((useCase) =>
     useCase.title === "Family and coworker explanations."
-      ? { ...useCase, body: FAMILY_EXPLANATION_BY_ARCHETYPE[resolved] }
+      ? { ...useCase, body: familyBody }
       : useCase
   );
   return (

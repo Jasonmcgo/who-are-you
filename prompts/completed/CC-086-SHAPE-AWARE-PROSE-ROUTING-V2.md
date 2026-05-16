@@ -1,14 +1,22 @@
-# CC-086 — Shape-Aware Prose Routing V2 (Hands + Lens + "What this is good for")
+# CC-086 — Shape-Aware Prose Routing V2 (Hands + Lens + UseCases + GiftCategory Picker Across 3 More Cards)
 
 ## Objective
 
-Three template-bleed sites surfaced in the 2026-05-16 cohort review are routing prose shape-blind across the cohort. Fix all three in one pass; each is independently scoped within this CC:
+**Six template-bleed sites** surfaced across the 2026-05-16 cohort review + Cindy's 15:06 prod-render review. Sites 1-3 are template-swap routing; sites 4-6 share a single deeper bug — the `pickGiftCategory()` router in `lib/identityEngine.ts:3052` is shape-blind for Trust / Gravity / Conviction cards, routing Cindy (Se driver, Family compass, present-tense caregiver) to `GiftCategory: Builder` and thus producing "a builder's gift" + "you tend to turn ideas into working systems..." prose that's literally Jason-architect language. The user pointed out: *"There hardly could be different people than me (Jason) and my mom (Cindy)"* — yet the engine maps both their reports to Builder-coded Strength prose on multiple cards. The routing isn't shape-aware.
+
+Fix all six in one pass; each is independently scoped within this CC:
 
 **Site 1 — Hands card caregiver template bleeds to non-caregivers.** The exact phrase "You build the relational continuity that lets people feel kept — care made concrete through repeated presence" + footnote "for a caregiver shape, high Soul-substance funnels into Goal-axis output through service" appears in Cindy, Kevin, Ashley, Michele reports (4 of 5 non-Daniel fixtures). Only Daniel — a steward shape — gets the steward template ("the standard followed when no one is watching..."). Routing rule appears to be: Soul-leaning OR Family compass → caregiver template, ignoring driver function + actual Hands shape. Kevin (Faith compass, present-tense Se driver, NOT a caregiver) gets routed there anyway.
 
 **Site 2 — "What this is good for" architect-template example.** The "Family and coworker explanations" subsection literally contains the hardcoded sentence: *'I see the long arc of what I'm building, and the structure I'm carrying isn't the one this room is asking for, but it is the one I'm built to build.'* This is Jason-architect-coded language. It appears verbatim in every cohort report including Cindy (caregiver), Daniel (steward), Michele (room-reader). Should route to driver-specific example text.
 
 **Site 3 — Lens card growth edge uses thinker-coded language for Se drivers.** Kevin / Ashley / Cindy (all Se present-tense self drivers) get "precision lets you see clearly can land as relational bluntness." Precision is a Ti/Te gift, not Se. The actual growth edge for present-tense shapes is "responsiveness becoming reactivity" — named correctly in the Gifts table, then forgotten by the Lens card. Michele (Fe room-reader) gets a more apt growth edge ("over-spiritualizing the practical"). The routing has partial shape-awareness but slips on present-tense Se drivers.
+
+**Sites 4, 5, 6 — Trust / Gravity / Conviction cards route Cindy to `GiftCategory: Builder`.** Cindy's report (2026-05-16 15:06) shows "A builder's gift shows up here: you tend to turn ideas into working systems and to push past friction toward a result" in BOTH the Trust card AND the Gravity card, plus "Precision is part of how this card lands: you tend to clarify what's actually being claimed before the conversation moves" on the Conviction card. The user's framing: *"There hardly could be different people than me (Jason) and my mom (Cindy)"* — yet the engine routes both shapes' Strength prose through the same `Builder` / `Precision` categories.
+
+The architectural cause: `pickGiftCategory()` in `lib/identityEngine.ts:3052`, plus `CARD_PREFERENCES` at line 3136, plus `selectGiftCategoryForCard()`-style logic around line 3251 — these compose to map (LensStack + Compass + cardKey) → `GiftCategory`. For Cindy's shape (Se driver + Family compass + present-tense response), the picker routes Trust → Builder, Gravity → Builder, Conviction → Precision. Those should route to `Action` (in-the-moment action gift) or `Harmony` (relational-attunement gift) for her shape, NOT `Builder` or `Precision`.
+
+The `GIFT_NOUN_PHRASE` + `GIFT_DESCRIPTION` lookups at lines 3552 / 3567 are correct — the bug is in the upstream category selection, not the noun/description tables. Fix the picker, the noun + description follow naturally.
 
 ## Sequencing
 
@@ -60,7 +68,22 @@ In `app/components/UseCasesSection.tsx`, the architect-coded sentence is one of 
 - Ne driver → "I see what could be here, even when no one else does yet." (possibility voice)
 - Fallback when driver is unknown: keep the architect example (least-bad default) but flag in a code comment.
 
-### Item 3 — Lens card growth edge per driver
+### Item 4 — GiftCategory picker shape-awareness for Trust / Gravity / Conviction
+
+In `lib/identityEngine.ts`, locate `pickGiftCategory()` (~line 3052), `CARD_PREFERENCES` (~line 3136), and the per-card category-selection logic (~line 3251). Today the picker routes Cindy's (Se driver + Family compass + present-tense response) Trust / Gravity cards to `Builder`. That's structurally wrong.
+
+The fix: when the LensStack dominant is Se / Fe / Fi / Si (relational or present-tense drivers) AND the Compass cluster is Family / Loyalty / Peace / Compassion (relational protected values), the picker should prefer `Action` / `Harmony` / `Stewardship` over `Builder` / `Precision` for non-Hands cards (Trust / Gravity / Conviction).
+
+Concrete routing constraints to add:
+- **Cindy-shape route**: Se + Family-cluster Compass → Trust = `Action` or `Harmony`; Gravity = `Action` or `Harmony`; Conviction = `Harmony` (her "clarity-before-action" is relational read, not Ti-precision)
+- **Jason-shape route**: Ni + Faith-cluster Compass → keep `Builder` / `Precision` / `Pattern` where it already routes for him (regression anchor)
+- **Daniel-shape route**: Si + Faith-cluster Compass → `Stewardship` for Trust / Gravity (regression anchor)
+
+Don't add new GiftCategory enum members. The 12 categories already in `GIFT_NOUN_PHRASE` are sufficient (Pattern / Precision / Stewardship / Action / Harmony / Integrity / Builder / Advocacy / Meaning / Endurance / Discernment / Generativity). The fix is in the picker's switch/match logic, not the lookup tables.
+
+**Risk profile of this item**: `pickGiftCategory()` is read by every card on every report. Cohort regression will be significant. Don't change `GIFT_NOUN_PHRASE` or `GIFT_DESCRIPTION` text — only the upstream category selection. The text stays canonical; the route to it shape-aligns.
+
+### Item 5 — Lens card growth edge per driver
 
 In `lib/renderMirror.ts` (Lens card section), the growth edge line for Se present-tense drivers currently uses precision-coded language. Route by driver:
 - Ni → "long-arc certainty closes early"
@@ -74,7 +97,7 @@ In `lib/renderMirror.ts` (Lens card section), the growth edge line for Se presen
 
 Use the Gifts table's already-named growth edges as the canonical source if they exist per-driver; otherwise the list above.
 
-### Item 4 — Regression sweep
+### Item 6 — Regression sweep
 
 Re-render the cohort fixtures. Verify:
 - Kevin's Hands card no longer reads "relational continuity that lets people feel kept" (he's not a caregiver)
@@ -83,8 +106,12 @@ Re-render the cohort fixtures. Verify:
 - Cindy's Hands card stays caregiver (regression anchor)
 - Every cohort fixture has driver-appropriate growth edge on Lens card
 - Every cohort fixture has driver-appropriate "What this is good for" example text
+- **Cindy-equivalent fixtures (cindyType archetype) have Trust + Gravity cards routed to `Action` or `Harmony` GiftCategory, NOT `Builder`**
+- **Cindy-equivalent fixtures have Conviction card routed to `Harmony` or `Action`, NOT `Precision`**
+- **Jason-equivalent fixtures (jasonType: Ni driver + Faith Compass) STILL get `Builder` / `Precision` / `Pattern` where they already do** (regression anchor)
+- **Daniel-equivalent fixtures (danielType: Si driver) get `Stewardship`** (regression anchor)
 
-### Item 5 — Audit
+### Item 7 — Audit
 
 New `tests/audit/shapeAwareProseRoutingV2.audit.ts` with assertions:
 1. Hands card prose for Kevin's fixture does NOT contain "relational continuity that lets people feel kept"
@@ -92,12 +119,20 @@ New `tests/audit/shapeAwareProseRoutingV2.audit.ts` with assertions:
 3. "What this is good for" section in Cindy's fixture renders does NOT contain "long arc of what I'm building"
 4. Lens card growth edge for Kevin's fixture contains "responsiveness becoming reactivity" or Se-driver-appropriate language
 5. Cohort sweep: every fixture's Hands card maps to a driver-appropriate template per the routing table
+6. **Trust card prose for cindyType fixture does NOT contain "a builder's gift" or "turn ideas into working systems"** (Site 4)
+7. **Gravity card prose for cindyType fixture does NOT contain "a builder's gift"** (Site 5)
+8. **Conviction card prose for cindyType fixture does NOT contain "Precision is part of how this card lands"** (Site 6)
+9. **Jason-equivalent fixture (jasonType: Ni + Faith) Trust/Gravity STILL routes to Builder or Pattern GiftCategory** (regression anchor — proves the fix is targeted, not blanket)
+10. **Daniel-equivalent fixture (danielType: Si + Faith) Trust/Gravity routes to Stewardship GiftCategory** (regression anchor)
 
 ## Do NOT
 
-- **Do NOT change any engine math.** No score changes. No Drive distribution changes. No Aim changes.
+- **Do NOT change any engine math.** No score changes. No Drive distribution changes. No Aim changes. No Grip changes. The GiftCategory picker edit changes WHICH category is selected, not the category's contents (text, scores).
 - **Do NOT rewrite the existing template prose.** This CC routes existing templates correctly; it doesn't author new prose. New prose authoring is a CC-LLM-PROSE-PASS-Vx job, not this.
+- **Do NOT add new GiftCategory enum members.** The 12 existing categories (Pattern / Precision / Stewardship / Action / Harmony / Integrity / Builder / Advocacy / Meaning / Endurance / Discernment / Generativity) are sufficient.
+- **Do NOT change `GIFT_NOUN_PHRASE` or `GIFT_DESCRIPTION` tables.** Their text is canonical. Only the upstream picker selecting WHICH category gets used changes.
 - **Do NOT change the Path card, Compass card, Movement section, or Risk Form prose.** Out of scope here.
+- **Do NOT touch the Gift table at the top of the report.** That's the separate misalignment bug (Site 7 — gift name/description cross-wiring) and goes to CC-088, not here.
 - **Do NOT regenerate any cache file** under `lib/cache/`.
 - **Do NOT regenerate `tests/audit/twoTierBaseline.snapshot.json`** until after this CC + CC-084 + CC-085 all land. The baseline refresh becomes a separate cleanup CC.
 - **Do NOT call any LLM.** No `*LlmServer.ts` imports. No `@anthropic-ai/sdk`.
@@ -109,6 +144,8 @@ New `tests/audit/shapeAwareProseRoutingV2.audit.ts` with assertions:
 - `lib/handsCard.ts`
 - `lib/renderMirror.ts` (Hands card section + Lens card section only)
 - `app/components/UseCasesSection.tsx`
+- `lib/identityEngine.ts` — **`pickGiftCategory()` (~line 3052) + `CARD_PREFERENCES` (~line 3136) + the per-card category-selection logic (~line 3251) only**. Do NOT touch `GIFT_NOUN_PHRASE` (~line 3552) or `GIFT_DESCRIPTION` (~line 3567) — those tables are canonical and stay as-is. Do NOT touch any score/aggregation/scoring function. Do NOT add new GiftCategory enum members.
+- `lib/synthesis1Finish.ts` — only if Strength prose Records for the three additional cards live here per CC-084's discovered pattern. Verify before editing.
 - `lib/types.ts` (only if a driver-to-template mapping type needs adding)
 - `tests/audit/shapeAwareProseRoutingV2.audit.ts` (new)
 - `package.json` (add `audit:shape-aware-prose-routing-v2` script)
@@ -126,14 +163,20 @@ New `tests/audit/shapeAwareProseRoutingV2.audit.ts` with assertions:
 
 1. `npx tsc --noEmit` passes
 2. `npm run lint` passes
-3. `npx tsx tests/audit/shapeAwareProseRoutingV2.audit.ts` passes 5/5
+3. `npx tsx tests/audit/shapeAwareProseRoutingV2.audit.ts` passes 10/10 (5 original + 5 added for sites 4-6)
 4. Wave 1 audits still pass
-5. CC-084 + CC-085 audits still pass (if they landed)
+5. CC-084 + CC-085 audits still pass
 6. Demographics audit still passes
-7. Kevin's Hands card no longer uses caregiver template
-8. Daniel + Cindy Hands cards unchanged (regression anchors)
-9. Lens card growth edge per-driver routing for Se drivers fires correctly
-10. "What this is good for" architect-template no longer bleeds to non-architects
+7. Kevin's Hands card no longer uses caregiver template (Site 1)
+8. Daniel + Cindy Hands cards unchanged in archetype routing (regression anchors)
+9. Lens card growth edge per-driver routing for Se drivers fires correctly (Site 3)
+10. "What this is good for" architect-template no longer bleeds to non-architects (Site 2)
+11. Cindy's Trust card no longer reads "a builder's gift" (Site 4)
+12. Cindy's Gravity card no longer reads "a builder's gift" (Site 5)
+13. Cindy's Conviction card no longer reads "Precision is part of how this card lands" (Site 6)
+14. Jason-equivalent fixture's Trust/Gravity STILL routes to Builder/Pattern (regression anchor — proves picker is targeted, not blanket)
+15. `GIFT_NOUN_PHRASE` + `GIFT_DESCRIPTION` tables byte-identical to pre-CC (canonical text preserved)
+16. Zero modifications to Wave 1 persistence files
 11. Zero modifications to Wave 1 persistence files
 12. Zero LLM calls
 13. Zero cache file modifications

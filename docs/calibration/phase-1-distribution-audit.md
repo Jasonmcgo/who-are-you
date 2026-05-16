@@ -282,7 +282,7 @@ No data gaps: every histogram in this artifact was producible from the cohort.
 
 ## Inputs
 
-- **Git SHA**: `6787d8193b67ef5a1bd1c6c9fbeecd74a85d6a30`
+- **Git SHA**: `b1eea2617ef087da3e6f331f9a2fbf2dbb108be5`
 - **Engine entry point**: `buildInnerConstitution(answers, [], demographics)` from `lib/identityEngine.ts`
 - **Engine-version cutoff**: `2026-05-12T00:00:00.000Z` (timestamp-based; `engine_shape_version` column absent because CC-STALE-SHAPE-DETECTOR has not shipped)
 - **Fixtures cohort dir**: `tests/fixtures/cohort/` (8 files)

@@ -9,6 +9,7 @@ import {
   USE_CASES,
   USE_CASES_SECTION_SUBHEAD,
   USE_CASES_SECTION_TITLE,
+  resolveFamilyExplanation,
 } from "../app/components/UseCasesSection";
 import { generateBeliefContextProse } from "./beliefHeuristics";
 import {
@@ -164,9 +165,24 @@ function scrubFosterVocab(
 function emitGripSection(out: string[], constitution: InnerConstitution): void {
   const grip = constitution.gripTaxonomy;
   if (!grip || !grip.primary) return;
-  // CC-GRIP-CALIBRATION — `proseMode` is the renderer's gate. "omitted"
-  // includes both low-confidence + zero-grip cases.
-  if (grip.proseMode === "omitted") return;
+  // CC-GRIP-CALIBRATION — `proseMode` is the legacy Primal classifier's
+  // gate. "omitted" includes both low-confidence + zero-grip cases.
+  //
+  // CC-085 — decouple the proprietary Grip Pattern card from the
+  // legacy Primal proseMode. The new classifier (gripPattern) can
+  // produce a renderable bucket at high/medium confidence even when
+  // the legacy classifier returns "low" → "omitted". Suppress the
+  // section ONLY when BOTH gates agree there's nothing to render:
+  // gripTaxonomy.proseMode === "omitted" AND gripPattern has no
+  // renderable bucket (unmapped OR low confidence). When the new
+  // classifier has a renderable read, the section emits and the
+  // body falls through to the engine-fallback prose branch.
+  const gripPattern = constitution.gripPattern;
+  const hasRenderableGripPattern =
+    gripPattern !== undefined &&
+    gripPattern.bucket !== "unmapped" &&
+    (gripPattern.confidence === "high" || gripPattern.confidence === "medium");
+  if (grip.proseMode === "omitted" && !hasRenderableGripPattern) return;
 
   // CC-GRIP-TAXONOMY-REPLACEMENT — the user-facing Grip section emits
   // the proprietary Grip Pattern reading. The engine-internal Primal
@@ -1622,13 +1638,28 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
   }
 
   // 19. Use-cases section (closer before footer).
+  //
+  // CC-086 Site 2 — the "Family and coworker explanations" body
+  // routes through the per-session resolver (driver-keyed primary,
+  // archetype-keyed fallback). Pre-CC-086 every markdown export
+  // carried the architect-coded long-arc example regardless of
+  // shape — that's the template bleed Cindy's 2026-05-16 prod render
+  // surfaced.
+  const familyExplanationBody = resolveFamilyExplanation(
+    constitution.lens_stack?.dominant ?? null,
+    constitution.profileArchetype?.primary ?? null
+  );
   out.push("");
   out.push(`## ${USE_CASES_SECTION_TITLE}`);
   out.push("");
   out.push(`*${USE_CASES_SECTION_SUBHEAD}*`);
   for (const useCase of USE_CASES) {
     out.push("");
-    out.push(`**${useCase.title}** ${useCase.body}`);
+    const body =
+      useCase.title === "Family and coworker explanations."
+        ? familyExplanationBody
+        : useCase.body;
+    out.push(`**${useCase.title}** ${body}`);
   }
 
   // 19a. CC-PROSE-1B Layer 5C — Final Line callout. Closing-of-the-closing,
