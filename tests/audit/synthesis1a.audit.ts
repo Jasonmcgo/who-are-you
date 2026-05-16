@@ -59,11 +59,13 @@ function loadFixtures(): FixtureRecord[] {
 }
 
 // CC-PHASE-3A-LABEL-LOGIC — refined Risk Form + quadrant labels.
+// CC-084 — extended with the "Lightly Governed Movement" 5th band.
 const RISK_FORM_LETTERS: readonly RiskFormLetter[] = [
   "Open-Handed Aim",
   "Grip-Governed",
   "Ungoverned Movement",
   "White-Knuckled Aim",
+  "Lightly Governed Movement",
 ];
 
 const QUADRANT_LABELS: readonly MovementQuadrantLabel[] = [
@@ -207,6 +209,8 @@ function runAudit(): AssertionResult[] {
     "Grip-Governed": 0,
     "Ungoverned Movement": 0,
     "White-Knuckled Aim": 0,
+    // CC-084 — 5th band counter.
+    "Lightly Governed Movement": 0,
   };
   for (const r of rows) {
     if (r.riskFormLetter) riskFormCounts[r.riskFormLetter]++;
@@ -217,7 +221,7 @@ function runAudit(): AssertionResult[] {
   results.push({
     ok: true,
     assertion: "synth-1a-risk-form-coverage",
-    detail: `${cellsCovered}/4 cells represented; counts ${RISK_FORM_LETTERS.map(
+    detail: `${cellsCovered}/${RISK_FORM_LETTERS.length} cells represented; counts ${RISK_FORM_LETTERS.map(
       (l) => `${l}=${riskFormCounts[l]}`
     ).join(", ")}`,
   });

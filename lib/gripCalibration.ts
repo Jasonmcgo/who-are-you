@@ -61,12 +61,15 @@ export interface CalibrationContext {
   // Risk Form letter (CC-SYNTHESIS-1A; CC-PHASE-3A-LABEL-LOGIC renames)
   // — null for thin-signal sessions. The CC-GRIP-CALIBRATION rules
   // R6/R7 read this letter, so the union now mirrors the new
-  // `RiskFormLetter` from `lib/riskForm.ts`.
+  // `RiskFormLetter` from `lib/riskForm.ts`. CC-084 extended with the
+  // 5th band; existing R6/R7 rules continue to discriminate on the
+  // 4-band labels (the new band falls through to default behavior).
   riskFormLetter:
     | "Open-Handed Aim"
     | "White-Knuckled Aim"
     | "Grip-Governed"
     | "Ungoverned Movement"
+    | "Lightly Governed Movement"
     | null;
   // OCEAN intensities (CC-072), 0-100. null when OCEAN derivation absent.
   oceanAgreeableness: number | null;

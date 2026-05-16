@@ -17,6 +17,8 @@
     "audit:calibration-phase-1": "tsx scripts/calibrationPhase1DistributionAudit.ts",
     "audit:stale-shape-detector": "tsx tests/audit/staleShapeDetector.audit.ts",
     "audit:demographics-save-wiring": "tsx tests/audit/demographicsSaveWiring.audit.ts",
+    "audit:admin-demographic-edit": "tsx tests/audit/adminDemographicEdit.audit.ts",
+    "audit:risk-form-5th-band": "tsx tests/audit/riskForm5thBandAndPathConsistency.audit.ts",
     "backfill:llm-rewrites": "tsx scripts/backfillLlmRewritesOnSessions.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",

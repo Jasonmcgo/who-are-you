@@ -197,8 +197,8 @@ Mapping note: the CC's 'Safety / Security / Belonging / Worth / Recognition / Co
 | Open-Handed Aim | 0 | 2 | +2 |
 | White-Knuckled Aim | 0 | 1 | +1 |
 | Grip-Governed | 5 | 1 | -4 |
-| Ungoverned Movement | 3 | 9 | +6 |
-| Lightly Governed Movement | 0 | 0 | +0 |
+| Ungoverned Movement | 2 | 7 | +5 |
+| Lightly Governed Movement | 1 | 2 | +1 |
 | Strained Integration | 0 | 0 | +0 |
 | (unset) | 0 | 0 | +0 |
 
@@ -282,7 +282,7 @@ No data gaps: every histogram in this artifact was producible from the cohort.
 
 ## Inputs
 
-- **Git SHA**: `5607de0b8891693ffe39f13f120aaee1b81d5645`
+- **Git SHA**: `6787d8193b67ef5a1bd1c6c9fbeecd74a85d6a30`
 - **Engine entry point**: `buildInnerConstitution(answers, [], demographics)` from `lib/identityEngine.ts`
 - **Engine-version cutoff**: `2026-05-12T00:00:00.000Z` (timestamp-based; `engine_shape_version` column absent because CC-STALE-SHAPE-DETECTOR has not shipped)
 - **Fixtures cohort dir**: `tests/fixtures/cohort/` (8 files)

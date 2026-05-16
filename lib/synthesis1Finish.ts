@@ -207,11 +207,12 @@ export function composeWeatherStateVsShape(
 
 // CC-SYNTHESIS-1A Risk Form letters.
 // CC-PHASE-3A-LABEL-LOGIC — labels refined per canon §14.
-type RiskFormLetter =
-  | "Open-Handed Aim"
-  | "Grip-Governed"
-  | "Ungoverned Movement"
-  | "White-Knuckled Aim";
+// CC-084 — kill the local re-declaration in favor of the public
+// `RiskFormLetter` from `lib/riskForm.ts` so the union stays in sync
+// when new bands are added (the 5th band "Lightly Governed Movement"
+// is the immediate use case). Local maps below (FIRE_NOTE_BY_LETTER,
+// PATH_RISK_FORM_INTEGRATION) grow a new entry per added variant.
+import type { RiskFormLetter } from "./riskForm";
 
 // ── Lens Movement Note: Cost as Work shape
 
@@ -414,6 +415,11 @@ const FIRE_NOTE_BY_LETTER: Record<RiskFormLetter, string> = {
     "**Movement Note** — When cost arrives, your shape tends to respond without much pause. Aim is thin, grip is thin. The motion is unimpeded; the work is to add enough pause that what gets risked is what's actually worth risking.",
   "White-Knuckled Aim":
     "**Movement Note** — When cost arrives, your shape tends to bear cost without the protection a paused look would give. Aim is present but grip has activated alongside it. The work is to let Risk become governor before grip takes its job.",
+  // CC-084 — Lightly Governed Movement. Aim is moderate, grip is
+  // light. The governor is doing real-if-understated work; the move
+  // is happening but not strongly aimed yet.
+  "Lightly Governed Movement":
+    "**Movement Note** — When cost arrives, your shape tends to move with some governance but without strong aim. Aim is moderate, grip is light. The governor is present but understated; the work is to let aim sharpen so the moves you make point at what you mean.",
 };
 
 // CC-SYNTHESIS-1-FINISH Section D + E — return null when length=0 so
@@ -422,14 +428,18 @@ const FIRE_NOTE_BY_LETTER: Record<RiskFormLetter, string> = {
 export function composeFireMovementNote(
   constitution: InnerConstitution
 ): string | null {
+  // CC-084 — prefer Aim-based classifier so Fire Movement Note and
+  // Path card stay consistent with the Movement section's label.
+  const riskForFire =
+    constitution.riskFormFromAim ?? constitution.riskForm;
   if (
-    !constitution.riskForm ||
+    !riskForFire ||
     !constitution.goalSoulMovement ||
     constitution.goalSoulMovement.dashboard.movementStrength.length === 0
   ) {
     return null;
   }
-  return FIRE_NOTE_BY_LETTER[constitution.riskForm.letter];
+  return FIRE_NOTE_BY_LETTER[riskForFire.letter];
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -465,6 +475,10 @@ const PATH_RISK_FORM_INTEGRATION: Record<RiskFormLetter, string> = {
     "Your Risk Form reads as Ungoverned Movement — motion runs unimpeded, calibration is the future asking.",
   "White-Knuckled Aim":
     "Your Risk Form reads as White-Knuckled Aim — Aim is present but grip has activated alongside it; engaged but not at peace.",
+  // CC-084 — Lightly Governed Movement. Aim is moderate, governing
+  // softly; the move is happening, the aim still maturing.
+  "Lightly Governed Movement":
+    "Your Risk Form reads as Lightly Governed Movement — the governor is present but understated, and the move is happening without strong aim.",
 };
 
 // Bias direction → "the {Work-or-Soul} line is strong, and the
@@ -565,9 +579,19 @@ export function composePathMasterSynthesis(
 
   // Risk Form integration — concise Path-level reference only. Fire
   // keeps the longer behavior reading; Path must not duplicate it.
+  // CC-084 — prefer the canonical Aim-based classifier
+  // (`riskFormFromAim`) so the Path card prose matches the Movement
+  // section's label. Previously this read `constitution.riskForm`
+  // (the legacy compliance-bucket classifier), which produced
+  // Movement/Path contradictions on sessions where the two classifiers
+  // disagreed (e.g., Aim ≥ 60 + compliance < 30 → Aim says
+  // Open-Handed, legacy says Ungoverned). Falls back to `riskForm`
+  // when the Aim reading is absent (pre-CC sessions).
+  const riskFormForPath =
+    constitution.riskFormFromAim ?? constitution.riskForm;
   const riskBehavior =
-    constitution.riskForm && dash.movementStrength.length > 0
-    ? ` ${PATH_RISK_FORM_INTEGRATION[constitution.riskForm.letter]}`
+    riskFormForPath && dash.movementStrength.length > 0
+    ? ` ${PATH_RISK_FORM_INTEGRATION[riskFormForPath.letter]}`
     : "";
 
   const parts: string[] = [];

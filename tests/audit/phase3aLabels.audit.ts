@@ -61,6 +61,11 @@ const ALL_RISK_FORM_LETTERS: RiskFormLetter[] = [
   "White-Knuckled Aim",
   "Grip-Governed",
   "Ungoverned Movement",
+  // CC-084 — 5th band. Listed for completeness so the audit's letter-
+  // coverage probe can verify the band is reachable, but the existing
+  // letter-union probes don't fire on this label since none of the
+  // 4-band synthetic probes hit the [40,60) Aim × [20,35] Grip window.
+  "Lightly Governed Movement",
 ];
 
 type CohortRow = {
@@ -263,6 +268,11 @@ function runAudit(): AssertionResult[] {
     { aim: 75, grip: 60, expected: "White-Knuckled Aim" },
     { aim: 35, grip: 60, expected: "Grip-Governed" },
     { aim: 35, grip: 25, expected: "Ungoverned Movement" },
+    // CC-084 — Lightly Governed Movement window: Aim in [40, 60) AND
+    // composed Grip in [20, 35]. This probe lands in the middle of
+    // the window so the band is reachable for the union-completeness
+    // assertion.
+    { aim: 55, grip: 25, expected: "Lightly Governed Movement" },
   ];
   const seenLetters = new Set<RiskFormLetter>();
   for (const p of riskProbes) {
@@ -277,7 +287,7 @@ function runAudit(): AssertionResult[] {
       ? {
           ok: true,
           assertion: "risk-form-letter-union-completeness",
-          detail: "all 4 Risk Form letters reachable via synthetic probes",
+          detail: "all 5 Risk Form letters reachable via synthetic probes",
         }
       : {
           ok: false,
@@ -301,7 +311,7 @@ function runAudit(): AssertionResult[] {
       ? {
           ok: true,
           assertion: "risk-form-label-renames",
-          detail: "all 4 synthetic quadrants land on canonical refined labels",
+          detail: "all 5 synthetic quadrants land on canonical refined labels",
         }
       : {
           ok: false,
@@ -349,6 +359,11 @@ function runAudit(): AssertionResult[] {
     "White-Knuckled Aim": "Reckless-fearful",
     "Grip-Governed": "Grip-governed",
     "Ungoverned Movement": "Free movement",
+    // CC-084 — no pre-CC-PHASE-3A legacy alias exists for the 5th band
+    // since it didn't exist in the 4-band classifier. Mirror the
+    // canonical alias-self-mapping pattern used in `lib/riskForm.ts`'s
+    // LEGACY_RISK_FORM_LABEL.
+    "Lightly Governed Movement": "Lightly Governed Movement",
   };
   const legacyMapFails: string[] = [];
   for (const letter of ALL_RISK_FORM_LETTERS) {

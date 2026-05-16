@@ -309,3 +309,201 @@ export async function attachDemographicsToSession(
     return { ok: true, created };
   });
 }
+
+// CC-087-ADMIN-DEMOGRAPHIC-EDIT — surgical per-field demographic edit.
+//
+// Updates exactly one (value, state) column-pair on the demographics row
+// for a session, and writes a `ghost_mapping_audit` entry capturing the
+// before/after column values. Unlike `attachDemographicsToSession`, this
+// action does NOT preserve prior values via `??` fallback — it writes
+// the new state authoritatively, so toggling a field to
+// `prefer_not_to_say` correctly clears the value column.
+//
+// If no demographics row exists yet (session was anonymous), this action
+// inserts one with the edited field populated and the rest at their
+// `not_answered` defaults. Email/mobile edits go to `contact_email` /
+// `contact_mobile`; the nine demographic field_ids go to their canonical
+// (value, state) column pairs per `buildDemographicsRow`.
+//
+// Field key vocabulary (intentionally NOT a `DemographicAnswer.field_id`
+// because email/mobile aren't part of that union):
+//   "name" | "gender" | "age" | "location" | "marital_status" |
+//   "education" | "political" | "religious" | "profession" |
+//   "contact_email" | "contact_mobile"
+//
+// Auth: same posture as the other admin actions in this file — the
+// `/admin/*` route is gated upstream; this action stays open.
+
+export type DemographicFieldKey =
+  | "name"
+  | "gender"
+  | "age"
+  | "location"
+  | "marital_status"
+  | "education"
+  | "political"
+  | "religious"
+  | "profession"
+  | "contact_email"
+  | "contact_mobile";
+
+export interface UpdateSessionDemographicFieldArgs {
+  sessionId: string;
+  fieldKey: DemographicFieldKey;
+  // The new state for the field. Ignored for contact_email / contact_mobile
+  // (which have no state column — they are simply nullable text).
+  state?: "specified" | "prefer_not_to_say" | "not_answered";
+  // The new value when state === "specified". For contact_email /
+  // contact_mobile, the raw string. For location, "country | region"
+  // format (split downstream). For "Other" picks, prefix the value with
+  // "Other: " — matches the existing `buildDemographicsRow` convention.
+  value?: string | null;
+  // Required free-text identifier for the admin user making the edit.
+  adminLabel: string;
+  // Optional free-text note (e.g., fingerprint detail).
+  note?: string;
+}
+
+export async function updateSessionDemographicField(
+  args: UpdateSessionDemographicFieldArgs
+): Promise<{ ok: true; created: boolean }> {
+  if (args.adminLabel.trim().length === 0) {
+    throw new Error("adminLabel is required");
+  }
+  const db = getDb();
+  return await db.transaction(async (tx) => {
+    const existingRows = await tx
+      .select()
+      .from(demographics)
+      .where(eq(demographics.session_id, args.sessionId))
+      .limit(1);
+    const before = existingRows[0] ?? null;
+
+    // Compute the new (value, state) write for this single field.
+    const setPatch = buildSingleFieldPatch(args);
+
+    let created = false;
+    if (before === null) {
+      // Insert a fresh row with the edited field set, everything else
+      // at its default (not_answered / null).
+      const insertRow: DemographicsRow = { session_id: args.sessionId, ...setPatch };
+      await tx.insert(demographics).values(insertRow);
+      created = true;
+    } else {
+      await tx
+        .update(demographics)
+        .set(setPatch)
+        .where(eq(demographics.session_id, args.sessionId));
+    }
+
+    // Snapshot only the columns the audit log already captures plus
+    // location (CC-087 widens audit to surface location edits too).
+    const beforeSnapshot = before
+      ? {
+          name_value: before.name_value,
+          name_state: before.name_state,
+          gender_value: before.gender_value,
+          gender_state: before.gender_state,
+          age_decade: before.age_decade,
+          age_state: before.age_state,
+          location_country: before.location_country,
+          location_region: before.location_region,
+          location_state: before.location_state,
+          marital_status_value: before.marital_status_value,
+          marital_status_state: before.marital_status_state,
+          education_value: before.education_value,
+          education_state: before.education_state,
+          political_value: before.political_value,
+          political_state: before.political_state,
+          religious_value: before.religious_value,
+          religious_state: before.religious_state,
+          profession_value: before.profession_value,
+          profession_state: before.profession_state,
+          contact_email: before.contact_email,
+          contact_mobile: before.contact_mobile,
+        }
+      : null;
+    const afterSnapshot = {
+      field_key: args.fieldKey,
+      state: args.state ?? null,
+      value: args.value ?? null,
+    };
+
+    await tx.insert(ghostMappingAudit).values({
+      session_id: args.sessionId,
+      admin_label: args.adminLabel.trim(),
+      note: args.note?.trim() ? args.note.trim() : null,
+      before_snapshot: beforeSnapshot,
+      after_snapshot: afterSnapshot,
+    });
+
+    return { ok: true, created };
+  });
+}
+
+// Translates a single-field edit into the partial DemographicsRow patch
+// that drizzle's `.set(...)` accepts. Centralized so the per-field column
+// mapping (especially location's split / contact-field special case)
+// stays in one place.
+function buildSingleFieldPatch(
+  args: UpdateSessionDemographicFieldArgs
+): Partial<DemographicsRow> {
+  const patch: Partial<DemographicsRow> = {};
+  const state = args.state ?? "not_answered";
+  const value = args.value ?? null;
+
+  switch (args.fieldKey) {
+    case "name":
+      patch.name_value = state === "specified" ? value : null;
+      patch.name_state = state;
+      break;
+    case "gender":
+      patch.gender_value = state === "specified" ? value : null;
+      patch.gender_state = state;
+      break;
+    case "age":
+      patch.age_decade = state === "specified" ? value : null;
+      patch.age_state = state;
+      break;
+    case "location": {
+      if (state === "specified" && value) {
+        const [country, ...rest] = value.split("|").map((s) => s.trim());
+        patch.location_country = country || null;
+        patch.location_region = rest.length > 0 ? rest.join(" | ") : null;
+      } else {
+        patch.location_country = null;
+        patch.location_region = null;
+      }
+      patch.location_state = state;
+      break;
+    }
+    case "marital_status":
+      patch.marital_status_value = state === "specified" ? value : null;
+      patch.marital_status_state = state;
+      break;
+    case "education":
+      patch.education_value = state === "specified" ? value : null;
+      patch.education_state = state;
+      break;
+    case "political":
+      patch.political_value = state === "specified" ? value : null;
+      patch.political_state = state;
+      break;
+    case "religious":
+      patch.religious_value = state === "specified" ? value : null;
+      patch.religious_state = state;
+      break;
+    case "profession":
+      patch.profession_value = state === "specified" ? value : null;
+      patch.profession_state = state;
+      break;
+    case "contact_email":
+      // No state column for contact fields. Empty/null value clears it.
+      patch.contact_email = value && value.length > 0 ? value : null;
+      break;
+    case "contact_mobile":
+      patch.contact_mobile = value && value.length > 0 ? value : null;
+      break;
+  }
+  return patch;
+}
