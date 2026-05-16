@@ -111,6 +111,8 @@ async function runAudit(): Promise<void> {
     if (!isAcceptableMobile("")) fails.push("empty mobile rejected (should pass)");
     if (!isAcceptableMobile("+1 (555) 123-4567"))
       fails.push("phone with punctuation rejected");
+    if (!isAcceptableMobile("734.474.5112"))
+      fails.push("phone with periods (e.g., 734.474.5112) rejected — Cindy regression");
     if (isAcceptableMobile("not-a-phone"))
       fails.push("non-phone string accepted as mobile");
     results.push(

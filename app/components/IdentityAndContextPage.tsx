@@ -45,9 +45,10 @@ type Props = {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // CC-HEADER-NAV-AND-EMAIL-GATE — optional mobile: when non-empty,
-// must look phone-ish (digits, spaces, dashes, parens, +). Empty
+// must look phone-ish. Allows digits, spaces, dashes, parens, plus,
+// and periods (e.g., 734.474.5112 is a normal US format). Empty
 // passes. Storage keeps the raw input intact.
-const MOBILE_RE = /^[\d\s\-+()]+$/;
+const MOBILE_RE = /^[\d\s\-+().]+$/;
 
 export function isValidEmail(s: string): boolean {
   return EMAIL_RE.test(s.trim());
