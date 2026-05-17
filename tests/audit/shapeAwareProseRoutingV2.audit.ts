@@ -405,13 +405,16 @@ function runAudit(): void {
     }
   }
 
-  // ── 10. Daniel-equivalent Trust/Gravity in steward-adjacent categories
-  //   The CC's literal anchor ("Stewardship") is constrained by the
-  //   editorial-discipline repetition cap; Stewardship is already used
-  //   on Compass/Weather for Si shapes. The acceptable steward-adjacent
-  //   set on Trust/Gravity is Stewardship / Harmony / Integrity /
-  //   Discernment / Advocacy / Endurance — none of which is Builder
-  //   or Precision (the bleeds the CC is fixing).
+  // ── 10. Daniel-equivalent Trust in steward-adjacent categories
+  //   CC-091 (steward-builder support widening) — danielType Gravity
+  //   now intentionally routes to Builder (Si-Te + faith compass +
+  //   individual/authority responsibility is the steward-builder
+  //   pattern). The Trust card still routes to a steward-adjacent
+  //   category (Stewardship / Harmony / Integrity / Discernment / Advocacy
+  //   / Endurance) and must NOT route to Builder or Precision (those
+  //   are the architect-coded bleeds CC-086 fixed). Gravity is exempt
+  //   from this assertion post-CC-091; CC-091's audit owns the Gravity
+  //   regression anchor.
   {
     const danielish = cohort.find(
       (c) =>
@@ -427,24 +430,21 @@ function runAudit(): void {
     } else {
       const trustStrength =
         strengthOfSection(danielish.rendered, "Trust") ?? "";
-      const gravityStrength =
-        strengthOfSection(danielish.rendered, "Gravity") ?? "";
       const isBuilderOrPrecision = (s: string) =>
         s.includes("builder's gift") ||
         s.includes("clarifying-precision");
       const trustOk = !isBuilderOrPrecision(trustStrength);
-      const gravityOk = !isBuilderOrPrecision(gravityStrength);
       results.push(
-        trustOk && gravityOk
+        trustOk
           ? {
               ok: true,
               assertion: "daniel-trust-gravity-not-builder",
-              detail: `${danielish.file}: trust=${trustStrength.slice(0, 40)}… gravity=${gravityStrength.slice(0, 40)}…`,
+              detail: `${danielish.file}: trust=${trustStrength.slice(0, 40)}… (Gravity intentionally routes Builder post-CC-091; verified in CC-091's audit)`,
             }
           : {
               ok: false,
               assertion: "daniel-trust-gravity-not-builder",
-              detail: `${danielish.file}: trust-ok=${trustOk} gravity-ok=${gravityOk}; trust=${trustStrength.slice(0, 60)} gravity=${gravityStrength.slice(0, 60)}`,
+              detail: `${danielish.file}: trust-ok=${trustOk}; trust=${trustStrength.slice(0, 60)}`,
             }
       );
     }

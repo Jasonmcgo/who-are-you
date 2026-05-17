@@ -1,5 +1,7 @@
 import type {
   Answer,
+  BlindSpot,
+  BlindSpotMagnitude,
   CardId,
   CognitiveFunctionId,
   ConvictionOutput,
@@ -456,11 +458,25 @@ const STRENGTHENERS: Record<string, SignalId[]> = {
   "T-002": ["conviction_under_cost"],
 };
 
+// CC-094 — legacy Q-P2 label remap. The Q-P2 options were relabeled
+// (gradient vocabulary) without changing the underlying signals; pre-
+// CC-094 sessions persist the old label strings in `Answer.response`,
+// so we translate them to the new labels before matching. The four
+// distinct Q-P2 signals are preserved; this only fixes label lookup.
+const LEGACY_RESPONSE_REMAP: Record<string, Record<string, string>> = {
+  "Q-P2": {
+    "Hide it from work": "Keep it quiet at work",
+    "Don't volunteer it": "Express it carefully at work",
+  },
+};
+
 function signalFromAnswer(a: Answer): Signal | null {
   if (a.type !== "forced") return null;
   const q = questions.find((q) => q.question_id === a.question_id);
   if (!q || q.type !== "forced") return null;
-  const opt = q.options.find((o) => o.label === a.response);
+  const remap = LEGACY_RESPONSE_REMAP[a.question_id];
+  const resolvedResponse = remap?.[a.response] ?? a.response;
+  const opt = q.options.find((o) => o.label === resolvedResponse);
   if (!opt || !opt.signal) return null;
   return {
     signal_id: opt.signal,
@@ -1496,6 +1512,482 @@ export function deriveSacredValues(answers: Answer[]): string[] {
   return out;
 }
 
+// ── CC-090 — Blind Spots Panel ─────────────────────────────────────────
+//
+// Promotes hypocrisy detection (the stated-vs-lived gap across Compass
+// values) out of the Open Tensions footer into a first-class section
+// alongside Gifts. Detection extends from the legacy four (Faith /
+// Knowledge / Justice / Compassion via T-013 / T-016) to all twelve
+// Compass values, using a data-driven probe table keyed by
+// (compass_value, cross_signal_checks). Per the gradient canon, each
+// probe produces a magnitude grade rather than a binary fire.
+//
+// Engine math is untouched. T-013 / T-014 / T-016 continue to fire as
+// Tension objects so cohort regression baselines stay stable. The
+// render layer filters them from the Open Tensions section because
+// their content lives in Blind Spots now.
+
+type BlindSpotCrossResult = "aligned" | "misaligned" | "unknown";
+
+type BlindSpotCrossCheck = {
+  description: string; // evidence clause used in the rendered prose
+  evaluate: (signals: Signal[]) => BlindSpotCrossResult;
+};
+
+type BlindSpotProbeRow = {
+  compass_value_id: SignalId;
+  compass_label: string;
+  crossChecks: BlindSpotCrossCheck[];
+  practice?: string;
+};
+
+function rankOfSignalFromQuestion(
+  signals: Signal[],
+  id: SignalId,
+  qid: string
+): number | null {
+  const sig = signals.find(
+    (s) => s.signal_id === id && s.source_question_ids.includes(qid)
+  );
+  return sig?.rank ?? null;
+}
+
+function questionWasAnswered(signals: Signal[], qid: string): boolean {
+  return signals.some((s) => s.source_question_ids.includes(qid));
+}
+
+const BLIND_SPOT_PROBES: BlindSpotProbeRow[] = [
+  {
+    compass_value_id: "faith_priority",
+    compass_label: "Faith",
+    crossChecks: [
+      {
+        description:
+          "religious giving doesn't lead your wider-circle money flow",
+        evaluate: (signals) => {
+          if (!questionWasAnswered(signals, "Q-S3-wider")) return "unknown";
+          const r = rankOfSignalFromQuestion(
+            signals,
+            "nonprofits_religious_spending_priority",
+            "Q-S3-wider"
+          );
+          if (r === null) return "unknown";
+          return r === 1 ? "aligned" : "misaligned";
+        },
+      },
+      {
+        description:
+          "religious institutions aren't among the public-mission institutions you trust most",
+        evaluate: (signals) => {
+          if (!questionWasAnswered(signals, "Q-X3-public")) return "unknown";
+          const r = rankOfSignalFromQuestion(
+            signals,
+            "religious_trust_priority",
+            "Q-X3-public"
+          );
+          if (r === null) return "unknown";
+          return r <= 3 ? "aligned" : "misaligned";
+        },
+      },
+    ],
+    practice:
+      "Name one concrete way Faith would have you spend the next hour, and check whether the next hour bears it out.",
+  },
+  {
+    compass_value_id: "knowledge_priority",
+    compass_label: "Knowledge",
+    crossChecks: [
+      {
+        description:
+          "Education isn't among the public-mission institutions you trust most",
+        evaluate: (signals) => {
+          if (!questionWasAnswered(signals, "Q-X3-public")) return "unknown";
+          const r = rankOfSignalFromQuestion(
+            signals,
+            "education_trust_priority",
+            "Q-X3-public"
+          );
+          if (r === null) return "unknown";
+          return r <= 3 ? "aligned" : "misaligned";
+        },
+      },
+      {
+        description:
+          "learning isn't what your inward energy most goes to",
+        evaluate: (signals) => {
+          if (!questionWasAnswered(signals, "Q-E1-inward")) return "unknown";
+          const r = rankOfSignalFromQuestion(
+            signals,
+            "learning_energy_priority",
+            "Q-E1-inward"
+          );
+          if (r === null) return "unknown";
+          return r === 1 ? "aligned" : "misaligned";
+        },
+      },
+    ],
+    practice:
+      "Hold the value sacred while distrusting the institutions that claim it — but name what does carry Knowledge for you, so the value has somewhere to live.",
+  },
+  {
+    compass_value_id: "justice_priority",
+    compass_label: "Justice",
+    crossChecks: [
+      {
+        description:
+          "Government isn't among the public-mission institutions you trust most",
+        evaluate: (signals) => {
+          if (!questionWasAnswered(signals, "Q-X3-public")) return "unknown";
+          const r = rankOfSignalFromQuestion(
+            signals,
+            "government_elected_trust_priority",
+            "Q-X3-public"
+          );
+          if (r === null) return "unknown";
+          return r <= 3 ? "aligned" : "misaligned";
+        },
+      },
+      {
+        description:
+          "solving problems isn't where your outward energy most goes",
+        evaluate: (signals) => {
+          if (!questionWasAnswered(signals, "Q-E1-outward")) return "unknown";
+          const r = rankOfSignalFromQuestion(
+            signals,
+            "solving_energy_priority",
+            "Q-E1-outward"
+          );
+          if (r === null) return "unknown";
+          return r <= 2 ? "aligned" : "misaligned";
+        },
+      },
+    ],
+    practice:
+      "Locate Justice in something concrete you carry this season — a specific arrangement you'd correct if you had the standing.",
+  },
+  {
+    compass_value_id: "compassion_priority",
+    compass_label: "Compassion",
+    crossChecks: [
+      {
+        description:
+          "Non-Profits aren't among the public-mission institutions you trust most",
+        evaluate: (signals) => {
+          if (!questionWasAnswered(signals, "Q-X3-public")) return "unknown";
+          const r = rankOfSignalFromQuestion(
+            signals,
+            "nonprofits_trust_priority",
+            "Q-X3-public"
+          );
+          if (r === null) return "unknown";
+          return r <= 3 ? "aligned" : "misaligned";
+        },
+      },
+      {
+        description:
+          "caring for people isn't where your inward energy most lands",
+        evaluate: (signals) => {
+          if (!questionWasAnswered(signals, "Q-E1-inward")) return "unknown";
+          const r = rankOfSignalFromQuestion(
+            signals,
+            "caring_energy_priority",
+            "Q-E1-inward"
+          );
+          if (r === null) return "unknown";
+          return r === 1 ? "aligned" : "misaligned";
+        },
+      },
+    ],
+    practice:
+      "Name one specific person Compassion would have you give your best energy to this season, and check whether that person actually gets it.",
+  },
+  {
+    compass_value_id: "honor_priority",
+    compass_label: "Honor",
+    crossChecks: [
+      {
+        description:
+          "reputation falls toward the bottom of what your behavior protects first when life gets crowded",
+        evaluate: (signals) => {
+          if (!questionWasAnswered(signals, "Q-3C2")) return "unknown";
+          const r = rankOfSignalFromQuestion(
+            signals,
+            "revealed_reputation_priority",
+            "Q-3C2"
+          );
+          if (r === null) return "unknown";
+          return r <= 3 ? "aligned" : "misaligned";
+        },
+      },
+    ],
+    practice:
+      "Pick one specific commitment Honor would have you keep this week even when nobody would notice the breach, and let the keeping be the test.",
+  },
+  {
+    compass_value_id: "loyalty_priority",
+    compass_label: "Loyalty",
+    crossChecks: [
+      {
+        description:
+          "yourself wins the close-circle money flow over family and friends",
+        evaluate: (signals) => {
+          if (!questionWasAnswered(signals, "Q-S3-close")) return "unknown";
+          const r = rankOfSignalFromQuestion(
+            signals,
+            "self_spending_priority",
+            "Q-S3-close"
+          );
+          if (r === null) return "unknown";
+          return r === 1 ? "misaligned" : "aligned";
+        },
+      },
+      {
+        description:
+          "partner and family aren't first in your relational trust order",
+        evaluate: (signals) => {
+          if (!questionWasAnswered(signals, "Q-X4-relational")) return "unknown";
+          const partnerR = rankOfSignalFromQuestion(
+            signals,
+            "partner_trust_priority",
+            "Q-X4-relational"
+          );
+          const familyR = rankOfSignalFromQuestion(
+            signals,
+            "family_trust_priority",
+            "Q-X4-relational"
+          );
+          const partnerFirst = partnerR === 1;
+          const familyFirst = familyR === 1;
+          return partnerFirst || familyFirst ? "aligned" : "misaligned";
+        },
+      },
+    ],
+    practice:
+      "Name the specific person Loyalty would have you stay with through what comes — and check whether your time and money say the same.",
+  },
+  {
+    compass_value_id: "stability_priority",
+    compass_label: "Stability",
+    crossChecks: [
+      {
+        description: "the present feels overwhelming or stretched",
+        evaluate: (signals) => {
+          if (!questionWasAnswered(signals, "Q-X1")) return "unknown";
+          return has(signals, "high_pressure_context")
+            ? "misaligned"
+            : "aligned";
+        },
+      },
+    ],
+    practice:
+      "Stability is a discipline of saying no to one more thing — name the one this season and start there.",
+  },
+  {
+    compass_value_id: "freedom_priority",
+    compass_label: "Freedom",
+    crossChecks: [
+      {
+        description:
+          "the day already spends itself on maintaining responsibilities",
+        evaluate: (signals) => {
+          if (!questionWasAnswered(signals, "Q-A1")) return "unknown";
+          return has(signals, "responsibility_maintainer")
+            ? "misaligned"
+            : "aligned";
+        },
+      },
+      {
+        description:
+          "safety, rules, and risk control are what your behavior protects first when life gets crowded",
+        evaluate: (signals) => {
+          if (!questionWasAnswered(signals, "Q-3C2")) return "unknown";
+          const r = rankOfSignalFromQuestion(
+            signals,
+            "revealed_compliance_priority",
+            "Q-3C2"
+          );
+          if (r === null) return "unknown";
+          return r <= 2 ? "misaligned" : "aligned";
+        },
+      },
+    ],
+    practice:
+      "Carve one unstructured hour this week that nothing else can claim, and let Freedom live there.",
+  },
+  {
+    compass_value_id: "peace_priority",
+    compass_label: "Peace",
+    crossChecks: [
+      {
+        description:
+          "stakes-rising surfaces an angry, anxious, or overwhelmed inner state",
+        evaluate: (signals) => {
+          if (!questionWasAnswered(signals, "Q-O2")) return "unknown";
+          const anxiousR = rankOfSignalFromQuestion(
+            signals,
+            "anxious_reactivity",
+            "Q-O2"
+          );
+          const angerR = rankOfSignalFromQuestion(
+            signals,
+            "anger_reactivity",
+            "Q-O2"
+          );
+          const overwhelmedR = rankOfSignalFromQuestion(
+            signals,
+            "overwhelmed_functioning",
+            "Q-O2"
+          );
+          const reactiveAtTop =
+            (anxiousR !== null && anxiousR <= 2) ||
+            (angerR !== null && angerR <= 2) ||
+            (overwhelmedR !== null && overwhelmedR <= 2);
+          return reactiveAtTop ? "misaligned" : "aligned";
+        },
+      },
+    ],
+    practice:
+      "Peace is interior groundedness, not external calm — when the inner state lands hot, the value is still there; the work is the path back.",
+  },
+  {
+    compass_value_id: "mercy_priority",
+    compass_label: "Mercy",
+    crossChecks: [
+      {
+        description:
+          "reputation tops what would hurt most to lose",
+        evaluate: (signals) => {
+          if (!questionWasAnswered(signals, "Q-Stakes1")) return "unknown";
+          const r = rankOfSignalFromQuestion(
+            signals,
+            "reputation_stakes_priority",
+            "Q-Stakes1"
+          );
+          if (r === null) return "unknown";
+          return r === 1 ? "misaligned" : "aligned";
+        },
+      },
+      {
+        description:
+          "the why-of-work points at output rather than naming the people served",
+        evaluate: (signals) => {
+          if (!questionWasAnswered(signals, "Q-V1")) return "unknown";
+          return has(signals, "performance_identity")
+            ? "misaligned"
+            : "aligned";
+        },
+      },
+    ],
+    practice:
+      "Mercy softens what justice would let you claim — pick one verdict you'd be entitled to deliver this week, and choose the lighter touch instead.",
+  },
+  {
+    compass_value_id: "truth_priority",
+    compass_label: "Truth",
+    crossChecks: [
+      {
+        description:
+          "relational cost moves you to stay silent or soften the truth",
+        evaluate: (signals) => {
+          if (!questionWasAnswered(signals, "Q-P1")) return "unknown";
+          return has(signals, "adapts_under_social_pressure")
+            ? "misaligned"
+            : "aligned";
+        },
+      },
+      {
+        description:
+          "economic cost moves you to change position or hide the belief",
+        evaluate: (signals) => {
+          if (!questionWasAnswered(signals, "Q-P2")) return "unknown";
+          if (has(signals, "adapts_under_economic_pressure"))
+            return "misaligned";
+          if (has(signals, "hides_belief")) return "misaligned";
+          return "aligned";
+        },
+      },
+    ],
+    practice:
+      "Pick one specific conversation Truth would have you not soften this season — and let the cost be the proof.",
+  },
+];
+
+function gradeBlindSpotMagnitude(
+  misalignedCount: number,
+  totalChecks: number
+): BlindSpotMagnitude {
+  if (misalignedCount === 0) return "aligned";
+  if (misalignedCount >= 3) return "large_gap";
+  if (misalignedCount === totalChecks && totalChecks >= 2) return "large_gap";
+  if (misalignedCount === 1 && totalChecks >= 2) return "small_gap";
+  return "meaningful_gap";
+}
+
+function joinEvidence(fragments: string[]): string {
+  if (fragments.length === 0) return "";
+  if (fragments.length === 1) return fragments[0];
+  if (fragments.length === 2) return `${fragments[0]}, and ${fragments[1]}`;
+  return `${fragments.slice(0, -1).join("; ")}; and ${fragments[fragments.length - 1]}`;
+}
+
+function capitalizeFirst(s: string): string {
+  if (!s) return s;
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function composeBlindSpotProse(
+  compassLabel: string,
+  magnitude: Exclude<BlindSpotMagnitude, "aligned">,
+  evidenceFragments: string[],
+  practice?: string
+): string {
+  const evidence = joinEvidence(evidenceFragments);
+  if (magnitude === "small_gap") {
+    return `A small gap reads under **${compassLabel}**: ${evidence}. The value is still central; this is one signal worth naming, not a section.`;
+  }
+  if (magnitude === "large_gap") {
+    const intro = `You named **${compassLabel}** as among your most sacred values; multiple cross-signals read it differently. ${capitalizeFirst(evidence)}. This gap reads as load-bearing for your shape — not a failing, but a feature of how the value lives versus how it gets named. The gap between what you name and what your week actually pays for is part of your shape, not a verdict against it.`;
+    return practice ? `${intro} ${practice}` : intro;
+  }
+  // meaningful_gap
+  const intro = `You named **${compassLabel}** as among your most sacred values; the cross-question signals read it differently. ${capitalizeFirst(evidence)}. The gap between what you name and what your week actually pays for is part of your shape, not a verdict against it.`;
+  return practice ? `${intro} ${practice}` : intro;
+}
+
+export function detectBlindSpots(signals: Signal[]): BlindSpot[] {
+  const out: BlindSpot[] = [];
+  for (const probe of BLIND_SPOT_PROBES) {
+    if (!hasAtRank(signals, probe.compass_value_id, 1)) continue;
+    const results = probe.crossChecks.map((c) => ({
+      description: c.description,
+      result: c.evaluate(signals),
+    }));
+    const misaligned = results.filter((r) => r.result === "misaligned");
+    const knownChecks = results.filter((r) => r.result !== "unknown").length;
+    if (knownChecks === 0) continue; // no cross-questions answered; can't grade
+    const magnitude = gradeBlindSpotMagnitude(
+      misaligned.length,
+      knownChecks
+    );
+    if (magnitude === "aligned") continue;
+    const fragments = misaligned.map((m) => m.description);
+    const prose = composeBlindSpotProse(
+      probe.compass_label,
+      magnitude,
+      fragments,
+      probe.practice
+    );
+    out.push({
+      compass_value_id: probe.compass_value_id,
+      compass_label: probe.compass_label,
+      magnitude,
+      misaligned_signals: fragments,
+      prose,
+    });
+  }
+  return out;
+}
+
 export function buildInnerConstitution(
   answers: Answer[],
   metaSignals: MetaSignal[] = [],
@@ -1523,6 +2015,15 @@ export function buildInnerConstitution(
   // intentionally excluded; CC-054's Faith Shape covers the
   // (faith_priority + religious_trust_priority) gap prose-side.
   tensions = [...tensions, ...detectValueInstitutionalTrustGap(signals)];
+
+  // CC-090 — Blind Spots panel. Gradient-graded stated-vs-lived gap
+  // detection across all twelve Compass values. Promoted out of Open
+  // Tensions footer position into a first-class section. The legacy
+  // T-013 / T-014 / T-016 tensions continue to populate
+  // `constitution.tensions` for cohort-baseline stability; the render
+  // layer filters them from Open Tensions because their content lives
+  // in Blind Spots.
+  const blindSpots = detectBlindSpots(signals);
 
   // CC-011 derivation pipeline.
   const stack = aggregateLensStack(signals);
@@ -1660,6 +2161,11 @@ export function buildInnerConstitution(
     // returns undefined for thin-signal sessions or when no Q-E1 evidence
     // exists. The render layer guards on presence.
     goalSoulGive: goalSoulGiveOutput,
+    // CC-090 — Blind Spots panel. Gradient-graded stated-vs-lived gap
+    // detection across the twelve Compass values. Empty array when no
+    // gap fires above the small_gap threshold or when the user's top
+    // Compass value has no cross-question signal available.
+    blindSpots,
   };
 
   baseConstitution.mirror = generateMirror(baseConstitution, {
@@ -1746,22 +2252,37 @@ export function buildInnerConstitution(
   // speaks in the archetype's register rather than the Te/Ti-coded
   // defaults. jasonType + unmappedType keep their existing labels per
   // CC out-of-scope guard #11.
+  //
+  // CC-092-GIFT-TABLE-LABEL-DESCRIPTION-JOIN — the previous overlay only
+  // overwrote `.label`, leaving `.paragraph` carrying the original
+  // `GIFT_DESCRIPTION[cat]` text from `synthesizeTopGifts`. That seam
+  // produced incoherent rows (e.g., Cindy saw "present-tense care"
+  // paired with Builder's description; Daniel saw "operational trust"
+  // paired with Advocacy's description). Fix: when overlaying the
+  // archetype-themed LABEL, also overlay the archetype-themed
+  // DESCRIPTION onto the leading sentence of `.paragraph` (preserving
+  // the trailing user-specific specificity + closing sentences). Label
+  // and description now come from the same archetype-positional source.
   const archetypeKey = baseConstitution.profileArchetype.primary;
   if (archetypeKey === "cindyType" || archetypeKey === "danielType") {
-    const overlay = GIFT_LABELS_BY_ARCHETYPE[archetypeKey];
+    const labelOverlay = GIFT_LABELS_BY_ARCHETYPE[archetypeKey];
+    const descOverlay = GIFT_DESCRIPTIONS_BY_ARCHETYPE[archetypeKey];
     const n = Math.min(
-      overlay.length,
+      labelOverlay.length,
+      descOverlay.length,
       baseConstitution.cross_card.topGifts.length,
       baseConstitution.cross_card.topRisks.length
     );
     for (let i = 0; i < n; i++) {
+      const existing = baseConstitution.cross_card.topGifts[i];
       baseConstitution.cross_card.topGifts[i] = {
-        ...baseConstitution.cross_card.topGifts[i],
-        label: overlay[i].label,
+        ...existing,
+        label: labelOverlay[i].label,
+        paragraph: swapLeadingDescription(existing.paragraph, descOverlay[i]),
       };
       baseConstitution.cross_card.topRisks[i] = {
         ...baseConstitution.cross_card.topRisks[i],
-        label: overlay[i].growthEdge,
+        label: labelOverlay[i].growthEdge,
       };
     }
   }
@@ -1912,6 +2433,10 @@ function attachHandsCard(constitution: InnerConstitution): void {
       qGS1TopReward,
       qV1TopMeaning,
       topCompassSignalIds,
+      // CC-089-HEDGED-LOW-CONFIDENCE-LENS — pass confidence through so
+      // the archetype router can fall back to `unmappedType` when the
+      // driver function is uncertain.
+      lensConfidence: constitution.lens_stack.confidence,
     });
   } catch {
     // Silent fallback — handsCard stays undefined.
@@ -3177,9 +3702,11 @@ function categoryHasSupport(
   topGravity: SignalRef[],
   agency: AgencyPattern,
   weather: WeatherLoad,
-  fire: FirePattern
+  fire: FirePattern,
+  card?: CardKey
 ): boolean {
   const dom = stack.dominant;
+  const aux = stack.auxiliary;
   const compassIds = new Set(topCompass.map((r) => r.signal_id));
   const gravityIds = new Set(topGravity.map((r) => r.signal_id));
   const inCompass = (id: SignalId) => compassIds.has(id);
@@ -3215,12 +3742,41 @@ function categoryHasSupport(
         dom === "si"; // CC-038 — SiFe aux-pair (the family-tender) routes to Harmony.
     case "Integrity":
       return dom === "fi" || (fire.willingToBearCost && (inCompass("truth_priority") || inCompass("faith_priority")));
-    case "Builder":
-      return dom === "te" && (agency.current === "creator" || agency.aspiration === "creator" ||
-        inGravity("system_responsibility_priority") || inGravity("authority_responsibility_priority")) ||
+    case "Builder": {
+      const baseBuilderSupport =
+        (dom === "te" && (agency.current === "creator" || agency.aspiration === "creator" ||
+          inGravity("system_responsibility_priority") || inGravity("authority_responsibility_priority"))) ||
         ((dom === "se" || dom === "ti") &&
           (agency.current === "creator" || inGravity("system_responsibility_priority"))) || // CC-036 — Se/Ti as system-builders.
         dom === "ni"; // CC-038 — NiTe aux-pair (the long-arc-architect) routes to Builder.
+      if (baseBuilderSupport) return true;
+      // CC-091 — Si-Te steward-builder Gravity widening. Daniel-shape
+      // sessions (Si dominant + Te auxiliary + faith-cluster compass)
+      // build AS protection — family business, faith infrastructure,
+      // institutional continuity — rather than build-for-its-own-sake.
+      // The existing architect-builder support (dom === "te") doesn't
+      // fire for them (Si dominant, not Te). This adds an OR branch
+      // specifically for Gravity: Si-Te + faith-cluster compass +
+      // individual/authority responsibility-attribution top routes to
+      // Builder on Gravity. Other cards stay routed through the
+      // existing chain (Stewardship/Discernment/etc.).
+      //
+      // Additive over substitutive (gradient canon): the existing
+      // base support is unchanged; this branch only fires when the
+      // base support didn't, and only on Gravity, and only for the
+      // exact Si-Te steward-builder cluster.
+      if (
+        card === "gravity" &&
+        dom === "si" &&
+        aux === "te" &&
+        isStewardShape(stack, topCompass) &&
+        (inGravity("individual_responsibility_priority") ||
+          inGravity("authority_responsibility_priority"))
+      ) {
+        return true;
+      }
+      return false;
+    }
     case "Advocacy":
       return inCompass("justice_priority") ||
         (inGravity("individual_responsibility_priority") && inGravity("system_responsibility_priority")) ||
@@ -3389,6 +3945,34 @@ function isRelationalShape(
   return topCompass.some((r) => RELATIONAL_COMPASS_ANCHORS.has(r.signal_id));
 }
 
+// CC-091 — `isStewardShape` surfaces Si-dominant + faith-cluster compass
+// as a named predicate. Folded out of the inline Si-dominant logic in
+// `reorderPreferencesForRelationalShape` and `pickGiftCategoryForCard`
+// for clarity + reuse (the steward-builder Gravity support gate +
+// the steward-shape fallback both read it).
+//
+// The faith-cluster compass list is intentionally wide: Daniel/Harry-
+// type stewards present with any of faith / honor / stability /
+// loyalty / family in their compass top. Family is included because
+// the canonical steward shape carries Family alongside Faith / Honor /
+// Stability — the relational anchors that make stewardship coherent
+// rather than abstract preservation.
+const STEWARD_COMPASS_ANCHORS: ReadonlySet<string> = new Set([
+  "faith_priority",
+  "honor_priority",
+  "stability_priority",
+  "loyalty_priority",
+  "family_priority",
+]);
+
+export function isStewardShape(
+  stack: LensStack,
+  topCompass: SignalRef[]
+): boolean {
+  if (stack.dominant !== "si") return false;
+  return topCompass.some((r) => STEWARD_COMPASS_ANCHORS.has(r.signal_id));
+}
+
 function reorderPreferencesForRelationalShape(
   card: CardKey,
   stack: LensStack,
@@ -3438,13 +4022,35 @@ export function pickGiftCategoryForCard(
   // Hands has its own card composer (lib/handsCard.ts) and never
   // passes through this picker, so reordering Hands is a no-op
   // regardless.
-  const prefs = isRelationalShape(stack, topCompass)
+  //
+  // CC-089-HEDGED-LOW-CONFIDENCE-LENS — when the engine's lens-stack
+  // confidence is "low", skip the shape-keyed reorder entirely. The
+  // dominant/auxiliary identities the reorder keys on (Si steward
+  // vs Se/Fe/Fi relational vs architect) are exactly what the engine
+  // says it's uncertain about; reordering on uncertain data
+  // compounds the miss downstream. Falls back to `basePrefs` which
+  // is shape-neutral.
+  const useShapeReorder =
+    stack.confidence !== "low" && isRelationalShape(stack, topCompass);
+  const prefs = useShapeReorder
     ? reorderPreferencesForRelationalShape(card, stack, [...basePrefs])
     : basePrefs;
   type Scored = { cat: GiftCategory; score: number };
   const scored: Scored[] = [];
   prefs.forEach((cat, idx) => {
-    if (!categoryHasSupport(cat, stack, topCompass, topGravity, agency, weather, fire)) return;
+    if (
+      !categoryHasSupport(
+        cat,
+        stack,
+        topCompass,
+        topGravity,
+        agency,
+        weather,
+        fire,
+        card
+      )
+    )
+      return;
     const w = PREFERENCE_WEIGHTS[Math.min(idx, PREFERENCE_WEIGHTS.length - 1)];
     let score = w;
     if (context) {
@@ -3469,14 +4075,35 @@ export function pickGiftCategoryForCard(
   // than letting `pickGiftCategory()` route through to Builder/Precision
   // via the Se+creator / Si+stability heuristics. Architect/steward
   // shapes' fallback paths are unchanged.
+  // CC-089-HEDGED-LOW-CONFIDENCE-LENS — same low-confidence short-circuit
+  // applies to the relational fallback: don't force Harmony when the
+  // shape is uncertain.
   const isRelationalFallback =
-    SHAPE_REORDER_CARDS.has(card) && isRelationalShape(stack, topCompass);
+    stack.confidence !== "low" &&
+    SHAPE_REORDER_CARDS.has(card) &&
+    isRelationalShape(stack, topCompass);
+  // CC-091 — steward-shape fallback. When the picker has zero supported
+  // categories on a Trust/Gravity/Conviction card AND the shape is Si-
+  // dominant + faith-cluster compass, fall to Stewardship rather than
+  // Harmony (which CC-086 added for the relational fallback case but
+  // misroutes steward shapes that aren't relational). The cap-of-3
+  // repetition logic still applies via the scored sort: if Stewardship
+  // is already capped (Compass + Weather + Trust used it), fall
+  // through to `pickGiftCategory()` instead of forcing a 4th use.
+  const isStewardFallback =
+    stack.confidence !== "low" &&
+    SHAPE_REORDER_CARDS.has(card) &&
+    isStewardShape(stack, topCompass);
+  const stewardshipCapped =
+    (context?.usedCategories.get("Stewardship") ?? 0) >= 3;
   const winner =
     scored.length > 0 && scored[0].score > 0
       ? scored[0].cat
-      : isRelationalFallback
-        ? "Harmony"
-        : pickGiftCategory(stack, topCompass, topGravity, agency, weather, fire);
+      : isStewardFallback && !stewardshipCapped
+        ? "Stewardship"
+        : isRelationalFallback
+          ? "Harmony"
+          : pickGiftCategory(stack, topCompass, topGravity, agency, weather, fire);
   if (context) {
     context.usedCategories.set(winner, (context.usedCategories.get(winner) ?? 0) + 1);
     context.cardCategoryByCard[card] = winner;
@@ -3788,6 +4415,71 @@ const GIFT_DESCRIPTION: Record<GiftCategory, string> = {
   Discernment: "you tend to detect what doesn't add up before it surfaces openly",
   Generativity: "you tend to help others become more capable rather than more dependent",
 };
+
+// CC-092-GIFT-TABLE-LABEL-DESCRIPTION-JOIN — archetype-themed gift
+// descriptions, positionally aligned with `GIFT_LABELS_BY_ARCHETYPE`.
+// Used at the post-build overlay site (lib/identityEngine.ts:~2242) to
+// replace the leading description sentence of each top-gift paragraph
+// so the LABEL the user reads ("stewardship", "present-tense care",
+// etc.) is followed by a DESCRIPTION drawn from the SAME archetype
+// source — not from whichever GiftCategory `synthesizeTopGifts`
+// scored for the slot. The trailing specificity + closing sentences
+// of the paragraph remain user-specific and are preserved through
+// the overlay via `swapLeadingDescription`.
+//
+// jasonType + unmappedType DO NOT enter the overlay branch; their
+// gifts continue to use the engine's category-keyed
+// GIFT_DESCRIPTION text (which already aligns with the Te/Ti-coded
+// GIFT_NOUN_PHRASE labels they use).
+//
+// Order is load-bearing: index i here MUST describe the gift labeled
+// at GIFT_LABELS_BY_ARCHETYPE[archetype][i].
+const GIFT_DESCRIPTIONS_BY_ARCHETYPE: Record<
+  "cindyType" | "danielType",
+  ReadonlyArray<string>
+> = {
+  cindyType: [
+    // 0: "present-tense care"
+    "you tend to read the moment as it is and to tend to what the situation in front of you is asking for, rather than what the plan said it would be",
+    // 1: "protective loyalty"
+    "you tend to stay with the people you've claimed, holding the through-line of who-belongs-to-whom even when it costs",
+    // 2: "embodied steadiness"
+    "you tend to bring steadiness to a room through presence rather than performance — the kind of being-there that others can lean against",
+  ],
+  danielType: [
+    // 0: "stewardship"
+    "you tend to preserve what matters across time, especially when others are looking past it",
+    // 1: "faithful responsibility"
+    "you tend to carry what's been entrusted to you with continuity, treating responsibility as a thing kept over time rather than a load to discharge",
+    // 2: "operational trust"
+    "you tend to make institutions work through the small kept commitments — standards, precedent, and the trust that compounds when what was promised is actually done",
+  ],
+};
+
+// Splits a composed gift paragraph at its first ". " boundary and
+// replaces the leading sentence with `newDescription` (capitalized,
+// re-terminated with ". "). The trailing string — specificity +
+// closing — is preserved verbatim. Used by the archetype overlay
+// so the label+description join is coherent without rebuilding the
+// user-specific tail from scratch.
+//
+// `synthesizeTopGifts` composes paragraphs as
+// `capitalize(GIFT_DESCRIPTION[cat]) + ". " + specificity + " " + closing`,
+// and `GIFT_DESCRIPTION` entries never contain ". " internally, so
+// splitting on the first ". " is unambiguous in practice.
+function swapLeadingDescription(
+  paragraph: string,
+  newDescription: string
+): string {
+  const splitIdx = paragraph.indexOf(". ");
+  if (splitIdx < 0) {
+    // Defensive: no recognizable split point; prefix the new
+    // description and keep the original paragraph as the body.
+    return capitalize(newDescription) + ". " + paragraph;
+  }
+  const tail = paragraph.slice(splitIdx + 2);
+  return capitalize(newDescription) + ". " + tail;
+}
 
 // ── CC-052 — Gift Specificity (Rule 2 of CC-048 Report Calibration Canon) ─
 //
@@ -4218,7 +4910,16 @@ export function deriveLensOutput(
     fe: "tending becoming self-erasure — the room's weather becomes yours, and your own register goes quiet.",
   };
   const PREFIX = SECOND_SENTENCE_PREFIX_BLIND_SPOT;
-  const driverAnchor = LENS_GROWTH_EDGE_BY_DRIVER[dom];
+  // CC-089-HEDGED-LOW-CONFIDENCE-LENS — the driver-keyed Lens growth-edge
+  // anchor asserts shape-specific risk text ("long-arc certainty that
+  // closes early" for Ni, "in-the-moment move runs past the moment that
+  // asked for it" for Se, etc.). When `lens_stack.confidence === "low"`,
+  // the engine isn't sure which driver to assert, so anchoring on
+  // `dom` would compound the miss. Skip the driverAnchor and fall
+  // through to the gift-category-keyed generic `blindSpotFor` text,
+  // which reads shape-neutral.
+  const driverAnchor =
+    stack.confidence === "low" ? undefined : LENS_GROWTH_EDGE_BY_DRIVER[dom];
   const blindText =
     `${capitalize(FUNCTION_VOICE[dom])}'s instinct, overused, can collapse into a smaller version of itself. ` +
     (driverAnchor

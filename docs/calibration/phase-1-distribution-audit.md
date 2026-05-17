@@ -1,6 +1,6 @@
 # Phase 1 Distribution Audit
 
-**Cohort counts** — fixtures N=8 / live N=13 (pre-online 13, current 0) / live skipped N=0.
+**Cohort counts** — fixtures N=9 / live N=13 (pre-online 13, current 0) / live skipped N=0.
 
 Engine-version split: sessions created before `2026-05-12T00:00:00.000Z` are bucketed "pre-online"; on/after are "current". Cutoff is per F1's "approximately 2026-05-10 to 2026-05-16" window. CC-STALE-SHAPE-DETECTOR was not present at run time — `engine_shape_version` column is absent on `sessions`, so the cutoff is timestamp-based rather than schema-stamped.
 
@@ -27,7 +27,7 @@ Engine-version split: sessions created before `2026-05-12T00:00:00.000Z` are buc
 | 20–25 | 0 | 0 | 0 | +0 |
 | 25–30 | 1 | 2 | 0 | -2 |
 | 30–35 | 0 | 1 | 0 | -1 |
-| 35–40 | 1 | 2 | 0 | -2 |
+| 35–40 | 2 | 2 | 0 | -2 |
 | 40–45 | 0 | 0 | 0 | +0 |
 | 45–50 | 0 | 1 | 0 | -1 |
 | 50–55 | 1 | 0 | 0 | +0 |
@@ -51,7 +51,7 @@ Engine-version split: sessions created before `2026-05-12T00:00:00.000Z` are buc
 | -20–-10 | 0 | 0 | 0 | +0 |
 | -10–0 | 0 | 0 | 0 | +0 |
 | 0–5 | 6 | 10 | 0 | -10 |
-| 5–10 | 1 | 0 | 0 | +0 |
+| 5–10 | 2 | 0 | 0 | +0 |
 | 10–15 | 1 | 2 | 0 | -2 |
 | 15–20 | 0 | 1 | 0 | -1 |
 | 20+ | 0 | 0 | 0 | +0 |
@@ -78,7 +78,7 @@ Engine-version split: sessions created before `2026-05-12T00:00:00.000Z` are buc
 | 65–70 | 0 | 0 | +0 |
 | 70–75 | 1 | 0 | -1 |
 | 75–80 | 0 | 1 | +1 |
-| 80–85 | 1 | 0 | -1 |
+| 80–85 | 2 | 0 | -2 |
 | 85–90 | 0 | 4 | +4 |
 | 90–95 | 0 | 0 | +0 |
 | 95–100 | 0 | 1 | +1 |
@@ -97,7 +97,7 @@ Engine-version split: sessions created before `2026-05-12T00:00:00.000Z` are buc
 | 50–60 | 1 | 0 | 0 | 0 | 0 |
 | 60–70 | 0 | 0 | 0 | 0 | 0 |
 | 70–80 | 0 | 0 | 0 | 1 | 0 |
-| 80–90 | 0 | 0 | 1 | 0 | 0 |
+| 80–90 | 0 | 0 | 2 | 0 | 0 |
 | 90–100 | 0 | 0 | 0 | 0 | 0 |
 
 ### Live
@@ -124,6 +124,7 @@ Per session: engine Soul score, cause-Soul-proxy, person-Soul-proxy, plus domina
 | fixture | `fi-quiet-resister.json` | Fi Quiet Resister (CC-COHORT-EXPANSION-SI-SE-CRISIS Addition 4) | 56 | 100 | 0 | cause |
 | fixture | `grasp-without-substance-` | Grasp Without Substance — Relational (CC-COHORT-EXPANSION-SI-SE-CRISIS Addition 5) | 15 | 0 | 0 | tie |
 | fixture | `paralysis-shame-without-` | Paralysis — Shame Without Project (CC-COHORT-EXPANSION-SI-SE-CRISIS Addition 6) | 21 | 0 | 33 | person |
+| fixture | `qp2-express-carefully-da` | Q-P2 Express-Carefully Daniel-Shape (CC-094 anchor) | 84 | 34 | 0 | cause |
 | fixture | `restless-reinvention-no-` | Restless Reinvention Without Anchor (CC-COHORT-EXPANSION-SI-SE-CRISIS Addition 8) | 24 | 0 | 0 | tie |
 | fixture | `se-high-extraversion-res` | Se High-Extraversion Responder (CC-COHORT-EXPANSION-SI-SE-CRISIS Addition 2) | 72 | 34 | 0 | cause |
 | fixture | `si-tradition-steward.jso` | Si Tradition Steward (CC-COHORT-EXPANSION-SI-SE-CRISIS Addition 1) | 84 | 34 | 0 | cause |
@@ -152,6 +153,7 @@ Per session: composed Grip, primal-cluster primary + confidence, contributing-gr
 | fixture | `fi-quiet-resister.json` | 26.9 | Am I secure? | low | 0 |
 | fixture | `grasp-without-substance-` | 89.8 | Am I wanted? | medium-high | 0 |
 | fixture | `paralysis-shame-without-` | 100.0 | Am I successful? | low | 0 |
+| fixture | `qp2-express-carefully-da` | 35.8 | Am I secure? | high | 0 |
 | fixture | `restless-reinvention-no-` | 65.0 | Am I good enough? | medium | 0 |
 | fixture | `se-high-extraversion-res` | 19.9 | Am I good enough? | medium | 0 |
 | fixture | `si-tradition-steward.jso` | 35.8 | Am I secure? | high | 0 |
@@ -178,7 +180,7 @@ Per session: composed Grip, primal-cluster primary + confidence, contributing-gr
 | Bucket | Fixtures (n) | Live (n) | Δ (live − fixtures) |
 |---|---:|---:|---:|
 | Am I safe? | 0 | 0 | +0 |
-| Am I secure? | 3 | 4 | +1 |
+| Am I secure? | 4 | 4 | +0 |
 | Am I loved? | 0 | 0 | +0 |
 | Am I wanted? | 1 | 2 | +1 |
 | Am I successful? | 1 | 1 | +0 |
@@ -197,7 +199,7 @@ Mapping note: the CC's 'Safety / Security / Belonging / Worth / Recognition / Co
 | Open-Handed Aim | 0 | 2 | +2 |
 | White-Knuckled Aim | 0 | 1 | +1 |
 | Grip-Governed | 5 | 1 | -4 |
-| Ungoverned Movement | 2 | 7 | +5 |
+| Ungoverned Movement | 3 | 7 | +4 |
 | Lightly Governed Movement | 1 | 2 | +1 |
 | Strained Integration | 0 | 0 | +0 |
 | (unset) | 0 | 0 | +0 |
@@ -211,7 +213,7 @@ Per the CC's expected finding: Lightly Governed Movement should show 0 entries (
 | Bucket | Fixtures (n) | Live (n) | Δ (live − fixtures) |
 |---|---:|---:|---:|
 | cost-leaning | 0 | 1 | +1 |
-| coverage-leaning | 6 | 5 | -1 |
+| coverage-leaning | 7 | 5 | -2 |
 | compliance-leaning | 0 | 0 | +0 |
 | aligned | 2 | 7 | +5 |
 | unknown | 0 | 0 | +0 |
@@ -223,7 +225,7 @@ Per the CC's expected finding: Lightly Governed Movement should show 0 entries (
 | Bucket | Fixtures (n) | Live (n) | Δ (live − fixtures) |
 |---|---:|---:|---:|
 | aligned | 2 | 5 | +3 |
-| inverted-small | 1 | 0 | -1 |
+| inverted-small | 2 | 0 | -2 |
 | inverted-big | 2 | 0 | -2 |
 | partial-mismatch | 3 | 0 | -3 |
 | balanced | 0 | 2 | +2 |
@@ -258,10 +260,10 @@ Threshold: contradiction rates ≥ 25% are **bolded**.
 
 | Pair | Fixtures (exp/cont/n.a) | Fixtures rate | Live (exp/cont/n.a) | Live rate | Δ |
 |---|---|---:|---|---:|---:|
-| Q-A2↔Q-E1-outward | 2/0/6 | 0.0% | 5/1/7 | 16.7% | +16.7 pts |
-| Q-Stakes1↔Q-GRIP1 | 2/4/2 | **66.7%** | 1/1/11 | **50.0%** | -16.7 pts |
-| Q-A2↔Q-GS1 (Soul intent) | 1/2/5 | **66.7%** | 3/1/9 | **25.0%** | -41.7 pts |
-| Q-V1↔Q-GS1 (cause vs person) | 4/0/4 | 0.0% | 3/0/10 | 0.0% | +0.0 pts |
+| Q-A2↔Q-E1-outward | 3/0/6 | 0.0% | 5/1/7 | 16.7% | +16.7 pts |
+| Q-Stakes1↔Q-GRIP1 | 2/5/2 | **71.4%** | 1/1/11 | **50.0%** | -21.4 pts |
+| Q-A2↔Q-GS1 (Soul intent) | 1/2/6 | **66.7%** | 3/1/9 | **25.0%** | -41.7 pts |
+| Q-V1↔Q-GS1 (cause vs person) | 5/0/4 | 0.0% | 3/0/10 | 0.0% | +0.0 pts |
 
 - **Q-A2↔Q-E1-outward** — Q-A2 'Building or creating something new' should pair with Q-E1-outward top-1 = 'building' or 'solving'.
 - **Q-Stakes1↔Q-GRIP1** — Q-Stakes1 top-1 ∈ {money, job} should pair with Q-GRIP1 top-1 ∈ {grips_security, grips_reputation, grips_certainty}; Q-Stakes1 top-1 = close_relationships should pair with Q-GRIP1 top-1 ∈ {grips_neededness, grips_approval}.
@@ -282,13 +284,14 @@ No data gaps: every histogram in this artifact was producible from the cohort.
 
 ## Inputs
 
-- **Git SHA**: `b1eea2617ef087da3e6f331f9a2fbf2dbb108be5`
+- **Git SHA**: `370e5c27f9379c4d7e0ec3fe0d08484f6fb2de28`
 - **Engine entry point**: `buildInnerConstitution(answers, [], demographics)` from `lib/identityEngine.ts`
 - **Engine-version cutoff**: `2026-05-12T00:00:00.000Z` (timestamp-based; `engine_shape_version` column absent because CC-STALE-SHAPE-DETECTOR has not shipped)
-- **Fixtures cohort dir**: `tests/fixtures/cohort/` (8 files)
+- **Fixtures cohort dir**: `tests/fixtures/cohort/` (9 files)
   - fi-quiet-resister.json
   - grasp-without-substance-relational.json
   - paralysis-shame-without-project.json
+  - qp2-express-carefully-daniel.json
   - restless-reinvention-no-anchor.json
   - se-high-extraversion-responder.json
   - si-tradition-steward.json

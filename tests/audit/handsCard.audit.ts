@@ -310,7 +310,13 @@ function runAudit(): AssertionResult[] {
       );
     }
   }
-  // Synthetic Cindy: cindyType archetype
+  // Synthetic Cindy: cindyType archetype. CC-086 Site 1 made the
+  // archetype->template router check driver/compass alignment; the
+  // caregiver template stays when the driver matches OR the Compass
+  // anchors caregiver-coded values (Family / Compassion / Mercy /
+  // Loyalty). Cindy's signature is Se driver + Family compass, so
+  // the synthetic must carry the Family compass signal id for the
+  // override to keep her on the caregiver template.
   const cindyHands = computeHandsCard({
     archetype: "cindyType",
     gripPatternBucket: "belonging",
@@ -322,6 +328,7 @@ function runAudit(): AssertionResult[] {
     qA2EnergyDirection: "deepening relationships",
     qGS1TopReward: null,
     qV1TopMeaning: null,
+    topCompassSignalIds: ["family_priority"],
   });
   if (!/care|presence|relational|continuity/i.test(cindyHands.strength)) {
     archetypeFails.push(

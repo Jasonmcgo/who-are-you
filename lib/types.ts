@@ -1150,6 +1150,34 @@ export type InnerConstitution = {
   // expression with a dual-mode read (health register vs pressure
   // register). Distinct from the Work Map vocational appendix.
   handsCard?: import("./handsCard").HandsCardReading;
+  // CC-090 — Blind Spots panel. Gradient-graded stated-vs-lived gap
+  // detection across all Compass values. Promoted out of the Open Tensions
+  // footer position into a first-class section that sits alongside Gifts.
+  // Optional because pre-CC-090 saved sessions don't carry the field and
+  // because `detectBlindSpots` returns an empty list for thin-signal
+  // sessions or fully-aligned shapes.
+  blindSpots?: BlindSpot[];
+};
+
+// CC-090 — Blind Spot reading. One entry per Compass top-1 value that
+// produced a meaningful_gap or large_gap; aligned values are not surfaced.
+// small_gap is rendered as a one-line bullet inside the section; meaningful
+// and large get full sub-entries with the canonical "shape, not verdict"
+// framing.
+export type BlindSpotMagnitude =
+  | "aligned"
+  | "small_gap"
+  | "meaningful_gap"
+  | "large_gap";
+
+export type BlindSpot = {
+  compass_value_id: SignalId;
+  compass_label: string;
+  magnitude: BlindSpotMagnitude;
+  // The misaligned cross-check descriptions in canonical evidence form;
+  // each is a clause the render layer composes into the entry prose.
+  misaligned_signals: string[];
+  prose: string;
 };
 
 // CC-021a — Admin-surface types for the researcher UI. These describe API

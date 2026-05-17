@@ -51,18 +51,21 @@ export const questions: Question[] = [
     card_id: "pressure",
     type: "forced",
     text: "If a belief put your job at risk, you would:",
-    // CC-027 — middle-two labels sharpened to surface the active-vs-passive
-    // split that the engine already encodes via distinct signals. Pre-fix,
-    // "Keep it private" and "Hold it quietly" collapsed in users' heads to
-    // the same option (both read as "I have it, but don't talk about it").
-    // Post-fix: "Hide it from work" names the active concealment behavior;
-    // "Don't volunteer it" names the passive non-advocacy posture. Signal
-    // IDs unchanged.
+    // CC-094 — relabel-only revision to surface the gradient already
+    // encoded in the four distinct signals. Pre-CC-094 labels ("Hide it
+    // from work" / "Don't volunteer it") read as near-duplicates to users
+    // even though the engine treated them as different shapes (active
+    // concealment vs. holding-without-actively-volunteering). New labels
+    // match Q-P1's gradient vocabulary so the middle stop ("Express it
+    // carefully at work" — Daniel-shape's actual lived posture) is
+    // findable. Order runs highest integrity → lowest. Signal IDs are
+    // unchanged; legacy answer strings remap in `signalFromAnswer` so
+    // pre-CC-094 sessions continue to derive the same signals.
     options: [
-      { label: "Change your position", signal: "adapts_under_economic_pressure" },
-      { label: "Hide it from work",    signal: "hides_belief" },
-      { label: "Don't volunteer it",   signal: "holds_internal_conviction" },
-      { label: "Accept the risk",      signal: "high_conviction_under_risk" },
+      { label: "Accept the risk",                  signal: "high_conviction_under_risk" },
+      { label: "Express it carefully at work",     signal: "holds_internal_conviction" },
+      { label: "Keep it quiet at work",            signal: "hides_belief" },
+      { label: "Change your position",             signal: "adapts_under_economic_pressure" },
     ],
   },
   {

@@ -56,9 +56,15 @@ function snapshot(): void {
         demographics?: DemographicSet | null;
       };
       const c = buildInnerConstitution(raw.answers, [], raw.demographics ?? null);
+      // CC-088 — audit (`handsCard.audit.ts`) renders in clinician mode
+      // before hashing each card section. The snapshot generator must
+      // match that render mode for the byte-identity comparison to
+      // work. Pre-CC-088, this defaulted to user mode and the audit
+      // mismatched against itself.
       const md = renderMirrorAsMarkdown({
         constitution: c,
         includeBeliefAnchor: false,
+        renderMode: "clinician",
       });
       out[key] = {};
       for (const header of CARD_HEADERS) {

@@ -27,8 +27,6 @@ import {
 import {
   computeRiskFormFromAim,
   LEGACY_RISK_FORM_LABEL,
-  RISK_FORM_HIGH_AIM,
-  RISK_FORM_HIGH_GRIP,
   type RiskFormLetter,
 } from "../../lib/riskForm";
 import { generateTrajectoryChartSvgFromConstitution } from "../../lib/trajectoryChart";
@@ -337,8 +335,13 @@ function runAudit(): AssertionResult[] {
         detail: "Jason has no riskFormFromAim reading",
       });
     } else {
+      // CC-088 — post-CC-084 Jason's 52.3 aim + 26.3 grip lands in the
+      // new 5th band's window (aim ∈ [40,60), grip ∈ [20,35]), so
+      // Lightly Governed Movement is the expected canonical route.
+      // The legacy expectation was Ungoverned Movement (4-band
+      // classifier); the 5-band classifier reclassifies him.
       results.push(
-        rf.letter === "Ungoverned Movement"
+        rf.letter === "Lightly Governed Movement"
           ? {
               ok: true,
               assertion: "risk-form-jason-fixture-classification",
@@ -347,7 +350,7 @@ function runAudit(): AssertionResult[] {
           : {
               ok: false,
               assertion: "risk-form-jason-fixture-classification",
-              detail: `Jason riskFormFromAim=${rf.letter} expected Ungoverned Movement (aim=${rf.aimScore.toFixed(1)} (<${RISK_FORM_HIGH_AIM}), grip=${rf.gripScore.toFixed(1)} (<${RISK_FORM_HIGH_GRIP}))`,
+              detail: `Jason riskFormFromAim=${rf.letter} expected Lightly Governed Movement (aim=${rf.aimScore.toFixed(1)}, grip=${rf.gripScore.toFixed(1)})`,
             }
       );
     }

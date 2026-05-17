@@ -70,6 +70,13 @@ export interface HandsCardInputs {
   // Optional so pre-CC callers continue to compile; absent when
   // omitted, the override falls back to driver-only routing.
   topCompassSignalIds?: string[];
+  // CC-089-HEDGED-LOW-CONFIDENCE-LENS — lens-stack confidence from the
+  // engine. When "low", the archetype-template router falls back to
+  // `unmappedType` regardless of driver/compass match, because the
+  // driver identity the archetype routing keys on is exactly what the
+  // engine isn't sure about. Optional so pre-CC callers continue to
+  // compile; absent => treated as "high" (preserves prior behavior).
+  lensConfidence?: "high" | "low";
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -237,8 +244,15 @@ function compassSupportsArchetype(
 function resolveTemplateArchetype(
   archetype: ProfileArchetype,
   lensDriver: string,
-  topCompassSignalIds: string[] | undefined
+  topCompassSignalIds: string[] | undefined,
+  lensConfidence: "high" | "low" | undefined
 ): ProfileArchetype {
+  // CC-089-HEDGED-LOW-CONFIDENCE-LENS — low-confidence Lens means the
+  // engine isn't sure about the driver function; routing the Hands
+  // template by an uncertain driver compounds the miss. Fall back to
+  // the shape-neutral `unmappedType` template regardless of archetype
+  // / compass match in this case.
+  if (lensConfidence === "low") return "unmappedType";
   const d = lensDriver.toLowerCase();
   const driverSet =
     archetype === "cindyType"
@@ -277,7 +291,8 @@ export function computeHandsCard(inputs: HandsCardInputs): HandsCardReading {
   const templateArchetype = resolveTemplateArchetype(
     archetype,
     lensDriver,
-    inputs.topCompassSignalIds
+    inputs.topCompassSignalIds,
+    inputs.lensConfidence
   );
   const t = TEMPLATES[templateArchetype] ?? TEMPLATES.unmappedType;
 

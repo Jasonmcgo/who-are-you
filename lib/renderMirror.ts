@@ -888,6 +888,41 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
   // composeReportCallouts continues to produce `callouts.summary` for
   // backward compatibility — only the render-path emission is removed.
 
+  // CC-090 — Blind Spots panel. Promoted out of the Open Tensions footer
+  // (where the same gap detections used to render with question-mark
+  // suffixes) into a first-class section that sits directly after the
+  // Gifts + Growth Edges table. Same prominence, same shape-as-feature
+  // framing. The section renders meaningful_gap and large_gap entries
+  // as full sub-entries; small_gap renders as a one-line bullet under
+  // the section heading. Silent when no entries fire.
+  const blindSpots = constitution.blindSpots ?? [];
+  if (blindSpots.length > 0) {
+    const fullEntries = blindSpots.filter(
+      (b) => b.magnitude === "meaningful_gap" || b.magnitude === "large_gap"
+    );
+    const smallEntries = blindSpots.filter((b) => b.magnitude === "small_gap");
+    if (fullEntries.length > 0 || smallEntries.length > 0) {
+      out.push("");
+      out.push("## Blind Spots");
+      out.push("");
+      out.push(
+        "*The places where what you name and what your week pays for don't quite line up. Hypocrisy in this register is universal — every shape has it. The point is to see it, not to fix it on cue.*"
+      );
+      for (const entry of fullEntries) {
+        out.push("");
+        const headingSuffix =
+          entry.magnitude === "large_gap" ? " — load-bearing" : "";
+        out.push(`### ${entry.compass_label}${headingSuffix}`);
+        out.push("");
+        out.push(entry.prose);
+      }
+      for (const entry of smallEntries) {
+        out.push("");
+        out.push(`- ${entry.prose}`);
+      }
+    }
+  }
+
   // 5. What Others May Experience
   out.push("");
   out.push("## What Others May Experience");
@@ -1346,7 +1381,26 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
     out.push("");
     out.push(`**${SHAPE_CARD_QUESTION[id]}**`);
     out.push("");
-    out.push(`*${card.cardHeader}*`);
+    // CC-089-HEDGED-LOW-CONFIDENCE-LENS — when the engine's Lens read is
+    // low-confidence (dominant or auxiliary too close to runner-ups —
+    // see `aggregateLensStack` in lib/jungianStack.ts), the Lens card's
+    // Read line replaces the authoritative "leans toward …" header with
+    // a hedge that names what was read AND surfaces the engine's own
+    // uncertainty. A visible meta-line (italic ⚠ badge) sits above the
+    // Read so the uncertainty reads at a glance, not buried in prose.
+    // The other cards are unaffected because their `cardHeader` strings
+    // are not driver-keyed in the same way.
+    if (id === "lens" && constitution.lens_stack.confidence === "low") {
+      out.push(
+        `*⚠ The engine's confidence in this Lens read is low.*`
+      );
+      out.push("");
+      out.push(
+        `*The engine's read of your cognitive pattern is uncertain. ${card.cardHeader.replace(/\.$/, "")}, but the signal isn't strong — trust your own knowledge of yourself if this doesn't fit.*`
+      );
+    } else {
+      out.push(`*${card.cardHeader}*`);
+    }
     out.push("");
     out.push(`**Strength** — ${card.gift.text}`);
     out.push("");
@@ -1622,8 +1676,19 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
   // 18. Open Tensions. The page-level surface uses local confirmation state
   // not available in the markdown renderer, so the export filters to the
   // persisted engine-side "unconfirmed" tensions only.
+  //
+  // CC-090 — T-013 / T-014 / T-016 (the hypocrisy/alignment detections)
+  // are also filtered out here because their content has been promoted
+  // to the new Blind Spots section near the top of the report. The
+  // tensions remain on `constitution.tensions` for cohort-baseline and
+  // downstream-consumer stability; only the render here suppresses them.
+  // Open Tensions stays reserved for genuine tension-as-finding outputs
+  // (dual-direction answers, Sacred Values in Conflict, T-015, T-D1).
+  const HYPOCRISY_TENSION_IDS = new Set(["T-013", "T-014", "T-016"]);
   const openTensions = constitution.tensions.filter(
-    (t) => t.status === undefined || t.status === "unconfirmed"
+    (t) =>
+      (t.status === undefined || t.status === "unconfirmed") &&
+      !HYPOCRISY_TENSION_IDS.has(t.tension_id)
   );
   if (openTensions.length > 0) {
     out.push("");

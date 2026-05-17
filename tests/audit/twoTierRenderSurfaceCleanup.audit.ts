@@ -123,6 +123,14 @@ function stripProtected(md: string): string {
   md = md.replace(/<svg[\s\S]*?<\/svg>/g, "");
   // 2. Strip masthead disclaimer line.
   md = md.replace(/\*Possible surface label:[^*]*\*/g, "");
+  // 2a. CC-088 — strip any sentence containing "Your Risk Form reads as
+  // <Label> — <text>" wherever it appears. Post-CC-084 the Path
+  // master synthesis embeds this integration sentence INSIDE a
+  // narrative paragraph (rather than only as its own italic line in
+  // the Movement section), so the per-line filter below no longer
+  // catches it. This is a Risk-Form-prose context by design and is
+  // allowed to carry a verdict phrase per the audit's intent.
+  md = md.replace(/Your Risk Form reads as [^.\n]+\.(\s|$)/g, " ");
   // 3. Strip protected per-line contexts.
   md = md
     .split("\n")

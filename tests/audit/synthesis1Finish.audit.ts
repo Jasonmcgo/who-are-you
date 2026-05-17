@@ -71,21 +71,33 @@ const FOUR_QUADRANTS = [
   "Love without Form",
   "Giving / Presence",
 ] as const;
+// CC-088 — extended with the Lightly Governed Movement 5th band's
+// Fire Movement Note opener (CC-084 added the band; synthesis1Finish
+// emits "move with some governance but without strong aim" for it).
 const FOUR_RISK_BEHAVIORS = [
   "weigh and aim",
   "lock up before weighing",
   "respond without much pause",
   "bear cost without the protection",
+  "move with some governance but without strong aim",
 ] as const;
+// CC-088 — Phase-3a labels (CC-PHASE-3A-LABEL-LOGIC) replaced the
+// legacy four-letter union ("Wisdom-governed" → "Open-Handed Aim"
+// etc.); CC-084 added the "Lightly Governed Movement" 5th band. The
+// map is keyed by the public RiskFormLetter (constitution.riskForm
+// .letter). Each entry mirrors `PATH_RISK_FORM_INTEGRATION` in
+// `lib/synthesis1Finish.ts`.
 const CLEANUP_RISK_INTEGRATION: Record<string, string> = {
-  "Wisdom-governed":
-    "Your Risk Form reads as Wisdom-governed — the governor is doing its work.",
-  "Grip-governed":
-    "Your Risk Form reads as Grip-governed — the governor has begun to lock motion rather than aim it.",
-  "Free movement":
-    "Your Risk Form reads as Free movement — motion runs unimpeded, calibration is the future asking.",
-  "Reckless-fearful":
-    "Your Risk Form reads as Reckless-fearful — grip without strong governing risk-orientation behind it.",
+  "Open-Handed Aim":
+    "Your Risk Form reads as Open-Handed Aim — the governor is doing its work.",
+  "Grip-Governed":
+    "Your Risk Form reads as Grip-Governed — the governor has begun to lock motion rather than aim it.",
+  "Ungoverned Movement":
+    "Your Risk Form reads as Ungoverned Movement — motion runs unimpeded, calibration is the future asking.",
+  "White-Knuckled Aim":
+    "Your Risk Form reads as White-Knuckled Aim — Aim is present but grip has activated alongside it; engaged but not at peace.",
+  "Lightly Governed Movement":
+    "Your Risk Form reads as Lightly Governed Movement — the governor is present but understated, and the move is happening without strong aim.",
 };
 const FOUR_CONVICTION_NOTES = [
   "soften before it speaks",
@@ -838,11 +850,20 @@ function runAudit(): AssertionResult[] {
       const canonicalHits = Object.values(CLEANUP_RISK_INTEGRATION).filter(
         (phrase) => synth.includes(phrase)
       );
+      // CC-088 — Path master synthesis emits the Risk Form integration
+      // sentence keyed by the Aim-based classifier (`riskFormFromAim`)
+      // after CC-084 made that the canonical source. The audit
+      // previously read `riskForm.letter` (the legacy classifier,
+      // compliance-bucket axis); when the two classifiers disagreed
+      // (most fixtures post-CC-084), the expected phrase didn't match
+      // the rendered phrase. Read from the same source the render
+      // path reads from.
+      const canonRisk = r.constitution.riskFormFromAim ?? r.constitution.riskForm;
       if (
-        r.constitution.riskForm &&
+        canonRisk &&
         r.movementLength > 0
       ) {
-        const expected = CLEANUP_RISK_INTEGRATION[r.constitution.riskForm.letter];
+        const expected = CLEANUP_RISK_INTEGRATION[canonRisk.letter];
         if (canonicalHits.length !== 1 || canonicalHits[0] !== expected) {
           pathRiskPhraseFails.push(
             `${r.file}: expected "${expected}", hits=${canonicalHits.length}`

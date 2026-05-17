@@ -142,13 +142,20 @@ async function runAudit(): Promise<void> {
 
   // ── Bug 1c — clinician mode retains "(formerly …)" ─────────────────
   //   Engine prose unchanged; clinician keeps the parenthetical for
-  //   audit reference. Sample Jason because his Risk Form prose
-  //   carries the parenthetical (Ungoverned Movement / Open-Handed Aim
-  //   variants all do per riskForm.ts).
+  //   audit reference.
+  //
+  //   CC-088 — post-CC-084 Jason's fixture (52.3 aim + 26.3 grip)
+  //   routes to "Lightly Governed Movement" which has no legacy
+  //   "(formerly …)" parenthetical — that's intentional, the 5th
+  //   band is new and has no predecessor label. Sampling a fixture
+  //   that still routes to a 4-band classifier letter
+  //   (goal-soul-give/01-generative routes to Open-Handed Aim, which
+  //   carries "(formerly Wisdom-governed)") so the assertion can
+  //   still verify the engine doc preservation.
   {
     const raw = JSON.parse(
       readFileSync(
-        join(ROOT, "ocean", "07-jason-real-session.json"),
+        join(ROOT, "goal-soul-give", "01-generative.json"),
         "utf-8"
       )
     ) as { answers: Answer[]; demographics?: DemographicSet | null };
