@@ -252,6 +252,21 @@ export type CognitiveFunctionId =
   | "fi"
   | "fe";
 
+// CC-097B — mirror-axis pair output. When Q-T direct and cross-signal
+// disagree across canonical perceiving-mirror partners (Si↔Ne / Ni↔Se)
+// AND both function clusters score moderate-high, the engine surfaces
+// this read instead of forcing a winner. `primary` is the Q-T direct
+// driver (currently leading); `secondary` is the cross-signal-inferred
+// driver (latent / rising). Axis is the shape; the tension is the form.
+export type MirrorAxisRead = {
+  axisName: string; // e.g., "SI-NE", "SE-NI"
+  primary: CognitiveFunctionId;
+  secondary: CognitiveFunctionId;
+  primaryScore: number;
+  secondaryScore: number;
+  confidence: "high"; // confidence in the axis itself; high by construction
+};
+
 export type LensStack = {
   dominant: CognitiveFunctionId;
   auxiliary: CognitiveFunctionId;
@@ -259,6 +274,32 @@ export type LensStack = {
   inferior: CognitiveFunctionId;
   mbtiCode?: string;
   confidence: "high" | "low";
+  // CC-097B — cross-signal driver inference parallel output.
+  // `crossSignalAgreement` names whether the Q-T direct read agrees
+  // with the cross-signal pattern (Compass + OCEAN + keystone + cost
+  // surface + Trust + Distribution + DiSC):
+  //   "agree"                          — Q-T and cross-signal point at
+  //                                       same driver. Existing confidence
+  //                                       reading stands.
+  //   "disagree-prefer-cross-signal"   — Q-T direct says X, cross-signal
+  //                                       says Y (non-mirror partner). The
+  //                                       broader signature is preferred
+  //                                       for the read; render hedges.
+  //   "mirror-axis"                    — Q-T says X, cross-signal says Y,
+  //                                       AND they're mirror partners
+  //                                       (Si↔Ne / Ni↔Se) AND both score
+  //                                       moderate-high. Output the axis,
+  //                                       not a winner.
+  // Optional for backward-compat: pre-CC-097B saved sessions render
+  // without this field; the hedge router falls back to the generic
+  // low-confidence prose.
+  crossSignalAgreement?: "agree" | "disagree-prefer-cross-signal" | "mirror-axis";
+  // Populated when cross-signal disagrees with Q-T direct OR when
+  // mirror-axis fires. The Q-T direct driver remains in `dominant`
+  // (CC-097B is additive, not mutating). Prose layer surfaces both.
+  crossSignalInferredDriver?: CognitiveFunctionId;
+  // Populated only when `crossSignalAgreement === "mirror-axis"`.
+  mirrorAxis?: MirrorAxisRead;
 };
 
 export type GiftCategory =

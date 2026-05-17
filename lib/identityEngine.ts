@@ -47,6 +47,10 @@ import {
   computeArchetype,
   GIFT_LABELS_BY_ARCHETYPE,
 } from "./profileArchetype";
+import {
+  classifyAgreement,
+  inferDriverFromCrossSignals,
+} from "./crossSignalDriverInference";
 // CC-SYNTHESIS-3 — runtime cache lookup for LLM-articulated Path master
 // synthesis paragraph. The composer module (synthesis3Llm) and the
 // inputs-derivation module (synthesis3Inputs) are imported lazily after
@@ -2350,7 +2354,57 @@ export function buildInnerConstitution(
   // input contract sees both gripTaxonomy and coherenceReading.
   attachLlmGripParagraph(baseConstitution);
 
+  // CC-097B-CROSS-SIGNAL-DRIVER-INFERENCE — runs LAST so it has access
+  // to the fully-built constitution (OCEAN intensities, workMap
+  // register key, distribution buckets, keystone belief, trust register,
+  // cost surface count). Layers parallel cross-signal driver inference
+  // onto `lens_stack` via new optional fields:
+  //   - `crossSignalAgreement`: "agree" | "disagree-prefer-cross-signal" | "mirror-axis"
+  //   - `crossSignalInferredDriver`: the cross-signal-preferred driver
+  //   - `mirrorAxis`: populated only when both Q-T and cross-signal
+  //                   land on canonical perceiving-mirror partners
+  //                   (Si↔Ne / Ni↔Se) AND both score >= 50.
+  // ARCHITECTURAL CONTRACT: the existing dominant/auxiliary/tertiary/
+  // inferior fields are NOT mutated. Q-T direct read remains
+  // authoritative on those; cross-signal output is parallel. CC-097D
+  // will compose Lens prose that surfaces both layers.
+  attachCrossSignalDriverInference(baseConstitution);
+
   return baseConstitution;
+}
+
+function attachCrossSignalDriverInference(
+  constitution: InnerConstitution
+): void {
+  try {
+    const cs = inferDriverFromCrossSignals(constitution);
+    const result = classifyAgreement(constitution.lens_stack.dominant, cs);
+    constitution.lens_stack.crossSignalAgreement = result.agreement;
+    constitution.lens_stack.crossSignalInferredDriver =
+      result.crossSignalInferredDriver;
+    if (result.agreement === "mirror-axis") {
+      constitution.lens_stack.mirrorAxis = {
+        axisName: result.mirrorAxis.axisName,
+        primary: result.mirrorAxis.primary,
+        secondary: result.mirrorAxis.secondary,
+        primaryScore: result.mirrorAxis.primaryScore,
+        secondaryScore: result.mirrorAxis.secondaryScore,
+        confidence: "high",
+      };
+      // Mirror-axis: hedge appropriately. Both registers are alive;
+      // the user reads as the axis, not as a single dominant.
+      constitution.lens_stack.confidence = "low";
+    } else if (result.agreement === "disagree-prefer-cross-signal") {
+      // Surface and depth disagree. CC-097D will surface both registers;
+      // for now the confidence drops so the hedge prose fires.
+      constitution.lens_stack.confidence = "low";
+    }
+    // agreement === "agree": existing confidence reading stands.
+  } catch {
+    // Silent fallback — if cross-signal inference throws on a
+    // thin-signal session, leave the LensStack untouched. The
+    // pre-CC-097B contract still holds.
+  }
 }
 
 function attachHandsCard(constitution: InnerConstitution): void {

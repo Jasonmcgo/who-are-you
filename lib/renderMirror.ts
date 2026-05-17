@@ -1391,13 +1391,48 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
     // The other cards are unaffected because their `cardHeader` strings
     // are not driver-keyed in the same way.
     if (id === "lens" && constitution.lens_stack.confidence === "low") {
-      out.push(
-        `*⚠ The engine's confidence in this Lens read is low.*`
-      );
-      out.push("");
-      out.push(
-        `*The engine's read of your cognitive pattern is uncertain. ${card.cardHeader.replace(/\.$/, "")}, but the signal isn't strong — trust your own knowledge of yourself if this doesn't fit.*`
-      );
+      // CC-097B — three hedge variants routed by `crossSignalAgreement`:
+      //   Variant A — "mirror-axis": both perceiving mirror partners
+      //   alive (Si↔Ne / Ni↔Se); name the axis, not a winner.
+      //   Variant B — "disagree-prefer-cross-signal": Q-T says X but
+      //   the broader signature points to Y; name both.
+      //   Variant C — generic uncertainty (existing behavior from
+      //   CC-089). Fires when crossSignalAgreement is "agree" with
+      //   low confidence, or when the field is missing entirely
+      //   (pre-CC-097B saved sessions).
+      const agreement = constitution.lens_stack.crossSignalAgreement;
+      if (agreement === "mirror-axis" && constitution.lens_stack.mirrorAxis) {
+        const ma = constitution.lens_stack.mirrorAxis;
+        out.push(
+          `*⚠ Your processing pattern sits on the ${ma.axisName} axis.*`
+        );
+        out.push("");
+        out.push(
+          `*Your processing pattern sits on the ${ma.axisName} axis — both registers are alive in you. The ${ma.primary.toUpperCase()} register currently leads; the ${ma.secondary.toUpperCase()} register is never far. The tension between them is part of your shape, not a verdict — trust your own read of which one is asking for the room on any given day.*`
+        );
+      } else if (
+        agreement === "disagree-prefer-cross-signal" &&
+        constitution.lens_stack.crossSignalInferredDriver
+      ) {
+        const qt = constitution.lens_stack.dominant.toUpperCase();
+        const cs = constitution.lens_stack.crossSignalInferredDriver.toUpperCase();
+        out.push(
+          `*⚠ Your ranking answers and your broader signature point in different directions.*`
+        );
+        out.push("");
+        out.push(
+          `*Your ranking answers point toward the ${qt}-led pattern, but the broader signature of your other responses (Compass values, what you'd protect at cost, what you trust, how you organize your effort) suggests a ${cs}-led pattern underneath. Both are real — the surface and the depth may be doing different work. Trust your own read of yourself if either feels off.*`
+        );
+      } else {
+        // Variant C — generic CC-089 uncertainty prose.
+        out.push(
+          `*⚠ The engine's confidence in this Lens read is low.*`
+        );
+        out.push("");
+        out.push(
+          `*The engine's read of your cognitive pattern is uncertain. ${card.cardHeader.replace(/\.$/, "")}, but the signal isn't strong — trust your own knowledge of yourself if this doesn't fit.*`
+        );
+      }
     } else {
       out.push(`*${card.cardHeader}*`);
     }
