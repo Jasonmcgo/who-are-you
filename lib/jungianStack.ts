@@ -76,6 +76,42 @@ const PERCEIVING: CognitiveFunctionId[] = ["ni", "ne", "si", "se"];
 const JUDGING: CognitiveFunctionId[] = ["ti", "te", "fi", "fe"];
 export const MBTI_TIE_MARGIN = 0.5;
 
+// CC-097-CONFIDENCE-FIX — same-dimension opposite-attitude pairs.
+// dominantTooTight previously compared the dominant function's avg
+// rank against the next-best function in the same POOL (perceiving
+// or judging). For Si dominant the runner-up was typically Ne — the
+// canonical tertiary in a developed Si-driver stack. Jung canon
+// predicts the tertiary IS close to the dominant (healthy shape),
+// so the legacy check conflated "developed tertiary" with "actual
+// driver ambiguity." That bug systematically flagged 3 of 4 Si/Se-
+// driver prod sessions (Daniel/Cindy/Harry) as ⚠ low confidence
+// even though their driver+aux detection was correct.
+//
+// The fix (Option C in CC-097): compare dominant against its mirror
+// — the same-dimension opposite-attitude function (Si↔Se,
+// Ni↔Ne, Ti↔Te, Fi↔Fe). If THAT function is close, the dominant
+// identity is genuinely ambiguous (am I introverted or extraverted
+// in this dimension?). If only the tertiary is close, that's normal
+// developed shape, not ambiguity. Intuitive drivers (Ni/Ne) were
+// already passing because their mirror sits at inferior position in
+// the canonical stack — naturally far. Sensing drivers (Si/Se) now
+// get the same treatment.
+//
+// Class D mirror-axis cases (Se↔Ni, where the dominant and inferior
+// flip across the MBTI dom-inf axis) are NOT caught by this check
+// alone; they're addressed in future CC-097B/C (cross-signal
+// inference + non-canonical-stack support).
+const SAME_DIMENSION_MIRROR: Record<CognitiveFunctionId, CognitiveFunctionId> = {
+  ni: "ne",
+  ne: "ni",
+  si: "se",
+  se: "si",
+  ti: "te",
+  te: "ti",
+  fi: "fe",
+  fe: "fi",
+};
+
 const ALL_FUNCTIONS: CognitiveFunctionId[] = [
   "ne",
   "ni",
@@ -249,17 +285,24 @@ export function aggregateLensStack(signals: Signal[]): LensStack {
     throw new Error(`Non-canonical Jungian stack resolved: ${key}`);
   }
 
+  // CC-097-CONFIDENCE-FIX — dominantTooTight now reads the SAME-
+  // DIMENSION OPPOSITE-ATTITUDE mirror's avg rank rather than the
+  // next-best function in the same pool. See SAME_DIMENSION_MIRROR
+  // comment above for the rationale (legacy logic flagged developed
+  // Si-driver shapes with Ne tertiary as ⚠ low when they were
+  // canon-healthy). The previous `dominantPool` + `dominantRunnerUp`
+  // computation is retained as `dominantPool` below for the unused-
+  // var lint cleanup, but the tooTight check no longer reads it.
   const dominantPool = PERCEIVING.includes(dominant.fn)
     ? PERCEIVING
     : JUDGING;
-  const dominantRunnerUp = allRanks.find(
-    (candidate) =>
-      candidate.fn !== dominant.fn && dominantPool.includes(candidate.fn)
-  );
+  void dominantPool;
+  const dominantMirror = SAME_DIMENSION_MIRROR[dominant.fn];
+  const dominantMirrorAvg = averageRank(signals, dominantMirror);
   const auxRunnerUp = auxCandidatesWithAvgs[1];
   const dominantTooTight =
-    dominantRunnerUp !== undefined &&
-    dominantRunnerUp.avg - dominant.avg < MBTI_TIE_MARGIN;
+    isFinite(dominantMirrorAvg) &&
+    dominantMirrorAvg - dominant.avg < MBTI_TIE_MARGIN;
   const auxTooTight =
     !isFinite(auxiliary.avg) ||
     (auxRunnerUp !== undefined &&

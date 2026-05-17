@@ -27,6 +27,8 @@
     "audit:aim-drag-rate-canon": "tsx tests/audit/aimDragRateCanon.audit.ts",
     "audit:steward-builder-support": "tsx tests/audit/stewardBuilderSupport.audit.ts",
     "audit:qp2-gradient-refinement": "tsx tests/audit/qp2GradientRefinement.audit.ts",
+    "audit:qt-item-wording-refinement": "tsx tests/audit/qtItemWordingRefinement.audit.ts",
+    "audit:lens-confidence-class-a-fix": "tsx tests/audit/lensConfidenceClassAFix.audit.ts",
     "backfill:llm-rewrites": "tsx scripts/backfillLlmRewritesOnSessions.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
