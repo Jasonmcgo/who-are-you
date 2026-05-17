@@ -631,12 +631,25 @@ function scoreNe(s: ExtractedSignals): { score: number; trace: string[] } {
 function scoreSi(s: ExtractedSignals): { score: number; trace: string[] } {
   return scoreFromComponents([
     {
+      // CC-097B-CALIBRATION Phase 2 — broadened Si compass condition.
+      // Pre-CC required `Faith && (Honor||Loyalty)`. Daniel cohort fixture's
+      // top-4 compass is [Loyalty, Family, Stability, Justice] (Faith falls
+      // to rank 4-5 — outside top-4 by tie-break, even though Faith
+      // ranks high on Q-S2). The steward Si signature is anchored as
+      // much in Stability as in Faith; Honor/Loyalty/Family all carry
+      // the steward register. Broader condition fires Daniel's Si
+      // without regressing Cindy (Freedom-anchored, no Stability/Faith),
+      // Kevin (no Stability/Faith), Michele (Freedom+Truth+Compassion+
+      // Justice, no Stability/Faith), Jason (Knowledge+Truth+Honor+
+      // Justice, no Stability/Faith), Ashley (no Stability/Faith).
       fires:
-        compassContains(s.compassLabels, "Faith") &&
+        (compassContains(s.compassLabels, "Faith") ||
+          compassContains(s.compassLabels, "Stability")) &&
         (compassContains(s.compassLabels, "Honor") ||
-          compassContains(s.compassLabels, "Loyalty")),
+          compassContains(s.compassLabels, "Loyalty") ||
+          compassContains(s.compassLabels, "Family")),
       weight: 25,
-      label: "si: compass∈{Faith}+(Honor|Loyalty)",
+      label: "si: compass∈{Faith,Stability}+(Honor|Loyalty|Family)",
     },
     {
       fires:

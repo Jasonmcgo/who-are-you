@@ -2373,11 +2373,50 @@ export function buildInnerConstitution(
   return baseConstitution;
 }
 
+// CC-097B-CALIBRATION — Phase 1 agreement-supports-confidence-lift
+// constants. The CC sourced these from Daniel's prod diagnostic
+// (2026-05-17 12:54): Q-T direct says Si correctly, same-dimension
+// mirror tightness (Si vs Ne) flagged confidence "low", but cross-signal
+// (Compass + Trust + OCEAN + keystone all consistent) cleanly confirms
+// Si. Two layers agreeing should lift confidence to high.
+//
+// `AGREEMENT_LIFT_GAP_FLOOR` is slightly relaxed from the
+// disagree-classifier `DISAGREE_GAP_FLOOR` (20) because the lift CONFIRMS
+// the Q-T direct read rather than overriding it; a smaller but still
+// unambiguous cross-signal gap is sufficient evidence.
+const AGREEMENT_LIFT_INFERRED_SCORE_FLOOR = 60;
+const AGREEMENT_LIFT_GAP_FLOOR = 15;
+
 function attachCrossSignalDriverInference(
   constitution: InnerConstitution
 ): void {
   try {
     const cs = inferDriverFromCrossSignals(constitution);
+    // CC-097B-CALIBRATION Phase 1 — agreement-lift rule.
+    // Runs BEFORE the existing agree/disagree/mirror-axis branching so
+    // that when Q-T direct and cross-signal converge strongly on the
+    // same driver, that converged signal overrides Q-T-internal
+    // same-dim mirror ambiguity (CC-097-CONFIDENCE-FIX). The classifier
+    // still runs after — the lifted "high" confidence flows naturally
+    // into the existing "agree" branch.
+    //
+    // The fields the CC named in lib/jungianStack.ts can't actually
+    // live there because aggregateLensStack's signals-only signature
+    // can't see Constitution-level data (OCEAN, workMap, keystone,
+    // etc.) the cross-signal inference consumes. CC-097B integrated
+    // the post-process here; the agreement-lift rule joins it. The
+    // confidence-value mutation flips the lens_stack field directly,
+    // matching the CC's intent.
+    if (
+      constitution.lens_stack.confidence === "low" &&
+      cs.inferredDriver === constitution.lens_stack.dominant &&
+      cs.inferredDriverScore >= AGREEMENT_LIFT_INFERRED_SCORE_FLOOR &&
+      cs.scoreGap >= AGREEMENT_LIFT_GAP_FLOOR
+    ) {
+      constitution.lens_stack.confidence = "high";
+      // Downstream agree/disagree/mirror-axis classification stays
+      // intact below; we only change the confidence value.
+    }
     const result = classifyAgreement(constitution.lens_stack.dominant, cs);
     constitution.lens_stack.crossSignalAgreement = result.agreement;
     constitution.lens_stack.crossSignalInferredDriver =
