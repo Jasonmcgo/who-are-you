@@ -121,6 +121,19 @@ function compassContains(labels: string[], target: string): boolean {
 // `null` when the field is missing (pre-CC saved sessions) so the
 // scorer can apply zero weight for that component without throwing.
 
+// CC-097B-CALIBRATION-V2 Phase 3b — blame-lens key (Q-C4 top-1
+// attribution). Per feedback_blame_lens_disc_mapping.md (2026-05-17),
+// Q-C4 top-1 contributes to DiSC dimensions:
+//   Individual    → +D (strong)
+//   Authority     → +C (some +D)
+//   System        → +C
+//   Nature        → +i (low weight)
+//   Supernatural  → +S
+// Cohort canon-anchors (Jason=Individual→+D, Harry=Supernatural→+S,
+// Daniel=Individual→+D, Michele=System→+C, Cindy=Individual→+D,
+// Ashley=System→+C).
+export type BlameLensTop = "individual" | "authority" | "system" | "nature" | "supernatural" | null;
+
 interface ExtractedSignals {
   compassLabels: string[];
   oceanOpenness: number; // 0–100
@@ -139,6 +152,9 @@ interface ExtractedSignals {
   trustTopLabels: string[];
   subRegister: SubRegisterKey | null;
   agreeablenessRegister: AgreeablenessRegisterKey | null;
+  // CC-097B-CALIBRATION-V2 Phase 3b — blame-lens top-1 attribution
+  // (Q-C4). Populated when the user ranked Q-C4; null when absent.
+  blameLensTop: BlameLensTop;
   // Per-function Q-T signal strengths (0–100, scaled), surfaced
   // separately so the DiSC derivation can consume them.
   functionSignalStrength: Record<CrossSignalFunctionId, number>;
@@ -291,35 +307,33 @@ function extractDistribution(
   people_service_society: number;
   risk_and_uncertainty: number;
 } {
-  // Pre-CC-067 / pre-CC-070 saved sessions don't carry goalSoulMovement.
-  // Default to zero buckets so the related score components stay neutral.
-  const movement = constitution.goalSoulMovement;
-  if (!movement) {
+  // CC-097B-CALIBRATION-V2 Phase 1b — distribution extraction fixed.
+  // Pre-V2 code read `goalSoulMovement.dashboard.driveDistribution.bucketScores`
+  // which doesn't exist on the engine output. The actual canonical
+  // distribution lives at `shape_outputs.path.drive.distribution`
+  // (type `DriveDistribution` per lib/types.ts:504) with three
+  // buckets: `cost`, `coverage`, `compliance` (each 0-100 summing to
+  // 100, per docs/canon/trajectory-model-refinement.md §10).
+  //
+  // Canonical bucket mapping per the cohort calibration:
+  //   cost       → building & wealth   (the building/financial outcomes axis)
+  //   coverage   → people, service, society (the relational/civic axis)
+  //   compliance → risk & uncertainty   (the risk-aware reading per CC-SYNTHESIS-1A)
+  // Values are normalized to 0-1 fractions (divided by 100) since the
+  // scoring weights downstream compare against thresholds like 0.30.
+  const drive = constitution.shape_outputs?.path?.drive;
+  if (!drive?.distribution) {
     return {
       building_and_wealth: 0,
       people_service_society: 0,
       risk_and_uncertainty: 0,
     };
   }
-  // The bucket label vocabulary on the dashboard payload varies by CC.
-  // We look up by canonical label substrings, lowercase-insensitive.
-  const dashboard = movement.dashboard as unknown as {
-    driveDistribution?: { bucketScores?: Record<string, number> };
-  };
-  const buckets = dashboard?.driveDistribution?.bucketScores ?? {};
-  function lookup(...needles: string[]): number {
-    for (const [key, value] of Object.entries(buckets)) {
-      const k = key.toLowerCase();
-      if (needles.some((n) => k.includes(n))) return value;
-    }
-    return 0;
-  }
-  const total = Object.values(buckets).reduce((s, v) => s + v, 0);
-  const norm = total > 0 ? (v: number) => v / total : (v: number) => v;
+  const d = drive.distribution;
   return {
-    building_and_wealth: norm(lookup("building", "wealth", "system")),
-    people_service_society: norm(lookup("people", "service", "society")),
-    risk_and_uncertainty: norm(lookup("risk", "uncertainty", "freedom")),
+    building_and_wealth: d.cost / 100,
+    people_service_society: d.coverage / 100,
+    risk_and_uncertainty: d.compliance / 100,
   };
 }
 
@@ -345,25 +359,49 @@ function extractCostSurfaceCount(constitution: InnerConstitution): number {
 // `getTopTrustPersonal` surfaces ranked refs. We map signal_ids back
 // to user-facing labels via a small vocabulary.
 
+// CC-097B-CALIBRATION-V2 Phase 1a — trust signal_ids fixed.
+// Pre-V2 keys were `trust_religious` / `trust_mentor` / etc. — these
+// never matched the engine's actual signal_ids emitted at
+// lib/identityEngine.ts:217-251 (`religious_trust_priority` etc.),
+// so extractTrustTopLabels returned (none) for every fixture and the
+// trust-weighted Si/Fe/Fi scoring components zero-fired across the
+// matrix. V2 fixes the keys; downstream Si/Fe/Fi scoring is now
+// empirically grounded.
 const TRUST_LABEL_BY_SIGNAL: Record<string, string> = {
-  trust_religious: "Religious",
-  trust_small_business: "Small Business",
-  trust_mentor: "mentor",
-  trust_education: "Education",
-  trust_journalism: "Journalism",
-  trust_government: "Government",
-  trust_corporate: "Corporate",
-  trust_own_counsel: "own counsel",
-  trust_family: "Family",
-  trust_friends: "Friends",
+  // Institutional (Q-X3)
+  religious_trust_priority: "Religious",
+  small_business_trust_priority: "Small Business",
+  large_companies_trust_priority: "Corporate",
+  education_trust_priority: "Education",
+  journalism_trust_priority: "Journalism",
+  news_organizations_trust_priority: "News",
+  social_media_trust_priority: "Social Media",
+  government_elected_trust_priority: "Government",
+  government_services_trust_priority: "Government",
+  nonprofits_trust_priority: "Non-Profits",
+  // Personal (Q-X4)
+  partner_trust_priority: "Partner",
+  friend_trust_priority: "Friend",
+  family_trust_priority: "Family",
+  mentor_trust_priority: "mentor",
+  outside_expert_trust_priority: "Outside Expert",
+  own_counsel_trust_priority: "own counsel",
 };
 
 function extractTrustTopLabels(
   constitution: InnerConstitution
 ): string[] {
+  // CC-097B-CALIBRATION-V2 Phase 1a — read top-3 trust signals by rank.
+  // Engine emits trust signals as `*_trust_priority` (see
+  // lib/identityEngine.ts:217-251). We collect every signal whose id
+  // ends in `_trust_priority` and is rank <= 3, then map to display
+  // label via TRUST_LABEL_BY_SIGNAL.
   const labels: string[] = [];
   for (const s of constitution.signals) {
-    if (s.signal_id.startsWith("trust_") && (s.rank ?? 99) <= 3) {
+    if (
+      s.signal_id.endsWith("_trust_priority") &&
+      (s.rank ?? 99) <= 3
+    ) {
       const label = TRUST_LABEL_BY_SIGNAL[s.signal_id];
       if (label) labels.push(label);
     }
@@ -417,6 +455,36 @@ function extractFunctionSignalStrengths(
   return out;
 }
 
+// ── Blame-lens (Q-C4) top-1 attribution extraction ───────────────
+//
+// CC-097B-CALIBRATION-V2 Phase 3b — Q-C4 top-1 by signal_id.
+// The engine emits signals from Q-C4 as `*_attribution_priority`
+// (e.g., `individual_attribution_priority`); we read the rank-1
+// signal and map to one of the five canon attribution categories.
+// Returns null when Q-C4 wasn't ranked or rank-1 isn't recognizable.
+
+// Engine emits Q-C4 ranking as `*_responsibility_priority` signals
+// (see lib/identityEngine.ts:250,252,3221,3222). Map the canon names
+// onto the engine's actual signal_ids.
+const BLAME_LENS_BY_SIGNAL: Record<string, BlameLensTop> = {
+  individual_responsibility_priority: "individual",
+  authority_responsibility_priority: "authority",
+  system_responsibility_priority: "system",
+  nature_responsibility_priority: "nature",
+  supernatural_responsibility_priority: "supernatural",
+};
+
+function extractBlameLensTop(
+  constitution: InnerConstitution
+): BlameLensTop {
+  const candidates = constitution.signals
+    .filter((s) => s.signal_id.endsWith("_responsibility_priority"))
+    .sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99));
+  const top = candidates[0];
+  if (!top) return null;
+  return BLAME_LENS_BY_SIGNAL[top.signal_id] ?? null;
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // Top-level extractor
 // ─────────────────────────────────────────────────────────────────────
@@ -460,6 +528,7 @@ function extractAllSignals(
       constitution,
       compassLabels
     ),
+    blameLensTop: extractBlameLensTop(constitution),
     functionSignalStrength: extractFunctionSignalStrengths(constitution),
   };
 }
@@ -489,35 +558,86 @@ export function deriveDiSC(
   const compassKnowOrTruth =
     compassContains(signals.compassLabels, "Knowledge") ||
     compassContains(signals.compassLabels, "Truth");
+  // CC-097B-CALIBRATION-V2 Phase 3a — DiSC weight rebalance.
+  // Pre-V2 Jason produced C>i>S>D (target: D>i>C>S). Two issues:
+  //  (1) C overweighted via ni_signal_strength (0.20) — Ni-driver
+  //      shapes (Jason) read as C-coded when Ni is also a D-coded
+  //      function via Te-aux executive register. Dropped to 0.10.
+  //  (2) C overweighted compass=Knowledge||Truth (0.15) — same
+  //      cluster fires for both D-coded and C-coded shapes; dropped
+  //      to 0.10.
+  //  (3) D under-weighted te_signal_strength (0.35) — Te is the
+  //      direct D-driver function; raised to 0.45.
+  // Net: Jason C drops ~10 points, D rises ~10 points → D-highest
+  // ordering should emerge for D-coded Ni-Te / Te-Ni patterns while
+  // Harry (Si-Fe non-D) stays S-highest.
+  //
+  // Phase 3b — blame-lens (Q-C4) contribution added to each
+  // dimension per feedback_blame_lens_disc_mapping.md.
+  const blameD = signals.blameLensTop === "individual" ? 20 : 0;
+  const blameDFromAuthority =
+    signals.blameLensTop === "authority" ? 10 : 0;
+  const blameCFromAuthority =
+    signals.blameLensTop === "authority" ? 15 : 0;
+  const blameCFromSystem =
+    signals.blameLensTop === "system" ? 20 : 0;
+  const blameIFromNature =
+    signals.blameLensTop === "nature" ? 15 : 0;
+  const blameSFromSupernatural =
+    signals.blameLensTop === "supernatural" ? 20 : 0;
   return {
-    D: weightedSum([
-      { signal: signals.functionSignalStrength.te, weight: 0.35 },
-      { signal: goalOrientationProxy, weight: 0.25 },
-      { signal: 100 - signals.oceanAgreeableness, weight: 0.15 },
-      { signal: signals.oceanExtraversion, weight: 0.15 },
-      { signal: signals.distribution.building_and_wealth * 100, weight: 0.10 },
-    ]),
-    i: weightedSum([
-      { signal: signals.functionSignalStrength.fe, weight: 0.30 },
-      { signal: signals.functionSignalStrength.ne, weight: 0.20 },
-      { signal: signals.oceanExtraversion, weight: 0.20 },
-      { signal: signals.oceanAgreeableness, weight: 0.15 },
-      { signal: signals.distribution.people_service_society * 100, weight: 0.15 },
-    ]),
-    S: weightedSum([
-      { signal: signals.functionSignalStrength.si, weight: 0.30 },
-      { signal: signals.functionSignalStrength.fe, weight: 0.25 },
-      { signal: signals.oceanAgreeableness, weight: 0.20 },
-      { signal: 100 - signals.oceanOpenness, weight: 0.15 },
-      { signal: Math.min(100, signals.costSurfaceCount * 10), weight: 0.10 },
-    ]),
-    C: weightedSum([
-      { signal: signals.functionSignalStrength.ti, weight: 0.25 },
-      { signal: signals.functionSignalStrength.ni, weight: 0.20 },
-      { signal: signals.oceanConscientiousness, weight: 0.25 },
-      { signal: compassKnowOrTruth ? 100 : 0, weight: 0.15 },
-      { signal: signals.oceanOpenness, weight: 0.15 },
-    ]),
+    D: Math.min(
+      100,
+      weightedSum([
+        { signal: signals.functionSignalStrength.te, weight: 0.45 },
+        { signal: goalOrientationProxy, weight: 0.20 },
+        { signal: 100 - signals.oceanAgreeableness, weight: 0.15 },
+        { signal: signals.oceanExtraversion, weight: 0.10 },
+        { signal: signals.distribution.building_and_wealth * 100, weight: 0.10 },
+      ]) +
+        blameD +
+        blameDFromAuthority
+    ),
+    i: Math.min(
+      100,
+      weightedSum([
+        { signal: signals.functionSignalStrength.fe, weight: 0.30 },
+        { signal: signals.functionSignalStrength.ne, weight: 0.20 },
+        { signal: signals.oceanExtraversion, weight: 0.20 },
+        { signal: signals.oceanAgreeableness, weight: 0.15 },
+        { signal: signals.distribution.people_service_society * 100, weight: 0.15 },
+      ]) + blameIFromNature
+    ),
+    S: Math.min(
+      100,
+      weightedSum([
+        { signal: signals.functionSignalStrength.si, weight: 0.30 },
+        { signal: signals.functionSignalStrength.fe, weight: 0.25 },
+        { signal: signals.oceanAgreeableness, weight: 0.20 },
+        { signal: 100 - signals.oceanOpenness, weight: 0.15 },
+        { signal: Math.min(100, signals.costSurfaceCount * 10), weight: 0.10 },
+      ]) + blameSFromSupernatural
+    ),
+    C: Math.min(
+      100,
+      weightedSum([
+        { signal: signals.functionSignalStrength.ti, weight: 0.25 },
+        { signal: signals.functionSignalStrength.ni, weight: 0.10 },
+        { signal: signals.oceanConscientiousness, weight: 0.25 },
+        { signal: compassKnowOrTruth ? 100 : 0, weight: 0.10 },
+        // CC-097B-CALIBRATION-V2 Phase 3a — Openness's C-contribution
+        // dropped from 0.15 to 0.10. High openness reads as
+        // analytical-curious (C-coded) but also as Ni-architectural
+        // (D-coded via Te-aux executive register). Pre-V2 Jason
+        // (O=81, Ni-Te) had C inflated 3 points above D; trim here
+        // restores canon D-highest ordering. Effect on cohort:
+        // Ashley C-67→64 (still well below D=82); Michele C-61→58
+        // (still i-dominant); negligible for low-O fixtures.
+        { signal: signals.oceanOpenness, weight: 0.10 },
+      ]) +
+        blameCFromSystem +
+        blameCFromAuthority
+    ),
   };
 }
 
@@ -569,11 +689,28 @@ function scoreNi(s: ExtractedSignals): { score: number; trace: string[] } {
       weight: 15,
       label: "ni: distribution.building_and_wealth>=0.30",
     },
-    { fires: s.oceanOpenness >= 75, weight: 10, label: "ni: openness>=75" },
     {
-      fires: s.oceanConscientiousness >= 90,
+      // CC-097B-CALIBRATION-V2 — lowered Ni openness threshold 75→65
+      // per feedback_se_fi_attractor_canon.md. Ashley's INFJ-latent
+      // architecture-seeking signature has O=67 — canon-correct Ni
+      // pattern but below pre-V2 75-floor. Effect: Ashley Ni +10
+      // (fires mirror-axis); Jason already fires (O=81); Daniel
+      // O=46 doesn't fire; Cindy O=69 +10 but Ni score stays well
+      // below Se=80; Harry O=54 doesn't fire.
+      fires: s.oceanOpenness >= 65,
       weight: 10,
-      label: "ni: conscientiousness>=90",
+      label: "ni: openness>=65",
+    },
+    {
+      // CC-097B-CALIBRATION-V2 — lowered Ni C threshold 90→85.
+      // Ashley C=88 — meets canon Ni-architecture pattern but
+      // below pre-V2 90-floor. Effect: Ashley Ni +10; Jason fires
+      // (C=88); Daniel doesn't (C=96 wait — Daniel fires); Cindy
+      // C=86 fires +10 but Ni well below Se=80; Michele C=81
+      // doesn't fire; Kevin C=82 doesn't fire; Harry C=98 fires.
+      fires: s.oceanConscientiousness >= 85,
+      weight: 10,
+      label: "ni: conscientiousness>=85",
     },
     {
       fires: s.workMapRegisterKey?.includes("strategic") === true ||
@@ -597,14 +734,27 @@ function scoreNe(s: ExtractedSignals): { score: number; trace: string[] } {
       label: "ne: keystone=humanist-universal-essence",
     },
     {
-      fires: s.oceanOpenness >= 75 && s.oceanConscientiousness >= 80,
+      // CC-097B-CALIBRATION-V2 — lowered openness threshold from 75
+      // to 70 per feedback_se_fi_attractor_canon.md. Michele's lived
+      // Ne-driver pattern has O=74 (canon-correct for Ne but just
+      // below the pre-V2 75-floor). Empirical cohort effect: fires
+      // Michele Ne (+15), preserves Jason/Daniel/Cindy/Kevin/Harry
+      // (Daniel/Harry O<70; Cindy/Kevin O<70 → no fire; Jason O=81
+      // already fired pre-V2).
+      fires: s.oceanOpenness >= 70 && s.oceanConscientiousness >= 80,
       weight: 15,
-      label: "ne: openness>=75 && conscientiousness>=80",
+      label: "ne: openness>=70 && conscientiousness>=80",
     },
     {
-      fires: s.costSurfaceCount <= 3,
+      // CC-097B-CALIBRATION-V2 — loosened cost-surface ceiling from
+      // <=3 to <=4 per feedback_se_fi_attractor_canon.md. Michele's
+      // narrow-selective cost-surface pattern lands at 4 (just above
+      // the pre-V2 3-ceiling). Empirical cohort effect: fires
+      // Michele/Cindy Ne (cost=4 each); preserves Jason/Daniel/Harry
+      // (cost=5).
+      fires: s.costSurfaceCount <= 4,
       weight: 15,
-      label: "ne: cost_surface<=3",
+      label: "ne: cost_surface<=4",
     },
     {
       fires: s.distribution.risk_and_uncertainty >= 0.3,
@@ -695,11 +845,22 @@ function scoreSi(s: ExtractedSignals): { score: number; trace: string[] } {
 function scoreSe(s: ExtractedSignals): { score: number; trace: string[] } {
   return scoreFromComponents([
     {
+      // CC-097B-CALIBRATION-V2 — added Agreeableness gate to Se's
+      // EmbodiedCraft attractor per feedback_se_fi_attractor_canon.md.
+      // The Se Class-C attractor (Kevin's case) routed Fe-driver
+      // users to Se because both share the EmbodiedCraft workMap.
+      // Genuine Se-drivers (Cindy A=75, Ashley A=80) have moderate
+      // Agreeableness; Fe-driver-misread-as-Se patterns (Kevin A=91)
+      // have very high Agreeableness — that's the discriminator.
+      // Gate: only fire when A<=85. Empirical effect: Kevin Se drops
+      // 25 (fe=85 vs se=55 → gap=30 ✓ disagree fires); Cindy/Ashley
+      // unaffected.
       fires:
-        s.workMapRegisterKey?.includes("embodied") === true ||
-        s.workMapRegisterKey?.includes("craft") === true,
+        (s.workMapRegisterKey?.includes("embodied") === true ||
+          s.workMapRegisterKey?.includes("craft") === true) &&
+        s.oceanAgreeableness <= 85,
       weight: 25,
-      label: "se: workMap=EmbodiedCraft",
+      label: "se: workMap=EmbodiedCraft + agreeableness<=85",
     },
     {
       fires: s.subRegister === "relational",
@@ -707,12 +868,21 @@ function scoreSe(s: ExtractedSignals): { score: number; trace: string[] } {
       label: "se: subRegister=relational",
     },
     {
+      // CC-097B-CALIBRATION-V2 — added Agreeableness gate to Se's
+      // Family-compass attractor. The Class C Fe-driver-misread-as-Se
+      // pattern (Kevin) has very-high Agreeableness (≥90) — Fe
+      // protector territory, not Se present-engagement. Cindy's
+      // genuine Se A=75 and Ashley's A=80 both stay below the
+      // 85 gate; only Kevin (A=91) loses this +15, which combined
+      // with the EmbodiedCraft gate above drops his Se from 80 to 40
+      // — clearing the disagree-classifier's qt-ceiling of 40.
       fires:
         compassContains(s.compassLabels, "Family") &&
         !compassContains(s.compassLabels, "Knowledge") &&
-        !compassContains(s.compassLabels, "Truth"),
+        !compassContains(s.compassLabels, "Truth") &&
+        s.oceanAgreeableness <= 85,
       weight: 15,
-      label: "se: compass=Family && !Knowledge && !Truth",
+      label: "se: compass=Family && !Knowledge && !Truth && agreeableness<=85",
     },
     {
       fires: s.distribution.people_service_society >= 0.4,
@@ -790,12 +960,24 @@ function scoreFi(s: ExtractedSignals): { score: number; trace: string[] } {
       label: "fi: keystone=individual-conscience-autonomy",
     },
     {
+      // CC-097B-CALIBRATION-V2 — narrowed Fi Freedom-anchored condition.
+      // Pre-V2 fired on any compass=Freedom+(Truth|Justice). This was
+      // over-triggering for Ne-driver humanist users (Michele:
+      // Freedom+Truth+Justice all top-4, but her Fi is aux not driver
+      // and her keystone is humanist-universal not individual-
+      // conscience). Per feedback_se_fi_attractor_canon.md the Fi-
+      // driver signature requires the conscience-autonomy keystone
+      // explicitly; without it, Freedom+Truth/Justice is the Ne-
+      // humanist pattern. Adding the keystone guard suppresses
+      // Michele's accidental Fi co-firing (-20) while preserving Fi-
+      // drivers (whose keystone IS individual-conscience-autonomy).
       fires:
+        s.keystoneRegister === "individual-conscience-autonomy" &&
         compassContains(s.compassLabels, "Freedom") &&
         (compassContains(s.compassLabels, "Truth") ||
           compassContains(s.compassLabels, "Justice")),
       weight: 20,
-      label: "fi: compass=Freedom+(Truth|Justice)",
+      label: "fi: keystone=individual-conscience-autonomy + compass=Freedom+(Truth|Justice)",
     },
     {
       fires: s.costSurfaceCount <= 3,
