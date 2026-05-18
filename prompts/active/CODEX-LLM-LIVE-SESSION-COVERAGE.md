@@ -6,6 +6,17 @@
 >
 > Per `feedback_cache_regen_ordering.md`: synthesis3 must run before
 > proseRewrites. Order matters.
+>
+> **Amendment 2026-05-18 (post first-fire blocker):**
+> - `DATABASE_URL` will be exported in the executor's shell before
+>   re-firing (Prisma Postgres prod connection). Use
+>   `process.env.DATABASE_URL` to read it. Do NOT echo it back in
+>   the report or commit it anywhere.
+> - The executor IS authorized to add `--session-id=<UUID>` flag
+>   support to `scripts/backfillLlmRewritesOnSessions.ts` as part
+>   of Step 6. Minimal change: parse argv, filter the session query
+>   when flag is present, leave unfiltered behavior intact when
+>   absent. Commit-eligible.
 
 ## Why this CODEX exists
 
@@ -167,6 +178,8 @@ changed.
   flow)
 - `scripts/buildProseRewrites.ts` (only to add the new fixture to its
   iteration glob, if needed; revert this addition before committing)
+- `scripts/backfillLlmRewritesOnSessions.ts` — add `--session-id=<UUID>`
+  flag support. Minimal change, commit-eligible.
 - `lib/cache/prose-rewrites.json`, `lib/cache/synthesis3-paragraphs.json`,
   `lib/cache/keystone-rewrites.json`, `lib/cache/grip-paragraphs.json`,
   `lib/cache/launch-polish-v3-rewrites.json` (regen output)

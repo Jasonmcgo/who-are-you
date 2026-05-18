@@ -346,23 +346,50 @@ function buildBundleForSession(
 // Main
 // ─────────────────────────────────────────────────────────────────────
 
+const SESSION_ID_ARG_PREFIX = "--session-id=";
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function sessionIdFilterFromArgv(argv: string[]): string | null {
+  const arg = argv.find((a) => a.startsWith(SESSION_ID_ARG_PREFIX));
+  if (!arg) return null;
+  const sessionId = arg.slice(SESSION_ID_ARG_PREFIX.length).trim();
+  if (!UUID_RE.test(sessionId)) {
+    throw new Error(
+      `[backfill] invalid --session-id value; expected UUID, got "${sessionId}"`
+    );
+  }
+  return sessionId;
+}
+
 async function main(): Promise<void> {
+  const sessionIdFilter = sessionIdFilterFromArgv(process.argv.slice(2));
   console.log("[backfill] starting");
+  if (sessionIdFilter) {
+    console.log(`[backfill] session filter enabled: ${sessionIdFilter}`);
+  }
   console.log(
     `[backfill] cache sizes — prose=${Object.keys(PROSE_CACHE).length} keystone=${Object.keys(KEYSTONE_CACHE).length} synthesis3=${Object.keys(SYNTHESIS3_CACHE).length} grip=${Object.keys(GRIP_CACHE).length} launchPolishV3=${Object.keys(V3_CACHE).length}`
   );
 
   const db = getDb();
-  const rows = await db
-    .select({
-      id: sessions.id,
-      answers: sessions.answers,
-      inner_constitution: sessions.inner_constitution,
-      llm_rewrites_engine_hash: sessions.llm_rewrites_engine_hash,
-    })
-    .from(sessions);
+  const sessionSelect = {
+    id: sessions.id,
+    answers: sessions.answers,
+    inner_constitution: sessions.inner_constitution,
+    llm_rewrites_engine_hash: sessions.llm_rewrites_engine_hash,
+  };
+  const rows = sessionIdFilter
+    ? await db
+        .select(sessionSelect)
+        .from(sessions)
+        .where(eq(sessions.id, sessionIdFilter))
+    : await db.select(sessionSelect).from(sessions);
 
   console.log(`[backfill] ${rows.length} session rows to process`);
+  if (sessionIdFilter && rows.length === 0) {
+    throw new Error(`[backfill] no session found for --session-id=${sessionIdFilter}`);
+  }
 
   let backfilled = 0;
   let skipped = 0;
