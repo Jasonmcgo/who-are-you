@@ -24,6 +24,14 @@ export const SHAPE_CARD_SVG_PATHS: Record<ShapeCardId, string> = {
   path: "/cards/08-path-gait.svg",
 };
 
+// CC-HANDS-CARD-IMAGE — body-map image for the 9th card (Hands · Work,
+// per the Plate Set V1 designer drop labeled "CRAFT · HANDS"). Hands
+// isn't a `ShapeCardId` (the 8 collapse/expand cards), so it lives as
+// a sibling constant rather than an entry in SHAPE_CARD_SVG_PATHS.
+// PNG (not SVG) per the designer drop format; the rendered <img> in
+// MapSection's Hands block consumes this path directly.
+export const HANDS_CARD_IMAGE_PATH = "/cards/09-craft-hands.png";
+
 // Display sizing for the Map render. The bundle README is explicit:
 // 140-280px on screen with breathing room; "don't shrink below 96px —
 // the line work falls apart." 200px sits center-band with margin for

@@ -19,6 +19,7 @@ import {
   type ShapeCardId,
 } from "../../lib/identityEngine";
 import {
+  HANDS_CARD_IMAGE_PATH,
   SHAPE_CARD_MAP_SIZE_PX,
   SHAPE_CARD_SVG_PATHS,
 } from "../../lib/cardAssets";
@@ -382,9 +383,27 @@ export default function MapSection({
               justifyContent: "center",
               marginTop: 24,
               marginBottom: 12,
-              minHeight: 8,
             }}
-          />
+          >
+            {/* CC-HANDS-CARD-IMAGE — Plate Set V1 hands illustration.
+                Same render shape as CardSvgPlate (200px square, alt=""
+                because the kicker below names the card). PNG rather
+                than SVG because the designer drop arrived as PNG;
+                cardAssets exports the path so any future asset swap
+                is a one-line edit. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={HANDS_CARD_IMAGE_PATH}
+              alt=""
+              width={SHAPE_CARD_MAP_SIZE_PX}
+              height={SHAPE_CARD_MAP_SIZE_PX}
+              style={{
+                width: SHAPE_CARD_MAP_SIZE_PX,
+                height: SHAPE_CARD_MAP_SIZE_PX,
+                display: "block",
+              }}
+            />
+          </div>
           <section
             data-card="hands"
             className="font-serif"
