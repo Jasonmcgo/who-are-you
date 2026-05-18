@@ -39,7 +39,13 @@ type AnthropicLikeClient = {
     create: (args: {
       model: string;
       max_tokens: number;
-      system: string;
+      system:
+        | string
+        | Array<{
+            type: "text";
+            text: string;
+            cache_control: { type: "ephemeral" };
+          }>;
       messages: { role: "user"; content: string }[];
     }) => Promise<{
       content: Array<{ type: string; text?: string }>;
@@ -106,7 +112,13 @@ export async function composePathMasterSynthesisLlm(
       client.messages.create({
         model: CLAUDE_MODEL,
         max_tokens: 800,
-        system: SYSTEM_PROMPT,
+        system: [
+          {
+            type: "text",
+            text: SYSTEM_PROMPT,
+            cache_control: { type: "ephemeral" },
+          },
+        ],
         messages: [{ role: "user", content: userPrompt }],
       }),
       API_TIMEOUT_MS,

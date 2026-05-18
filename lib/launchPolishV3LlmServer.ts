@@ -28,7 +28,13 @@ type AnthropicLikeClient = {
       model: string;
       max_tokens: number;
       temperature?: number;
-      system: string;
+      system:
+        | string
+        | Array<{
+            type: "text";
+            text: string;
+            cache_control: { type: "ephemeral" };
+          }>;
       messages: Array<{ role: "user"; content: string }>;
     }) => Promise<{ content: Array<{ type: string; text?: string }> }>;
   };
@@ -80,7 +86,13 @@ export async function composeV3Rewrite(
         model: CLAUDE_MODEL,
         max_tokens: 1400,
         temperature: 0,
-        system: V3_REWRITE_SYSTEM_PROMPT,
+        system: [
+          {
+            type: "text",
+            text: V3_REWRITE_SYSTEM_PROMPT,
+            cache_control: { type: "ephemeral" },
+          },
+        ],
         messages: [{ role: "user", content: userPrompt }],
       }),
       timeoutMs,
