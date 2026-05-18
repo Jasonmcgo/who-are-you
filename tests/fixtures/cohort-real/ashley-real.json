@@ -1,0 +1,656 @@
+{
+  "label": "Ashley — real-person calibration anchor",
+  "_source": "Extracted from prod session bbd5300a-7b57-4408-a787-67cea202e772 on 2026-05-17. Real-person answers from the named cohort user. Per feedback_cohort_fixtures_two_functions.md — this is a REAL-PERSON calibration anchor, not a synthetic shape-pattern diagnostic.",
+  "canonical_name": "Ashley",
+  "prod_session_id": "bbd5300a-7b57-4408-a787-67cea202e772",
+  "extracted_at": "2026-05-17T22:36:06.351Z",
+  "answers": [
+    {
+      "type": "forced",
+      "card_id": "conviction",
+      "response": "Misunderstood but correct",
+      "question_id": "Q-C1",
+      "question_text": "Would you rather be misunderstood but correct, or liked but slightly dishonest?"
+    },
+    {
+      "type": "forced",
+      "card_id": "conviction",
+      "response": "Freedom to act",
+      "question_id": "Q-C3",
+      "question_text": "Which feels more important to preserve?"
+    },
+    {
+      "type": "ranking",
+      "order": [
+        "system",
+        "individual",
+        "authority",
+        "supernatural",
+        "nature"
+      ],
+      "card_id": "conviction",
+      "question_id": "Q-C4",
+      "question_text": "When something goes wrong, rank where the responsibility most often sits."
+    },
+    {
+      "type": "forced",
+      "card_id": "pressure",
+      "response": "Express it carefully",
+      "question_id": "Q-P1",
+      "question_text": "If expressing a belief would cost you close relationships, you would:"
+    },
+    {
+      "type": "forced",
+      "card_id": "pressure",
+      "response": "Accept the risk",
+      "question_id": "Q-P2",
+      "question_text": "If a belief put your job at risk, you would:"
+    },
+    {
+      "type": "forced",
+      "card_id": "formation",
+      "response": "Necessary but flawed",
+      "question_id": "Q-F1",
+      "question_text": "As a child, authority figures were mostly:"
+    },
+    {
+      "type": "forced",
+      "card_id": "formation",
+      "response": "Mixed",
+      "question_id": "Q-F2",
+      "question_text": "Your childhood environment felt:"
+    },
+    {
+      "type": "forced",
+      "card_id": "context",
+      "response": "Busy but controlled",
+      "question_id": "Q-X1",
+      "question_text": "Your current life feels:"
+    },
+    {
+      "type": "forced",
+      "card_id": "context",
+      "response": "A lot",
+      "question_id": "Q-X2",
+      "question_text": "Right now, people depend on you:"
+    },
+    {
+      "type": "ranking",
+      "order": [
+        "education",
+        "government_services",
+        "government_elected",
+        "nonprofits",
+        "religious"
+      ],
+      "card_id": "context",
+      "question_id": "Q-X3-public",
+      "question_text": "How much do you trust each of these public-mission institutions to tell the truth and act in good faith? Rank in order."
+    },
+    {
+      "type": "ranking",
+      "order": [
+        "journalism",
+        "small_business",
+        "large_companies",
+        "social_media",
+        "news_organizations"
+      ],
+      "card_id": "context",
+      "question_id": "Q-X3-information-and-commercial",
+      "question_text": "How much do you trust each of these information and commercial institutions to tell the truth and act in good faith? Rank in order."
+    },
+    {
+      "type": "ranking_derived",
+      "order": [
+        "Q-X3-public:education",
+        "Q-X3-public:government_services",
+        "Q-X3-information-and-commercial:journalism",
+        "Q-X3-information-and-commercial:small_business"
+      ],
+      "card_id": "context",
+      "question_id": "Q-X3-cross",
+      "question_text": "When public-mission and information-and-commercial institutions compete for your trust, where does it actually go?",
+      "derived_item_sources": [
+        {
+          "id": "Q-X3-public:education",
+          "signal": "education_trust_priority",
+          "source_question_id": "Q-X3-public"
+        },
+        {
+          "id": "Q-X3-public:government_services",
+          "signal": "government_services_trust_priority",
+          "source_question_id": "Q-X3-public"
+        },
+        {
+          "id": "Q-X3-information-and-commercial:journalism",
+          "signal": "journalism_trust_priority",
+          "source_question_id": "Q-X3-information-and-commercial"
+        },
+        {
+          "id": "Q-X3-information-and-commercial:small_business",
+          "signal": "small_business_trust_priority",
+          "source_question_id": "Q-X3-information-and-commercial"
+        }
+      ]
+    },
+    {
+      "type": "ranking",
+      "order": [
+        "partner",
+        "family",
+        "friend"
+      ],
+      "card_id": "context",
+      "question_id": "Q-X4-relational",
+      "question_text": "When you need to hear the truth and not just kindness, whom of these — the people entangled in your life — do you trust most? Rank in order."
+    },
+    {
+      "type": "ranking",
+      "order": [
+        "outside_expert",
+        "own_counsel",
+        "mentor"
+      ],
+      "card_id": "context",
+      "question_id": "Q-X4-chosen",
+      "question_text": "And when you need truth from someone you've selected for their judgment — not someone bound to you by relationship — whom do you trust most? Rank in order."
+    },
+    {
+      "type": "ranking_derived",
+      "order": [
+        "Q-X4-chosen:own_counsel",
+        "Q-X4-relational:partner",
+        "Q-X4-relational:family",
+        "Q-X4-chosen:outside_expert"
+      ],
+      "card_id": "context",
+      "question_id": "Q-X4-cross",
+      "question_text": "When relational trust and chosen trust compete for the same hard-truth question, who actually wins?",
+      "derived_item_sources": [
+        {
+          "id": "Q-X4-relational:partner",
+          "signal": "partner_trust_priority",
+          "source_question_id": "Q-X4-relational"
+        },
+        {
+          "id": "Q-X4-relational:family",
+          "signal": "family_trust_priority",
+          "source_question_id": "Q-X4-relational"
+        },
+        {
+          "id": "Q-X4-chosen:outside_expert",
+          "signal": "outside_expert_trust_priority",
+          "source_question_id": "Q-X4-chosen"
+        },
+        {
+          "id": "Q-X4-chosen:own_counsel",
+          "signal": "own_counsel_trust_priority",
+          "source_question_id": "Q-X4-chosen"
+        }
+      ]
+    },
+    {
+      "type": "forced",
+      "card_id": "agency",
+      "response": "Building or creating",
+      "question_id": "Q-A1",
+      "question_text": "How do you spend most of your time?"
+    },
+    {
+      "type": "forced",
+      "card_id": "agency",
+      "response": "Exploring, learning, or wandering",
+      "question_id": "Q-A2",
+      "question_text": "If your obligations were lighter, where would your energy naturally go?"
+    },
+    {
+      "type": "ranking",
+      "order": [
+        "freedom",
+        "truth",
+        "peace",
+        "loyalty",
+        "honor",
+        "stability"
+      ],
+      "card_id": "sacred",
+      "question_id": "Q-S1",
+      "question_text": "Order these by what you'd protect first when something has to give."
+    },
+    {
+      "type": "ranking",
+      "order": [
+        "family",
+        "knowledge",
+        "compassion",
+        "justice",
+        "faith",
+        "mercy"
+      ],
+      "card_id": "sacred",
+      "question_id": "Q-S2",
+      "question_text": "Order these by which has the strongest claim on you."
+    },
+    {
+      "type": "ranking",
+      "order": [
+        "ni",
+        "se",
+        "ne",
+        "si"
+      ],
+      "card_id": "temperament",
+      "question_id": "Q-T1",
+      "question_text": "When you're working on a hard problem"
+    },
+    {
+      "type": "ranking",
+      "order": [
+        "se",
+        "ni",
+        "ne",
+        "si"
+      ],
+      "card_id": "temperament",
+      "question_id": "Q-T2",
+      "question_text": "When you walk into a new environment"
+    },
+    {
+      "type": "ranking",
+      "order": [
+        "ni",
+        "se",
+        "si",
+        "ne"
+      ],
+      "card_id": "temperament",
+      "question_id": "Q-T3",
+      "question_text": "When you're learning something new"
+    },
+    {
+      "type": "ranking",
+      "order": [
+        "se",
+        "ne",
+        "si",
+        "ni"
+      ],
+      "card_id": "temperament",
+      "question_id": "Q-T4",
+      "question_text": "When you're trying to read a complex situation"
+    },
+    {
+      "type": "ranking",
+      "order": [
+        "ti",
+        "te",
+        "fi",
+        "fe"
+      ],
+      "card_id": "temperament",
+      "question_id": "Q-T5",
+      "question_text": "When a plan isn't working"
+    },
+    {
+      "type": "ranking",
+      "order": [
+        "fi",
+        "ti",
+        "fe",
+        "te"
+      ],
+      "card_id": "temperament",
+      "question_id": "Q-T6",
+      "question_text": "When someone you respect disagrees with you"
+    },
+    {
+      "type": "ranking",
+      "order": [
+        "fi",
+        "fe",
+        "te",
+        "ti"
+      ],
+      "card_id": "temperament",
+      "question_id": "Q-T7",
+      "question_text": "When you have to make a hard call"
+    },
+    {
+      "type": "ranking",
+      "order": [
+        "fe",
+        "ti",
+        "te",
+        "fi"
+      ],
+      "card_id": "temperament",
+      "question_id": "Q-T8",
+      "question_text": "When someone close to you is struggling"
+    },
+    {
+      "type": "ranking",
+      "order": [
+        "intellectual",
+        "perspective",
+        "aesthetic",
+        "emotional",
+        "experiential",
+        "low_novelty_preference"
+      ],
+      "card_id": "temperament",
+      "question_id": "Q-O1",
+      "question_text": "What kind of new are you most drawn toward?"
+    },
+    {
+      "type": "ranking",
+      "order": [
+        "low_reactivity_focus",
+        "hidden_reactivity",
+        "overwhelmed_functioning",
+        "anxious_reactivity",
+        "detached_reactivity",
+        "avoidant_reactivity",
+        "anger_reactivity"
+      ],
+      "card_id": "temperament",
+      "question_id": "Q-O2",
+      "question_text": "When the stakes rise, your inner state usually becomes:"
+    },
+    {
+      "type": "ranking",
+      "order": [
+        "yourself",
+        "family",
+        "friends"
+      ],
+      "card_id": "sacred",
+      "question_id": "Q-S3-close",
+      "question_text": "When you have discretionary money — beyond basic survival — where does it most naturally flow among the people closest to you?"
+    },
+    {
+      "type": "ranking",
+      "order": [
+        "social",
+        "companies",
+        "nonprofits_religious"
+      ],
+      "card_id": "sacred",
+      "question_id": "Q-S3-wider",
+      "question_text": "When your money flows beyond your immediate circle, where does it most naturally go?"
+    },
+    {
+      "type": "ranking_derived",
+      "order": [
+        "Q-S3-close:yourself",
+        "Q-S3-close:family",
+        "Q-S3-wider:social",
+        "Q-S3-wider:companies"
+      ],
+      "card_id": "sacred",
+      "question_id": "Q-S3-cross",
+      "question_text": "When close-circle and wider-circle compete for the same dollar, where does it actually go?",
+      "derived_item_sources": [
+        {
+          "id": "Q-S3-close:yourself",
+          "signal": "self_spending_priority",
+          "source_question_id": "Q-S3-close"
+        },
+        {
+          "id": "Q-S3-close:family",
+          "signal": "family_spending_priority",
+          "source_question_id": "Q-S3-close"
+        },
+        {
+          "id": "Q-S3-wider:social",
+          "signal": "social_spending_priority",
+          "source_question_id": "Q-S3-wider"
+        },
+        {
+          "id": "Q-S3-wider:companies",
+          "signal": "companies_spending_priority",
+          "source_question_id": "Q-S3-wider"
+        }
+      ]
+    },
+    {
+      "type": "ranking",
+      "order": [
+        "building",
+        "solving",
+        "restoring"
+      ],
+      "card_id": "sacred",
+      "overlay": {
+        "restoring": "wish_more"
+      },
+      "question_id": "Q-E1-outward",
+      "question_text": "When you have discretionary energy — not forced by obligation — where does it most naturally go in the outward, generative direction?"
+    },
+    {
+      "type": "ranking",
+      "order": [
+        "caring",
+        "learning",
+        "enjoying"
+      ],
+      "card_id": "sacred",
+      "overlay": {
+        "enjoying": "wish_more"
+      },
+      "question_id": "Q-E1-inward",
+      "question_text": "And in the inward, relational direction — where does your discretionary energy most naturally go?"
+    },
+    {
+      "type": "ranking_derived",
+      "order": [
+        "Q-E1-inward:caring",
+        "Q-E1-outward:solving",
+        "Q-E1-outward:building",
+        "Q-E1-inward:learning"
+      ],
+      "card_id": "sacred",
+      "question_id": "Q-E1-cross",
+      "question_text": "When outward energy and inward energy compete for the same hour, which actually wins?",
+      "derived_item_sources": [
+        {
+          "id": "Q-E1-outward:building",
+          "signal": "building_energy_priority",
+          "source_question_id": "Q-E1-outward"
+        },
+        {
+          "id": "Q-E1-outward:solving",
+          "signal": "solving_energy_priority",
+          "source_question_id": "Q-E1-outward"
+        },
+        {
+          "id": "Q-E1-inward:caring",
+          "signal": "caring_energy_priority",
+          "source_question_id": "Q-E1-inward"
+        },
+        {
+          "id": "Q-E1-inward:learning",
+          "signal": "learning_energy_priority",
+          "source_question_id": "Q-E1-inward"
+        }
+      ]
+    },
+    {
+      "type": "ranking",
+      "order": [
+        "soul_calling",
+        "soul_people",
+        "security_freedom",
+        "durable_creation",
+        "gripping_proof",
+        "creative_truth",
+        "goal_completion"
+      ],
+      "card_id": "sacred",
+      "question_id": "Q-GS1",
+      "question_text": "When a major effort succeeds, what makes it feel most worth it?"
+    },
+    {
+      "type": "ranking",
+      "order": [
+        "soul_beloved_named",
+        "goal_logic_explanation",
+        "sacred_belief_connection",
+        "performance_identity",
+        "vulnerability_open_uncertainty",
+        "vulnerability_deflection"
+      ],
+      "card_id": "conviction",
+      "question_id": "Q-V1",
+      "question_text": "When someone asks why your work really matters, what are you most likely to do?"
+    },
+    {
+      "type": "ranking",
+      "order": [
+        "grips_control",
+        "grips_comfort",
+        "grips_certainty",
+        "grips_old_plan",
+        "grips_neededness",
+        "grips_security",
+        "grips_approval",
+        "grips_reputation"
+      ],
+      "card_id": "pressure",
+      "question_id": "Q-GRIP1",
+      "question_text": "Under pressure, what do you most tend to grip?"
+    },
+    {
+      "type": "ranking",
+      "order": [
+        "presence",
+        "shared_experience",
+        "co_construction",
+        "problem_solving",
+        "protection",
+        "verbal_expression",
+        "quiet_sacrifice"
+      ],
+      "card_id": "sacred",
+      "question_id": "Q-L1",
+      "question_text": "The people closest to you are most likely to know you love them because you:"
+    },
+    {
+      "type": "ranking",
+      "order": [
+        "close_relationships",
+        "health",
+        "money",
+        "job",
+        "reputation"
+      ],
+      "card_id": "sacred",
+      "question_id": "Q-Stakes1",
+      "question_text": "Rank these by importance to your life — what would hurt most to lose."
+    },
+    {
+      "type": "ranking",
+      "order": [
+        "coverage",
+        "compliance",
+        "cost"
+      ],
+      "card_id": "role",
+      "question_id": "Q-3C1",
+      "question_text": "When you have to choose, which most often guides you?"
+    },
+    {
+      "type": "ranking",
+      "order": [
+        "coverage_priority",
+        "compliance_priority",
+        "goal_priority",
+        "recovery_priority",
+        "cost_priority",
+        "reputation_priority"
+      ],
+      "card_id": "role",
+      "question_id": "Q-3C2",
+      "question_text": "When life gets crowded, what do you protect first in practice?"
+    },
+    {
+      "type": "ranking",
+      "order": [
+        "legacy",
+        "success",
+        "wealth",
+        "fame"
+      ],
+      "card_id": "role",
+      "question_id": "Q-Ambition1",
+      "question_text": "When you imagine succeeding — what does the win look like?"
+    },
+    {
+      "type": "freeform",
+      "card_id": "conviction",
+      "response": "People are born good.",
+      "question_id": "Q-I1",
+      "question_text": "What is a belief you'd bear real cost to keep?"
+    },
+    {
+      "type": "multiselect_derived",
+      "card_id": "pressure",
+      "other_text": "There is a scenario where it could be all of the above, I suppose",
+      "selections": [
+        {
+          "id": "Q-Stakes1:money",
+          "signal": "money_stakes_priority",
+          "source_question_id": "Q-Stakes1"
+        },
+        {
+          "id": "Q-Stakes1:reputation",
+          "signal": "reputation_stakes_priority",
+          "source_question_id": "Q-Stakes1"
+        },
+        {
+          "id": "Q-Stakes1:job",
+          "signal": "job_stakes_priority",
+          "source_question_id": "Q-Stakes1"
+        },
+        {
+          "id": "Q-Stakes1:health",
+          "signal": "health_stakes_priority",
+          "source_question_id": "Q-Stakes1"
+        },
+        {
+          "id": "Q-Stakes1:close_relationships",
+          "signal": "close_relationships_stakes_priority",
+          "source_question_id": "Q-Stakes1"
+        },
+        {
+          "id": "other",
+          "signal": null
+        }
+      ],
+      "question_id": "Q-I3",
+      "none_selected": false,
+      "question_text": "What would you risk losing for this belief?"
+    }
+  ],
+  "demographics": {
+    "name_value": "#1 Daughter",
+    "name_state": "specified",
+    "gender_value": "woman",
+    "gender_state": "specified",
+    "age_decade": "1990s",
+    "age_state": "specified",
+    "location_country": "United States",
+    "location_region": null,
+    "location_state": "specified",
+    "marital_status_value": null,
+    "marital_status_state": "not_answered",
+    "education_value": null,
+    "education_state": "not_answered",
+    "political_value": null,
+    "political_state": "not_answered",
+    "religious_value": null,
+    "religious_state": "not_answered",
+    "profession_value": null,
+    "profession_state": "not_answered"
+  }
+}

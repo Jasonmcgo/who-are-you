@@ -77,6 +77,16 @@ export interface AimScoreInputs {
   movementStrength: number;
   /** From Segment 1.3 ResponsibilityIntegrationReading.score, 0-100. */
   responsibilityIntegration: number;
+  /**
+   * CC-101-VO-WIRING Phase 1 — Victim/Owner score (0-100; 100 = full
+   * owner-anchored). Optional for backward-compat: pre-CC-100 saved
+   * sessions and any caller that doesn't pass it gets the pre-V/O
+   * Aim score verbatim. When provided, owner-side (score > 50)
+   * receives a gradient boost (max +15 at score=100). Victim-side
+   * (score < 50) contributes zero to Aim — victim weight is wired
+   * into Grip + Movement (Phases 2/3), not Aim.
+   */
+  victimOwnerScore?: number;
 }
 
 export interface AimComponents {
@@ -92,6 +102,19 @@ export interface AimReading {
   components: AimComponents;
   weights: typeof AIM_WEIGHTS;
   rationale: string;
+  /**
+   * CC-101-VO-WIRING Phase 1 — Aim baseline before owner-boost
+   * application. `score` carries the post-boost value (canonical for
+   * downstream consumers). Optional/undefined when no V/O score was
+   * threaded (backward-compat).
+   */
+  scoreBeforeVictimOwner?: number;
+  /**
+   * CC-101-VO-WIRING Phase 1 — additive contribution from V/O owner-
+   * register. 0 when V/O undefined or score ≤ 50; max +15 at
+   * owner-anchored score=100.
+   */
+  victimOwnerBoost?: number;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -132,6 +155,14 @@ function clamp01(v: number, max = 100): number {
 // computeAimScore — Phase 2 canonical
 // ─────────────────────────────────────────────────────────────────────
 
+// CC-101-VO-WIRING Phase 1 — max owner-side Aim boost. Per
+// feedback_victim_owner_axis_gsag.md: owner-anchored shapes receive
+// a strong Aim contribution. Gradient-weighted from 0 (balanced
+// score=50) to +15 (owner-anchored score=100). Victim-side
+// contributes 0 to Aim — victim weight wires into Grip + Movement
+// (CC-101 Phases 2/3), not Aim.
+export const VICTIM_OWNER_AIM_BOOST_MAX = 15;
+
 export function computeAimScore(inputs: AimScoreInputs): AimReading {
   const wrs = clamp01(inputs.wiseRiskStrength);
   const cc = clamp01(inputs.convictionClarity);
@@ -145,7 +176,18 @@ export function computeAimScore(inputs: AimScoreInputs): AimReading {
     gsc * AIM_WEIGHTS.goalSoulCoherence +
     ms * AIM_WEIGHTS.movementStrength +
     ri * AIM_WEIGHTS.responsibilityIntegration;
-  const score = Math.round(weighted * 10) / 10;
+  const baseScore = Math.round(weighted * 10) / 10;
+
+  // CC-101-VO-WIRING Phase 1 — owner-boost. Backward-compat: when no
+  // V/O score is threaded, victimOwnerBoost is 0 and Aim is the base
+  // score verbatim. Pre-V/O callers, legacy fixtures, and sessions
+  // that haven't re-rendered all keep their original Aim numbers.
+  const vo = inputs.victimOwnerScore;
+  const ownerBoost =
+    typeof vo === "number" && vo > 50
+      ? ((vo - 50) / 50) * VICTIM_OWNER_AIM_BOOST_MAX
+      : 0;
+  const score = Math.round(Math.min(100, baseScore + ownerBoost) * 10) / 10;
 
   const components: AimComponents = {
     wiseRiskStrength: wrs,
@@ -161,9 +203,19 @@ export function computeAimScore(inputs: AimScoreInputs): AimReading {
     `+ ${gsc.toFixed(1)}×${AIM_WEIGHTS.goalSoulCoherence} (G/S coherence) ` +
     `+ ${ms.toFixed(1)}×${AIM_WEIGHTS.movementStrength} (movement) ` +
     `+ ${ri.toFixed(1)}×${AIM_WEIGHTS.responsibilityIntegration} (responsibility) ` +
-    `= ${score.toFixed(1)}.`;
+    `= ${baseScore.toFixed(1)}` +
+    (ownerBoost > 0
+      ? ` + ${ownerBoost.toFixed(1)} (V/O owner-boost, score=${vo}) = ${score.toFixed(1)}.`
+      : `.`);
 
-  return { score, components, weights: AIM_WEIGHTS, rationale };
+  return {
+    score,
+    components,
+    weights: AIM_WEIGHTS,
+    rationale,
+    scoreBeforeVictimOwner: baseScore,
+    victimOwnerBoost: ownerBoost,
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────

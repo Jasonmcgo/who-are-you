@@ -468,16 +468,23 @@ function runAudit(): AssertionResult[] {
     const g = r.constitution.gripReading;
     if (!g) continue;
     compChecked++;
+    const victimOwnerMultiplier = g.victimOwnerMultiplier ?? 1;
+    // Post-CC-101 canonical composition: defensiveGrip × amplifier × V/O_victim_multiplier.
     const expected =
       Math.round(
         Math.min(
           100,
-          Math.max(0, g.components.defensiveGrip * g.components.amplifier)
+          Math.max(
+            0,
+            g.components.defensiveGrip *
+              g.components.amplifier *
+              victimOwnerMultiplier
+          )
         ) * 10
       ) / 10;
     if (Math.abs(g.score - expected) > 0.2) {
       compFails.push(
-        `${r.file}: score=${g.score} expected≈${expected} (def=${g.components.defensiveGrip} × amp=${g.components.amplifier})`
+        `${r.file}: score=${g.score} expected≈${expected} (def=${g.components.defensiveGrip} × amp=${g.components.amplifier} × vo=${victimOwnerMultiplier})`
       );
     }
   }
@@ -486,7 +493,7 @@ function runAudit(): AssertionResult[] {
       ? {
           ok: true,
           assertion: "composition-still-multiplicative",
-          detail: `${compChecked} fixtures: score ≈ clamp(def × amp, 0, 100) within ±0.2`,
+          detail: `${compChecked} fixtures: score ≈ clamp(def × amp × V/O multiplier, 0, 100) within ±0.2`,
         }
       : {
           ok: false,

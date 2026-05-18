@@ -319,7 +319,7 @@ function runAudit(): AssertionResult[] {
   );
 
   // ── 7. risk-form-jason-fixture-classification ───────────────────────
-  // Jason: Aim ~56, Grip ~21 — both below thresholds → Ungoverned Movement.
+  // Jason: Aim ~64.9, Grip ~26.3, V/O=77 owner-leaning → Open-Handed Aim.
   if (!jasonRow) {
     results.push({
       ok: false,
@@ -335,13 +335,9 @@ function runAudit(): AssertionResult[] {
         detail: "Jason has no riskFormFromAim reading",
       });
     } else {
-      // CC-088 — post-CC-084 Jason's 52.3 aim + 26.3 grip lands in the
-      // new 5th band's window (aim ∈ [40,60), grip ∈ [20,35]), so
-      // Lightly Governed Movement is the expected canonical route.
-      // The legacy expectation was Ungoverned Movement (4-band
-      // classifier); the 5-band classifier reclassifies him.
+      // Updated post-CC-101 — V/O Aim boost on owner-leaning shapes crosses Aim 60-threshold into Open-Handed band.
       results.push(
-        rf.letter === "Lightly Governed Movement"
+        rf.letter === "Open-Handed Aim"
           ? {
               ok: true,
               assertion: "risk-form-jason-fixture-classification",
@@ -350,7 +346,7 @@ function runAudit(): AssertionResult[] {
           : {
               ok: false,
               assertion: "risk-form-jason-fixture-classification",
-              detail: `Jason riskFormFromAim=${rf.letter} expected Lightly Governed Movement (aim=${rf.aimScore.toFixed(1)}, grip=${rf.gripScore.toFixed(1)})`,
+              detail: `Jason riskFormFromAim=${rf.letter} expected Open-Handed Aim (aim=${rf.aimScore.toFixed(1)}, grip=${rf.gripScore.toFixed(1)})`,
             }
       );
     }

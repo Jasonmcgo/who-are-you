@@ -392,14 +392,23 @@ function runAudit(): AssertionResult[] {
     const g = r.constitution.gripReading;
     if (!g) continue;
     multChecked++;
+    const victimOwnerMultiplier = g.victimOwnerMultiplier ?? 1;
+    // Post-CC-101 canonical composition: defensiveGrip × amplifier × V/O_victim_multiplier.
     const expected =
       Math.round(
-        Math.min(100, Math.max(0, g.components.defensiveGrip * g.components.amplifier)) *
-          10
+        Math.min(
+          100,
+          Math.max(
+            0,
+            g.components.defensiveGrip *
+              g.components.amplifier *
+              victimOwnerMultiplier
+          )
+        ) * 10
       ) / 10;
     if (Math.abs(g.score - expected) > 0.2) {
       multFails.push(
-        `${r.file}: score=${g.score} expected≈${expected} (def=${g.components.defensiveGrip} × amp=${g.components.amplifier})`
+        `${r.file}: score=${g.score} expected≈${expected} (def=${g.components.defensiveGrip} × amp=${g.components.amplifier} × vo=${victimOwnerMultiplier})`
       );
     }
   }
@@ -408,7 +417,7 @@ function runAudit(): AssertionResult[] {
       ? {
           ok: true,
           assertion: "grip-composition-multiplicative",
-          detail: `${multChecked} fixtures: score === clamp(def × amp, 0, 100) within ±0.2`,
+          detail: `${multChecked} fixtures: score === clamp(def × amp × V/O multiplier, 0, 100) within ±0.2`,
         }
       : {
           ok: false,
@@ -558,9 +567,9 @@ function runAudit(): AssertionResult[] {
   // ── 14. aim-reading-canonical-unchanged ─────────────────────────────
   // The canonical Aim score is a pure function of (driveStrengths.compliance,
   // convictionClarity, goalSoulCoherence, movementStrength.length,
-  // responsibilityIntegration). This CC didn't change any of those
-  // formulas. Verify by recomputing each cohort fixture's Aim from its
-  // inputs and confirming === aimReading.score within ±0.1.
+  // responsibilityIntegration, victimOwnerScore). Verify by recomputing each
+  // cohort fixture's Aim from its inputs and confirming === aimReading.score
+  // within ±0.1.
   const aimFails: string[] = [];
   for (const r of cohort) {
     const dash = r.constitution.goalSoulMovement?.dashboard;
@@ -573,6 +582,8 @@ function runAudit(): AssertionResult[] {
       movementStrength: dash.movementStrength.length,
       responsibilityIntegration:
         r.constitution.responsibilityIntegration?.score ?? 0,
+      // Post-CC-101 — V/O Aim boost applied per ownerBoost composition.
+      victimOwnerScore: r.constitution.victim_owner?.score,
     });
     if (Math.abs(recomputed.score - r.constitution.aimReading.score) > 0.1) {
       aimFails.push(

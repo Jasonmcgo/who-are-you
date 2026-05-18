@@ -23,6 +23,11 @@
 
 export const MAX_GRIP_DRAG = 0.45;
 export const MAX_AIM_GOVERNOR = 0.15;
+// CC-101-VO-WIRING Phase 3 — max victim-side drag on Usable Movement.
+// Per feedback_victim_owner_axis_gsag.md: victim register gates
+// Goal/Soul movement. Total-drag ceiling stays ≤0.70 (Grip 0.45 +
+// Aim 0.15 + V/O 0.10), preserving the ≥30% usable floor.
+export const MAX_VICTIM_OWNER_DRAG = 0.1;
 
 // ─────────────────────────────────────────────────────────────────────
 // Helpers
@@ -92,12 +97,28 @@ export interface UsableMovementInputs {
   potentialMovement: number; // 0-100, from goalSoulMovement.movementStrength.length
   grip: number;              // 0-100, canonical (gripFromDefensive)
   aim: number;               // 0-100, from new Aim formula
+  /**
+   * CC-101-VO-WIRING Phase 3 — Victim/Owner score (0-100). Victim-
+   * side (score < 50) adds an additional drag on top of the existing
+   * Grip + Aim governors. Max -10% at victim-anchored (score=0).
+   * Owner-side and undefined have no effect. Backward-compat: when
+   * absent, Usable Movement is identical to pre-CC-101 behavior.
+   * Preserves the 0.70 total-drag ceiling (Grip 0.45 + Aim 0.15 +
+   * V/O 0.10 = 0.70, ≥30% usable floor).
+   */
+  victimOwnerScore?: number;
 }
 
 export interface UsableMovementReading {
   potentialMovement: number;
   gripDragModifier: number;
   aimGovernorModifier: number;
+  /**
+   * CC-101-VO-WIRING Phase 3 — additional Usable-Movement modifier
+   * from V/O victim register. 1.0 (no drag) when V/O undefined or
+   * score ≥ 50; 0.90 (max -10% drag) at victim-anchored score=0.
+   */
+  victimOwnerDragModifier?: number;
   usableMovement: number;
   toleranceDegrees: number;
   /** CC-MOMENTUM-HONESTY — Usable-anchored descriptor. Reserved for
@@ -124,8 +145,21 @@ export function computeUsableMovement(
 
   const gripDragModifier = computeGripDragModifier(grip);
   const aimGovernorModifier = computeAimGovernorModifier(aim);
+  // CC-101-VO-WIRING Phase 3 — V/O victim-drag. Returns a multiplier
+  // in [0.90, 1.0]; 1.0 when V/O undefined or score ≥ 50 (no drag).
+  const vo = inputs.victimOwnerScore;
+  const victimOwnerDragModifier =
+    typeof vo === "number" && vo < 50
+      ? 1 - ((50 - vo) / 50) * MAX_VICTIM_OWNER_DRAG
+      : 1;
   const usableMovement =
-    Math.round(potential * gripDragModifier * aimGovernorModifier * 10) / 10;
+    Math.round(
+      potential *
+        gripDragModifier *
+        aimGovernorModifier *
+        victimOwnerDragModifier *
+        10
+    ) / 10;
   const toleranceDegrees = computeToleranceDegrees(aim);
   const dragPercent =
     potential > 0
@@ -150,6 +184,8 @@ export function computeUsableMovement(
     potentialMovement: Math.round(potential * 10) / 10,
     gripDragModifier: Math.round(gripDragModifier * 1000) / 1000,
     aimGovernorModifier: Math.round(aimGovernorModifier * 1000) / 1000,
+    victimOwnerDragModifier:
+      Math.round(victimOwnerDragModifier * 1000) / 1000,
     usableMovement,
     toleranceDegrees,
     usableDescriptor,

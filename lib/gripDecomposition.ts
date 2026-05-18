@@ -390,24 +390,67 @@ export interface GripReading {
     amplifier: number; // [1.0, 1.5]
   };
   rationale: string;
+  /**
+   * CC-101-VO-WIRING Phase 2 — Grip score before V/O victim-amplifier
+   * was applied. `score` carries the post-amplifier value. Optional
+   * for backward-compat: undefined when no V/O score was threaded.
+   */
+  scoreBeforeVictimOwner?: number;
+  /**
+   * CC-101-VO-WIRING Phase 2 — multiplier applied for V/O victim
+   * register. 1.0 when V/O undefined or score ≥ 50; up to 1.20 at
+   * victim-anchored score=0.
+   */
+  victimOwnerMultiplier?: number;
 }
+
+// CC-101-VO-WIRING Phase 2 — max victim-side Grip multiplier. Per
+// feedback_victim_owner_axis_gsag.md: victim-anchored shapes receive
+// heavy Grip amplification. Gradient: 1.0 at balanced (score=50)
+// to 1.20 at victim-anchored (score=0). Stacks multiplicatively
+// with the existing stakes amplifier; final Grip remains clamped
+// at the canonical [0, 100] ceiling.
+export const VICTIM_OWNER_GRIP_MULTIPLIER_MAX = 1.2;
 
 /** computeGrip — canonical §13 reading. Accepts the pre-computed
  *  decomposed components (DefensiveGrip + StakesLoad) and returns the
- *  composed multiplicative Grip. */
+ *  composed multiplicative Grip.
+ *
+ *  CC-101-VO-WIRING Phase 2: optional `victimOwnerScore` (0-100).
+ *  Victim-side (score < 50) amplifies Grip by up to 1.20x at
+ *  score=0; owner-side and unset/undefined have no effect. */
 export function computeGrip(
   defensiveGrip: number,
-  stakesLoad: number
+  stakesLoad: number,
+  victimOwnerScore?: number
 ): GripReading {
-  const amplifier = computeStakesAmplifier(stakesLoad, defensiveGrip);
-  const score = Math.round(clamp(defensiveGrip * amplifier, 0, 100) * 10) / 10;
+  const stakesAmp = computeStakesAmplifier(stakesLoad, defensiveGrip);
+  const baseScore =
+    Math.round(clamp(defensiveGrip * stakesAmp, 0, 100) * 10) / 10;
+  const victimMultiplier =
+    typeof victimOwnerScore === "number" && victimOwnerScore < 50
+      ? 1 +
+        ((50 - victimOwnerScore) / 50) *
+          (VICTIM_OWNER_GRIP_MULTIPLIER_MAX - 1)
+      : 1;
+  const score =
+    victimMultiplier === 1
+      ? baseScore
+      : Math.round(clamp(baseScore * victimMultiplier, 0, 100) * 10) / 10;
   return {
     score,
     components: {
       defensiveGrip,
       stakesLoad,
-      amplifier: Math.round(amplifier * 1000) / 1000,
+      amplifier: Math.round(stakesAmp * 1000) / 1000,
     },
-    rationale: `Grip ${score.toFixed(1)} = DefensiveGrip ${defensiveGrip.toFixed(1)} × amplifier ${amplifier.toFixed(3)} (StakesLoad ${stakesLoad.toFixed(1)}; floor=${DEFENSIVE_GRIP_AMPLIFIER_FLOOR}).`,
+    rationale:
+      `Grip ${score.toFixed(1)} = DefensiveGrip ${defensiveGrip.toFixed(1)} × amplifier ${stakesAmp.toFixed(3)} (StakesLoad ${stakesLoad.toFixed(1)}; floor=${DEFENSIVE_GRIP_AMPLIFIER_FLOOR})` +
+      (victimMultiplier !== 1
+        ? ` × V/O victim-multiplier ${victimMultiplier.toFixed(3)} (V/O score=${victimOwnerScore})`
+        : ``) +
+      `.`,
+    scoreBeforeVictimOwner: baseScore,
+    victimOwnerMultiplier: Math.round(victimMultiplier * 1000) / 1000,
   };
 }

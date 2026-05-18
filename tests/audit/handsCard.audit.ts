@@ -89,7 +89,7 @@ function extractSection(md: string, header: string): string | null {
   const idx = md.indexOf(header);
   if (idx < 0) return null;
   const rest = md.slice(idx);
-  const nextHeader = rest.slice(header.length).search(/\n### /);
+  const nextHeader = rest.slice(header.length).search(/\n## |\n### /);
   if (nextHeader < 0) return rest.trimEnd();
   return rest.slice(0, header.length + nextHeader).trimEnd();
 }

@@ -267,8 +267,15 @@ async function runAudit(): Promise<void> {
     );
     const missLogs = warnings.filter((w) => w.includes("[cache-miss]"));
     const fails: string[] = [];
-    if (typeof result !== "string")
-      fails.push(`expected string return on hit, got: ${typeof result}`);
+    if (result === null) {
+      fails.push("cache hit returned null (miss)");
+    } else if (typeof result !== "string") {
+      const shape =
+        typeof result === "object"
+          ? JSON.stringify(Object.keys(result as Record<string, unknown>))
+          : typeof result;
+      fails.push(`cache hit returned non-string shape: ${shape}`);
+    }
     if (missLogs.length !== 0)
       fails.push(`expected 0 miss logs on hit, got ${missLogs.length}`);
     results.push(

@@ -1198,6 +1198,93 @@ export type InnerConstitution = {
   // because `detectBlindSpots` returns an empty list for thin-signal
   // sessions or fully-aligned shapes.
   blindSpots?: BlindSpot[];
+  // CC-VO-EXTRACTOR-AND-COMPOSER — Q-I1/Q-I1b normalized text + verb
+  // register counts. Data-only at this layer; no prose generation reads
+  // from this field yet. Wiring into Grip/Aim is owned by CC-VO-WIRING.
+  identity_freeform?: IdentityFreeform;
+  // CC-VO-EXTRACTOR-AND-COMPOSER — Victim/Owner axis reading (Locus of
+  // Control). Composes verb register, blame attribution, cost surface,
+  // existing victim/owner-coded signals, hypocrisy panel, and truth-
+  // register patterns into a single 0-100 score where 100 = full
+  // owner-anchored and 0 = full victim-anchored. Data-only at this
+  // layer; engine math wiring is owned by CC-VO-WIRING.
+  victim_owner?: VictimOwnerReading;
+  // CC-104-NEXT-MOVES-SHAPE-AWARE — shape-aware release-mechanism
+  // prose. Routes to one of three registers (Load-Audit /
+  // Identity-Reframe / Build-Something) based on V/O × grip bucket ×
+  // state-load × primal coherence, then emits register-specific
+  // paragraphs + a single retakable oneSmallMove + a reMeasureCue
+  // naming the signal that should move on retake. Optional because
+  // unmapped grip or missing V/O suppresses the section.
+  nextMoves?: import("./nextMovesProse").NextMovesAttachment;
+};
+
+// CC-VO-EXTRACTOR-AND-COMPOSER — Q-I1/Q-I1b verb register surface.
+export type IdentityFreeform = {
+  q_i1_text: string | null;
+  q_i1b_text: string | null;
+  owner_verb_count: number;
+  victim_verb_count: number;
+};
+
+// CC-VO-EXTRACTOR-AND-COMPOSER — Victim/Owner axis reading.
+// 0 = full victim-anchored; 100 = full owner-anchored; 50 = balanced.
+// Register bands: 0-20 victim-anchored; 21-40 victim-leaning;
+// 41-59 balanced; 60-79 owner-leaning; 80-100 owner-anchored.
+export type VictimOwnerRegister =
+  | "victim-anchored"
+  | "victim-leaning"
+  | "balanced"
+  | "owner-leaning"
+  | "owner-anchored";
+
+export type VictimOwnerEvidence = {
+  verbRegister: { owner: number; victim: number };
+  blameAttribution: number; // signed contribution: + owner, − victim
+  costBearing: number; // signed contribution
+  hypocrisyDrag: number; // always ≤ 0 (pulls victim)
+  truthRegister: "pursuit" | "possession" | "neutral";
+  existingVictimSignals: string[];
+  existingOwnerSignals: string[];
+};
+
+export type VictimOwnerReading = {
+  score: number;
+  register: VictimOwnerRegister;
+  evidence: VictimOwnerEvidence;
+  rationale: string;
+  // CC-101-VO-WIRING Phase 4 — canon-predicted register derived from
+  // shape signature (Lens stack + Compass + OCEAN + Q-C4 blame).
+  // Represents the "lived shape" expectation distinct from the
+  // composer's behavior-signal measurement (score/register above).
+  canonPredicted?: CanonPredictedRegister;
+  // CC-101-VO-WIRING Phase 5 — tension between measured (above) and
+  // canon-predicted register. When fires=true, the user's expressed
+  // V/O register and their canon-predicted register diverge — the
+  // engine surfaces this as a finding rather than collapsing it
+  // (per feedback_tension_is_the_form.md).
+  registerTension?: RegisterTension;
+};
+
+// CC-101-VO-WIRING Phase 4 — canon-predicted V/O register from
+// shape signature.
+export type CanonPredictedRegister = {
+  score: number; // 0-100, same scale as composer
+  register: VictimOwnerRegister;
+  rationale: string; // signature components used
+};
+
+// CC-101-VO-WIRING Phase 5 — register tension finding.
+export type RegisterTension = {
+  fires: boolean;
+  direction:
+    | "expressed-exceeds-canon"
+    | "canon-exceeds-expressed"
+    | "direction-reversed"
+    | "aligned";
+  magnitude: "minor" | "meaningful" | "significant";
+  bandDelta: number; // signed: positive = expressed-band > canon-band
+  note: string;
 };
 
 // CC-090 — Blind Spot reading. One entry per Compass top-1 value that

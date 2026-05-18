@@ -128,16 +128,20 @@ const CHART_ORIGIN_X = 60;
 const CHART_ORIGIN_Y = 224;
 const CHART_VIEWBOX_HEIGHT = 320;
 const LEGEND_START_Y = 246;
+// CC-103 — trajectory line + tolerance cone anchor at the canonical
+// midpoint, score (50/50) → SVG (160, 124).
+const MIDPOINT_X = 160;
+const MIDPOINT_Y = 124;
 
-// Compute angle from chart origin to (x, y) in degrees in the
-// Goal/Soul plane. Goal is +x from origin; Soul is -y from origin
-// (svg y grows downward). atan2(soulDelta, goalDelta).
-function svgPointToAngle(x: number, y: number): number {
-  const goalDelta = x - CHART_ORIGIN_X;
-  const soulDelta = CHART_ORIGIN_Y - y;
-  if (goalDelta === 0 && soulDelta === 0) return 0;
-  const rad = Math.atan2(soulDelta, goalDelta);
-  return (rad * 180) / Math.PI;
+// CC-103 — tolerance cone arms now emanate from midpoint. Compute the
+// arm angle relative to the midpoint anchor (not absolute origin).
+// (The legacy origin-anchored `svgPointToAngle` was removed when the
+// cone assertion switched to midpoint-relative math.)
+function svgPointToAngleFromMidpoint(x: number, y: number): number {
+  const dx = x - MIDPOINT_X;
+  const dy = MIDPOINT_Y - y; // svg y grows downward
+  if (dx === 0 && dy === 0) return 0;
+  return (Math.atan2(dy, dx) * 180) / Math.PI;
 }
 
 function distanceFromOrigin(x: number, y: number): number {
@@ -312,7 +316,9 @@ function runAudit(): AssertionResult[] {
   }
 
   // ── 5. trajectory-chart-jason-tolerance-cone-correct ────────────────
-  // Jason: Aim ~52 → tolerance 15°; angle ~33° → lower 18°, upper 48° (±2°).
+  // CC-103 — cone apex moved to midpoint; cone arms emanate ±tolerance
+  // from the *rendered* line direction (midpoint → potentialEnd), not
+  // the engine angle (which is atan2(soul, goal) from absolute origin).
   if (!jasonRow) {
     results.push({
       ok: false,
@@ -323,39 +329,52 @@ function runAudit(): AssertionResult[] {
     const svg = generateTrajectoryChartSvgFromConstitution(jasonRow.constitution);
     const lowerTag = findElementTag(svg, "tolerance-cone-lower");
     const upperTag = findElementTag(svg, "tolerance-cone-upper");
+    const potentialTag = findElementTag(svg, "potential-trajectory");
     const dash = jasonRow.constitution.goalSoulMovement?.dashboard;
     const limiter = dash?.movementLimiter;
     const aim = jasonRow.constitution.aimReading?.score ?? null;
-    const angle = dash?.direction.angle ?? null;
     const tolerance = limiter?.toleranceDegrees ?? null;
-    if (!lowerTag || !upperTag || aim === null || angle === null || tolerance === null) {
+    if (
+      !lowerTag ||
+      !upperTag ||
+      !potentialTag ||
+      aim === null ||
+      tolerance === null
+    ) {
       results.push({
         ok: false,
         assertion: "trajectory-chart-jason-tolerance-cone-correct",
-        detail: `missing data — lowerTag=${!!lowerTag} upperTag=${!!upperTag} aim=${aim} angle=${angle} tol=${tolerance}`,
+        detail: `missing data — lowerTag=${!!lowerTag} upperTag=${!!upperTag} potentialTag=${!!potentialTag} aim=${aim} tol=${tolerance}`,
       });
     } else {
+      const potEndX = readAttrNum(potentialTag, "x2") ?? 0;
+      const potEndY = readAttrNum(potentialTag, "y2") ?? 0;
+      const renderedLineAngle = svgPointToAngleFromMidpoint(potEndX, potEndY);
       const lowerX = readAttrNum(lowerTag, "x2") ?? 0;
       const lowerY = readAttrNum(lowerTag, "y2") ?? 0;
       const upperX = readAttrNum(upperTag, "x2") ?? 0;
       const upperY = readAttrNum(upperTag, "y2") ?? 0;
-      const lowerAngle = svgPointToAngle(lowerX, lowerY);
-      const upperAngle = svgPointToAngle(upperX, upperY);
-      const expectedLower = Math.max(0, angle - tolerance);
-      const expectedUpper = Math.min(90, angle + tolerance);
-      const lowerOk = Math.abs(lowerAngle - expectedLower) <= 2;
-      const upperOk = Math.abs(upperAngle - expectedUpper) <= 2;
+      const lowerAngle = svgPointToAngleFromMidpoint(lowerX, lowerY);
+      const upperAngle = svgPointToAngleFromMidpoint(upperX, upperY);
+      // SVG rotation (y grows downward): the cone "lower" arm rotates
+      // by -tolerance in screen space, which corresponds to +tolerance
+      // in the Goal/Soul plane (where Soul is up). Use absolute deltas.
+      const lowerDelta = Math.abs(lowerAngle - renderedLineAngle);
+      const upperDelta = Math.abs(upperAngle - renderedLineAngle);
+      const lowerOk = Math.abs(lowerDelta - tolerance) <= 2;
+      const upperOk = Math.abs(upperDelta - tolerance) <= 2;
+      const armsSpanCorrect = Math.abs(lowerDelta + upperDelta - 2 * tolerance) <= 2;
       results.push(
-        lowerOk && upperOk
+        lowerOk && upperOk && armsSpanCorrect
           ? {
               ok: true,
               assertion: "trajectory-chart-jason-tolerance-cone-correct",
-              detail: `cone: lower ${lowerAngle.toFixed(1)}° (expected ${expectedLower.toFixed(1)}°), upper ${upperAngle.toFixed(1)}° (expected ${expectedUpper.toFixed(1)}°), tolerance=${tolerance}°`,
+              detail: `cone arms: ±${tolerance}° from rendered line angle ${renderedLineAngle.toFixed(1)}° — got lower=${lowerAngle.toFixed(1)}° (Δ${lowerDelta.toFixed(1)}°), upper=${upperAngle.toFixed(1)}° (Δ${upperDelta.toFixed(1)}°)`,
             }
           : {
               ok: false,
               assertion: "trajectory-chart-jason-tolerance-cone-correct",
-              detail: `cone bounds off — lower ${lowerAngle.toFixed(1)}° vs ${expectedLower.toFixed(1)}° (±2), upper ${upperAngle.toFixed(1)}° vs ${expectedUpper.toFixed(1)}° (±2)`,
+              detail: `cone arms off — expected ±${tolerance}° from line angle ${renderedLineAngle.toFixed(1)}°; got Δlower=${lowerDelta.toFixed(1)}° Δupper=${upperDelta.toFixed(1)}° (±2)`,
             }
       );
     }

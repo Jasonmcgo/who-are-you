@@ -763,22 +763,23 @@ function runAudit(): AssertionResult[] {
     const pathClass = r.constitution.coherenceReading?.pathClass ?? "trajectory";
     if (pathClass === "crisis") continue; // crisis widens the cone (×2)
     const svg = generateTrajectoryChartSvgFromConstitution(r.constitution);
-    const angle = dash.direction.angle;
     const tol = limiter.toleranceDegrees;
-    const expectedLower = Math.max(0, angle - tol);
-    const expectedUpper = Math.min(90, angle + tol);
     const lowerTagMatch = svg.match(
       /<line[^>]*data-element="tolerance-cone-lower"[^>]*\/>/
     );
     const upperTagMatch = svg.match(
       /<line[^>]*data-element="tolerance-cone-upper"[^>]*\/>/
     );
-    if (!lowerTagMatch || !upperTagMatch) {
-      chartConeFails.push(`${r.file}: cone tags missing`);
+    const potentialTagMatch = svg.match(
+      /<line[^>]*data-element="potential-trajectory"[^>]*\/>/
+    );
+    if (!lowerTagMatch || !upperTagMatch || !potentialTagMatch) {
+      chartConeFails.push(`${r.file}: cone or potential-trajectory tag missing`);
       continue;
     }
     const lowerTag = lowerTagMatch[0];
     const upperTag = upperTagMatch[0];
+    const potentialTag = potentialTagMatch[0];
     const parseAttr = (tag: string, attr: string): number => {
       const m = tag.match(new RegExp(`${attr}="([0-9.\\-]+)"`));
       return m ? Number(m[1]) : NaN;
@@ -787,20 +788,28 @@ function runAudit(): AssertionResult[] {
     const lowerY = parseAttr(lowerTag, "y2");
     const upperX = parseAttr(upperTag, "x2");
     const upperY = parseAttr(upperTag, "y2");
-    // CC-CHART-LABEL-LEGIBILITY moved chart origin to (60, 224).
+    const potX = parseAttr(potentialTag, "x2");
+    const potY = parseAttr(potentialTag, "y2");
+    // CC-103: cone arms emanate from canonical midpoint SVG (160, 124),
+    // not the absolute origin. Compare arm angles to the *rendered*
+    // line direction (midpoint → potential endpoint) ± toleranceDegrees.
+    const lineAngle =
+      (Math.atan2(124 - potY, potX - 160) * 180) / Math.PI;
     const lowerAngle =
-      (Math.atan2(224 - lowerY, lowerX - 60) * 180) / Math.PI;
+      (Math.atan2(124 - lowerY, lowerX - 160) * 180) / Math.PI;
     const upperAngle =
-      (Math.atan2(224 - upperY, upperX - 60) * 180) / Math.PI;
+      (Math.atan2(124 - upperY, upperX - 160) * 180) / Math.PI;
+    const lowerDelta = Math.abs(lowerAngle - lineAngle);
+    const upperDelta = Math.abs(upperAngle - lineAngle);
     chartConeChecked++;
-    if (Math.abs(lowerAngle - expectedLower) > 2.5) {
+    if (Math.abs(lowerDelta - tol) > 2.5) {
       chartConeFails.push(
-        `${r.file}: lower cone ${lowerAngle.toFixed(1)}° vs expected ${expectedLower.toFixed(1)}°`
+        `${r.file}: lower cone Δ${lowerDelta.toFixed(1)}° vs expected ±${tol}°`
       );
     }
-    if (Math.abs(upperAngle - expectedUpper) > 2.5) {
+    if (Math.abs(upperDelta - tol) > 2.5) {
       chartConeFails.push(
-        `${r.file}: upper cone ${upperAngle.toFixed(1)}° vs expected ${expectedUpper.toFixed(1)}°`
+        `${r.file}: upper cone Δ${upperDelta.toFixed(1)}° vs expected ±${tol}°`
       );
     }
   }

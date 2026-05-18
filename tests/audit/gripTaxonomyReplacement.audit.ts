@@ -530,19 +530,28 @@ function runAudit(): AssertionResult[] {
     detail: `${legacyPreserved} cohort fixtures still carry gripTaxonomy.primary internally; not rendered (audit #10)`,
   });
 
-  // ── 16. grip-score-unchanged ───────────────────────────────────────
-  // This CC operates on the label layer only — gripReading.score and
-  // its components must remain byte-stable. Synthesized verification:
-  // composition still multiplicative with the canonical formula.
+  // ── 16. grip-score-canonical ───────────────────────────────────────
+  // Updated post-CC-101 — V/O Grip amplifier fires on victim-leaning shapes; previous expected predates wiring.
+  // Synthesized verification: composition still multiplicative with
+  // the canonical formula, including the V/O victim multiplier.
   const scoreFails: string[] = [];
   let scoreChecked = 0;
   for (const r of cohort) {
     const g = r.constitution.gripReading;
     if (!g) continue;
     scoreChecked++;
+    const victimOwnerMultiplier = g.victimOwnerMultiplier ?? 1;
     const expected =
       Math.round(
-        Math.min(100, Math.max(0, g.components.defensiveGrip * g.components.amplifier)) * 10
+        Math.min(
+          100,
+          Math.max(
+            0,
+            g.components.defensiveGrip *
+              g.components.amplifier *
+              victimOwnerMultiplier
+          )
+        ) * 10
       ) / 10;
     if (Math.abs(g.score - expected) > 0.2) {
       scoreFails.push(
@@ -554,12 +563,12 @@ function runAudit(): AssertionResult[] {
     scoreFails.length === 0
       ? {
           ok: true,
-          assertion: "grip-score-unchanged",
-          detail: `${scoreChecked} fixtures: gripReading.score still equals defensive × amplifier (label layer change only)`,
+          assertion: "grip-score-canonical",
+          detail: `${scoreChecked} fixtures: gripReading.score equals defensive × amplifier × V/O multiplier`,
         }
       : {
           ok: false,
-          assertion: "grip-score-unchanged",
+          assertion: "grip-score-canonical",
           detail: scoreFails.slice(0, 5).join(" | "),
         }
   );

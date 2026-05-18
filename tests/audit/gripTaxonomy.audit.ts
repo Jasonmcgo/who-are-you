@@ -471,16 +471,27 @@ function runAudit(): AssertionResult[] {
   );
 
   // ── 10. grip-taxonomy-fallback-when-cluster-low ─────────────────────
-  // CC-GRIP-CALIBRATION — render gate is `proseMode === "omitted"`,
-  // not the binary `confidence === "high"`. Low-confidence cluster
-  // fixtures must NOT render the "## Your Grip" section. Medium-
-  // confidence (hedged) fixtures DO render — covered by other audits.
+  // Post-CC-085 canon: Grip section renders whenever gripPattern is renderable (bucket valid + confidence ≥ medium), regardless of legacy proseMode. Gate is dual: (proseMode === "omitted") AND (gripPattern not renderable).
   const fallbackFails: string[] = [];
   for (const r of rows) {
     const grip = r.constitution.gripTaxonomy;
     if (!grip || grip.proseMode !== "omitted") continue;
-    if (/^## Your Grip$/m.test(r.markdown)) {
-      fallbackFails.push(`${r.file}: proseMode=omitted but Grip section rendered`);
+    const gripPattern = r.constitution.gripPattern;
+    const hasRenderableGripPattern =
+      gripPattern !== undefined &&
+      gripPattern.bucket !== "unmapped" &&
+      (gripPattern.confidence === "high" ||
+        gripPattern.confidence === "medium");
+    const hasGripSection = /^## Your Grip$/m.test(r.markdown);
+    if (!hasRenderableGripPattern && hasGripSection) {
+      fallbackFails.push(
+        `${r.file}: proseMode=omitted + no renderable gripPattern but Grip section rendered`
+      );
+    }
+    if (hasRenderableGripPattern && !hasGripSection) {
+      fallbackFails.push(
+        `${r.file}: renderable gripPattern (${gripPattern.bucket}/${gripPattern.confidence}) but Grip section omitted`
+      );
     }
   }
   results.push(

@@ -33,9 +33,9 @@ const CARD_HEADERS = [
 function extractSection(md: string, header: string): string | null {
   const idx = md.indexOf(header);
   if (idx < 0) return null;
-  // Section runs until the next "###" header at the same depth.
+  // Section runs until the next card or top-level section boundary.
   const rest = md.slice(idx);
-  const nextHeader = rest.slice(header.length).search(/\n### /);
+  const nextHeader = rest.slice(header.length).search(/\n## |\n### /);
   if (nextHeader < 0) return rest.trimEnd();
   return rest.slice(0, header.length + nextHeader).trimEnd();
 }

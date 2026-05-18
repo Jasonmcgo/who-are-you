@@ -1558,6 +1558,33 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
   out.push("");
   out.push(`*${convPatternNote}*`);
 
+  // 13.5. CC-104-NEXT-MOVES-SHAPE-AWARE — release-mechanism prose.
+  // Renders between the SWOT-shape cards (which include the Grip
+  // Pattern read) and the Path section. Sits here so a user reading
+  // top-down meets "what's the grip" before "how do I release it"
+  // before "what's the trajectory." Section emits only when the
+  // engine attached `constitution.nextMoves` (skipped for unmapped
+  // grip / missing V/O).
+  const nextMoves = constitution.nextMoves;
+  if (nextMoves) {
+    out.push("");
+    out.push("## Next Moves");
+    if (renderMode === "clinician") {
+      out.push("");
+      out.push(
+        `_Register: ${nextMoves.prose.registerLabel} — ${nextMoves.routing.reason}_`
+      );
+    }
+    for (const para of nextMoves.prose.paragraphs) {
+      out.push("");
+      out.push(para);
+    }
+    out.push("");
+    out.push(`**One move this week:** ${nextMoves.prose.oneSmallMove}`);
+    out.push("");
+    out.push(`**Watch for change in:** ${nextMoves.prose.reMeasureCue}`);
+  }
+
   // 14. Path — Gait. Work / Love / Give / Practice (was "Growth move" pre-CC-025).
   const path = shape.path;
   out.push("");

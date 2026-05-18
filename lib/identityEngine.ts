@@ -51,6 +51,14 @@ import {
   classifyAgreement,
   inferDriverFromCrossSignals,
 } from "./crossSignalDriverInference";
+import {
+  composeVictimOwner,
+  detectRegisterTension,
+  extractIdentityFreeform,
+  predictVictimOwnerRegister,
+} from "./victimOwnerAxis";
+import { computeGrip as computeGripCanonical } from "./gripDecomposition";
+import { buildNextMovesProse } from "./nextMovesProse";
 // CC-SYNTHESIS-3 — runtime cache lookup for LLM-articulated Path master
 // synthesis paragraph. The composer module (synthesis3Llm) and the
 // inputs-derivation module (synthesis3Inputs) are imported lazily after
@@ -2312,6 +2320,26 @@ export function buildInnerConstitution(
   attachConvictionClarity(baseConstitution);
   attachGoalSoulCoherence(baseConstitution);
   attachResponsibilityIntegration(baseConstitution);
+  // CC-101-VO-WIRING — cross-signal inference MUST run before V/O so
+  // the V/O predictor can read `lens_stack.crossSignalInferredDriver`
+  // when computing the canon-predicted register (Kevin/Michele/Cindy
+  // cross-signal-driver override per the predictor's lived-shape read).
+  attachCrossSignalDriverInference(baseConstitution);
+  // CC-101-VO-WIRING — attach V/O BEFORE Aim/Movement so the V/O score
+  // can be threaded into both. (Grip was already attached above at
+  // attachGripDecomposition; the §13 gripReading recompute below
+  // picks up the V/O victim-multiplier.) V/O composer's dependencies
+  // (signals, ocean, workMap, belief_under_tension, blindSpots,
+  // lens_stack.crossSignalInferredDriver from the call above) are
+  // all populated by this point.
+  attachVictimOwnerAxis(baseConstitution);
+  // CC-101-VO-WIRING Phase 2 — recompute the canonical §13 grip
+  // reading with the V/O victim-multiplier threaded in. The
+  // attachGripDecomposition above set `gripReading` from the pre-V/O
+  // computation; this recompute applies the multiplier when V/O is
+  // populated. Backward-compat preserved: when V/O is undefined,
+  // the multiplier is 1.0 and the reading is byte-identical.
+  rewireGripReadingWithVictimOwner(baseConstitution);
   attachAimReading(baseConstitution);
   attachMovementLimiter(baseConstitution);
 
@@ -2341,6 +2369,12 @@ export function buildInnerConstitution(
   // attachLlmGripParagraph so the cache hash reflects the path class.
   attachPrimalCoherence(baseConstitution);
 
+  // CC-104-NEXT-MOVES-SHAPE-AWARE — attach the shape-aware release
+  // prose. Runs AFTER attachGripPattern + attachVictimOwnerAxis +
+  // attachAimReading + attachPrimalCoherence so all router inputs
+  // are populated. Reads raw answers for the state-load composite.
+  attachNextMoves(baseConstitution, answers);
+
   // CC-SYNTHESIS-3 — attach LLM-articulated Path master synthesis
   // paragraph from the static cache when present. Pure cache lookup;
   // never calls the API at runtime (per CC-SYNTHESIS-3 Out-of-Scope #4).
@@ -2368,9 +2402,76 @@ export function buildInnerConstitution(
   // inferior fields are NOT mutated. Q-T direct read remains
   // authoritative on those; cross-signal output is parallel. CC-097D
   // will compose Lens prose that surfaces both layers.
-  attachCrossSignalDriverInference(baseConstitution);
+  // CC-101-VO-WIRING — call moved earlier in the pipeline (before
+  // attachVictimOwnerAxis) so V/O predictor can read
+  // crossSignalInferredDriver. No-op here for the end-of-pipeline slot.
+
+  // CC-VO-EXTRACTOR-AND-COMPOSER + CC-101-VO-WIRING — Victim/Owner
+  // axis attach was moved earlier in the pipeline (just before
+  // attachAimReading) so its score can be threaded into Aim/Grip/
+  // Movement. No-op here for the end-of-pipeline slot.
 
   return baseConstitution;
+}
+
+// CC-101-VO-WIRING Phase 2 — recompute the canonical §13 GripReading
+// with the V/O victim-multiplier. When V/O is undefined or its score
+// is ≥ 50 (owner / balanced), the recompute is a no-op: the existing
+// gripReading is preserved verbatim. Only victim-leaning fixtures
+// (V/O score < 50) see Grip amplification.
+function rewireGripReadingWithVictimOwner(
+  constitution: InnerConstitution
+): void {
+  try {
+    const vo = constitution.victim_owner?.score;
+    if (typeof vo !== "number" || vo >= 50) return;
+    const existing = constitution.gripReading;
+    if (!existing) return;
+    constitution.gripReading = computeGripCanonical(
+      existing.components.defensiveGrip,
+      existing.components.stakesLoad,
+      vo
+    );
+  } catch {
+    // No-op fallback: leave existing gripReading in place.
+  }
+}
+
+// CC-104-NEXT-MOVES-SHAPE-AWARE — attach the routing + prose layer.
+// Wraps the pure builder so the engine pipeline has a uniform attach
+// shape. Silently no-ops when the builder declines (unmapped grip or
+// missing V/O).
+function attachNextMoves(
+  constitution: InnerConstitution,
+  answers: Answer[]
+): void {
+  const attachment = buildNextMovesProse(constitution, answers);
+  if (attachment) {
+    constitution.nextMoves = attachment;
+  }
+}
+
+function attachVictimOwnerAxis(constitution: InnerConstitution): void {
+  try {
+    const idf = extractIdentityFreeform(constitution);
+    constitution.identity_freeform = idf;
+    const reading = composeVictimOwner(constitution, idf);
+    // CC-101-VO-WIRING Phase 4 — canon-predicted register from shape
+    // signature (independent of behavior-signal composer).
+    const canonPredicted = predictVictimOwnerRegister(constitution);
+    reading.canonPredicted = canonPredicted;
+    // CC-101-VO-WIRING Phase 5 — tension between measured and
+    // canon-predicted register. Per feedback_tension_is_the_form.md,
+    // the engine surfaces the gap rather than collapsing it.
+    reading.registerTension = detectRegisterTension(
+      { score: reading.score, register: reading.register },
+      { score: canonPredicted.score, register: canonPredicted.register }
+    );
+    constitution.victim_owner = reading;
+  } catch {
+    // Silent fallback for thin-signal sessions. Leaving the field
+    // undefined is the canon-correct "we don't know" read.
+  }
 }
 
 // CC-097B-CALIBRATION — Phase 1 agreement-supports-confidence-lift
@@ -2810,6 +2911,11 @@ function attachAimReading(constitution: InnerConstitution): void {
       movementStrength: movement.movementStrength.length,
       responsibilityIntegration:
         constitution.responsibilityIntegration?.score ?? 0,
+      // CC-101-VO-WIRING Phase 1 — thread V/O score into Aim so the
+      // owner-side boost (max +15 at score=100) lifts genuine owner-
+      // anchored shapes. Undefined when V/O isn't populated
+      // (backward-compat).
+      victimOwnerScore: constitution.victim_owner?.score,
     });
     constitution.aimReading = aimReading;
 
@@ -2874,6 +2980,9 @@ function attachMovementLimiter(constitution: InnerConstitution): void {
       potentialMovement: dashboard.movementStrength.length,
       grip,
       aim: aimScore,
+      // CC-101-VO-WIRING Phase 3 — victim-drag on Usable Movement.
+      // Undefined when V/O isn't populated (backward-compat).
+      victimOwnerScore: constitution.victim_owner?.score,
     });
   } catch {
     // Silent fallback

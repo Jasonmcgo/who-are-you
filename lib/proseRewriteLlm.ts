@@ -57,6 +57,15 @@ const CARD_GUIDANCE: Record<ProseCardId, string> = {
     "Gait / Path — how the user moves through a season. The directional reading of their next move — what to keep, what to update, what the shape is asking next. Land on a directional verb.",
 };
 
+const SHAPE_AWARE_VOICE_CONSTRAINTS: Partial<
+  Record<ProfileArchetype, string>
+> = {
+  cindyType:
+    'For cindyType: the caregiver Lens vocabulary is presence, room, care, meal, silence, boundaries, the held middle. Do not use architect-coded language ("weaponized", "precision", "tactical", "leverage", "vector", "surface area").',
+  danielType:
+    'For danielType: the steward Lens vocabulary is precedent, continuity, tradition, room, the long arc. Do not use architect-coded language ("weaponized", "precision", "tactical", "leverage").',
+};
+
 // ─────────────────────────────────────────────────────────────────────
 // System prompt
 // ─────────────────────────────────────────────────────────────────────
@@ -124,6 +133,12 @@ export function buildProseRewriteUserPrompt(
     `Voice / imagery for this archetype: ${ARCHETYPE_VOICE[inputs.archetype]}`,
     "",
   ];
+  const shapeConstraint = SHAPE_AWARE_VOICE_CONSTRAINTS[inputs.archetype];
+  if (shapeConstraint) {
+    lines.push("Shape-aware vocabulary constraint:");
+    lines.push(shapeConstraint);
+    lines.push("");
+  }
   if (inputs.reservedCanonLines.length > 0) {
     lines.push(
       "Reserved canon phrases (DO NOT include any of these — they are landing elsewhere in the report):"
