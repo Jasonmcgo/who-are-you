@@ -1,5 +1,5 @@
 // CC-TRAJECTORY-VISUALIZATION → CC-CHART-LABEL-LEGIBILITY-AND-TOLERANCE-SMOOTHING
-// → CC-103-CHART-MIDPOINT-RECALIBRATION.
+// → CC-103-CHART-MIDPOINT-RECALIBRATION → CC-105-CHART-GEOMETRY-AND-SOUL-SYMMETRY.
 //
 // Per canon `docs/canon/trajectory-model-refinement.md` §15, the chart
 // renders:
@@ -8,13 +8,14 @@
 //   2. Usable trajectory     — shorter solid line after Aim governor + Grip drag
 //   3. Tolerance cone        — dotted ±toleranceDegrees fan around trajectory
 //   4. Grip drag marker      — visible pullback indicator near plot point
-//   5. Midpoint baseline dot — canonical (50/50) anchor (CC-103)
+//   5. Grip Zone triangle    — shaded SW origin zone (CC-105B)
 //
-// CC-103: Both trajectory lines + tolerance cone now anchor at the
-// canonical midpoint (50/50) → SVG (160, 124), not the absolute origin
-// (0/0). This makes "above midpoint = progress, below = direction of
-// work" the visible semantic. Engine math is unchanged; only the
-// chart's line origin shifts.
+// CC-105: Both trajectory lines + tolerance cone anchor at score (0, 0)
+// (bottom-left corner). CC-105B renders the Grip Zone as a shaded
+// triangle in the SW box: score points (0,0), (50,0), (0,50). The
+// filled zone marks Grip core / FUD territory without adding another
+// dashed element. CC-103's midpoint-anchor interpretation was incorrect
+// per canon; this CC restores the radial-from-origin geometry.
 //
 // Plus a legend block below the plot that explains every element +
 // surfaces the Primal annotation (moved out of the plot region per
@@ -40,15 +41,14 @@ const PLOT_SIZE = 200;
 const MARGIN_LEFT = 60;
 const MARGIN_TOP = 24;
 const ORIGIN_X = MARGIN_LEFT;             // 60
-const ORIGIN_Y = MARGIN_TOP + PLOT_SIZE;  // 224
+const ORIGIN_Y = MARGIN_TOP + PLOT_SIZE;  // 224 — SVG y of score (0,0)
 const PLOT_RIGHT = MARGIN_LEFT + PLOT_SIZE; // 260
 const PLOT_TOP = MARGIN_TOP;              // 24
-// CC-103: Canonical baseline anchor in SVG coordinates. SVG of score
-// (50/50) = (ORIGIN_X + 100, ORIGIN_Y - 100) = (160, 124). The
-// trajectory line, tolerance cone, and grip drag marker all anchor
-// here instead of the absolute origin (0/0).
-const MIDPOINT_X = ORIGIN_X + PLOT_SIZE / 2;  // 160
-const MIDPOINT_Y = ORIGIN_Y - PLOT_SIZE / 2;  // 124
+
+// CC-105B — Grip Zone triangle vertices in score space. The triangle
+// inscribes the SW 50×50 score box and replaces the old dashed arc.
+const GRIP_ZONE_SCORE_RADIUS = 50;
+const GRIP_ZONE_OPACITY = 0.15;
 
 // Legend block (below plot area).
 const LEGEND_START_Y = ORIGIN_Y + 22;     // 246
@@ -129,16 +129,6 @@ function svgAxes(): string {
   ].join("\n  ");
 }
 
-function svgQuadrantGuides(): string {
-  // CC-103 Item 2b — midpoint cross now reads as a structural element
-  // (matches axis color, slightly higher contrast), since the line
-  // origin lives at this intersection.
-  return [
-    `<line x1="${MIDPOINT_X}" y1="${ORIGIN_Y}" x2="${MIDPOINT_X}" y2="${PLOT_TOP}" stroke="#999" stroke-width="0.6" stroke-dasharray="3 3" opacity="0.7" data-element="midpoint-gridline-vertical" />`,
-    `<line x1="${ORIGIN_X}" y1="${MIDPOINT_Y}" x2="${PLOT_RIGHT}" y2="${MIDPOINT_Y}" stroke="#999" stroke-width="0.6" stroke-dasharray="3 3" opacity="0.7" data-element="midpoint-gridline-horizontal" />`,
-  ].join("\n  ");
-}
-
 function svgAxisLabels(): string {
   return [
     `<text x="${PLOT_RIGHT}" y="${ORIGIN_Y + 14}" font-size="10" font-family="system-ui, sans-serif" fill="#666" text-anchor="end">Goal →</text>`,
@@ -199,15 +189,10 @@ function svgCornerLabels(
     .join("\n  ");
 }
 
-// Element 3: tolerance cone. CC-103 — apex moved from absolute origin
-// to canonical midpoint (160, 124). Cone arms emanate ±tolerance from
-// the actual rendered trajectory direction (midpoint→endpoint) and
-// match the trajectory's rendered length. Crisis path doubles the
-// tolerance fan.
-//
-// Rotation runs in SVG space (atan2 over screen vector), which keeps
-// the cone visually tangent to the line in all four quadrants the
-// midpoint anchor can now project into.
+// Element 3: tolerance cone. CC-105 — apex restored to score (0, 0)
+// (SVG origin (60, 224)). Cone arms emanate ±tolerance from the
+// trajectory direction (origin→endpoint) and match the trajectory's
+// rendered length. Crisis path doubles the tolerance fan.
 function svgToleranceCone(
   toleranceDegrees: number,
   goal: number,
@@ -216,8 +201,8 @@ function svgToleranceCone(
 ): string {
   if (toleranceDegrees <= 0) return "";
   const endpoint = mapToSvg(goal, soul);
-  const dx = endpoint.x - MIDPOINT_X;
-  const dy = endpoint.y - MIDPOINT_Y;
+  const dx = endpoint.x - ORIGIN_X;
+  const dy = endpoint.y - ORIGIN_Y;
   const lineLen = Math.sqrt(dx * dx + dy * dy);
   if (lineLen <= 0) return "";
   const effectiveTolerance = isCrisis
@@ -226,31 +211,38 @@ function svgToleranceCone(
   const lineAngleRad = Math.atan2(dy, dx);
   const tolRad = (effectiveTolerance * Math.PI) / 180;
   const lowerEnd = {
-    x: MIDPOINT_X + lineLen * Math.cos(lineAngleRad - tolRad),
-    y: MIDPOINT_Y + lineLen * Math.sin(lineAngleRad - tolRad),
+    x: ORIGIN_X + lineLen * Math.cos(lineAngleRad - tolRad),
+    y: ORIGIN_Y + lineLen * Math.sin(lineAngleRad - tolRad),
   };
   const upperEnd = {
-    x: MIDPOINT_X + lineLen * Math.cos(lineAngleRad + tolRad),
-    y: MIDPOINT_Y + lineLen * Math.sin(lineAngleRad + tolRad),
+    x: ORIGIN_X + lineLen * Math.cos(lineAngleRad + tolRad),
+    y: ORIGIN_Y + lineLen * Math.sin(lineAngleRad + tolRad),
   };
   const opacity = isCrisis ? 0.35 : 0.55;
   return [
-    `<line x1="${MIDPOINT_X}" y1="${MIDPOINT_Y}" x2="${lowerEnd.x.toFixed(1)}" y2="${lowerEnd.y.toFixed(1)}" stroke="${CONE_COLOR}" stroke-width="1" stroke-dasharray="3 3" opacity="${opacity}" data-element="tolerance-cone-lower" />`,
-    `<line x1="${MIDPOINT_X}" y1="${MIDPOINT_Y}" x2="${upperEnd.x.toFixed(1)}" y2="${upperEnd.y.toFixed(1)}" stroke="${CONE_COLOR}" stroke-width="1" stroke-dasharray="3 3" opacity="${opacity}" data-element="tolerance-cone-upper" />`,
+    `<line x1="${ORIGIN_X}" y1="${ORIGIN_Y}" x2="${lowerEnd.x.toFixed(1)}" y2="${lowerEnd.y.toFixed(1)}" stroke="${CONE_COLOR}" stroke-width="1" stroke-dasharray="3 3" opacity="${opacity}" data-element="tolerance-cone-lower" />`,
+    `<line x1="${ORIGIN_X}" y1="${ORIGIN_Y}" x2="${upperEnd.x.toFixed(1)}" y2="${upperEnd.y.toFixed(1)}" stroke="${CONE_COLOR}" stroke-width="1" stroke-dasharray="3 3" opacity="${opacity}" data-element="tolerance-cone-upper" />`,
   ].join("\n  ");
 }
 
+// CC-105B — Grip Zone triangle. Always rendered as an orientation
+// element: score (0,0), (50,0), (0,50), converted through the canonical
+// score→SVG mapper.
+function svgGripTriangle(): string {
+  const a = mapToSvg(0, 0);
+  const b = mapToSvg(GRIP_ZONE_SCORE_RADIUS, 0);
+  const c = mapToSvg(0, GRIP_ZONE_SCORE_RADIUS);
+  const points = `${a.x},${a.y} ${b.x},${b.y} ${c.x},${c.y}`;
+  return `<polygon points="${points}" fill="${CONE_COLOR}" opacity="${GRIP_ZONE_OPACITY}" data-element="grip-zone-triangle" />`;
+}
+
 // Elements 1 + 2: potential trajectory line and usable trajectory line.
-// CC-103 — both lines anchor at the canonical midpoint SVG (160, 124),
-// not the absolute origin. The usable line is a linear interpolation
-// from the midpoint toward the potential endpoint at the
-// usable/potential ratio.
+// CC-105 — both lines anchor at score (0, 0) (SVG ORIGIN). Usable
+// endpoint is the linear interpolation from origin toward the
+// (Goal, Soul) endpoint at the usable/potential ratio.
+//
 // A single consolidated readout appears above the plot endpoint:
 //   "<angle>° · Usable <X> of potential <Y> (-<Z>% drag)"
-// replacing the two stacked length labels of the legacy chart. The
-// displayed angle is the engine reading (atan2 over Goal/Soul) — the
-// semantic of the engine's direction reading is unchanged by the
-// render-layer anchor shift.
 function svgTrajectoryLines(
   goal: number,
   soul: number,
@@ -263,25 +255,25 @@ function svgTrajectoryLines(
   }
   const potentialEnd = mapToSvg(goal, soul);
   // CC-MOMENTUM-HONESTY — Potential renders as a faint/ghosted reference
-  // line; Usable renders bold as the primary line. The endpoint open
-  // circle moves to the Usable endpoint when a limiter reading exists.
+  // line; Usable renders bold as the primary line.
   const elements: string[] = [
-    `<line x1="${MIDPOINT_X}" y1="${MIDPOINT_Y}" x2="${potentialEnd.x}" y2="${potentialEnd.y}" stroke="${POTENTIAL_LINE_COLOR}" stroke-width="1" stroke-dasharray="2 2" opacity="0.7" data-element="potential-trajectory" />`,
+    `<line x1="${ORIGIN_X}" y1="${ORIGIN_Y}" x2="${potentialEnd.x}" y2="${potentialEnd.y}" stroke="${POTENTIAL_LINE_COLOR}" stroke-width="1" opacity="0.45" data-element="potential-trajectory" />`,
   ];
   let primaryEnd = potentialEnd;
   let hasUsableLine = false;
   if (usableLength !== null && potentialLength > 0) {
     const ratio = clamp(usableLength / potentialLength, 0, 1);
     if (ratio < 1) {
-      // Interpolate from midpoint toward potential endpoint at the
-      // same ratio — preserves "what fraction of trajectory you have"
-      // semantic now that the line origin is (50/50) instead of (0/0).
-      const usableEndX = MIDPOINT_X + (potentialEnd.x - MIDPOINT_X) * ratio;
-      const usableEndY = MIDPOINT_Y + (potentialEnd.y - MIDPOINT_Y) * ratio;
+      // CC-105 — interpolate from score (0, 0) toward potential endpoint
+      // at the usable/potential ratio. Preserves the "fraction of
+      // trajectory you have" semantic with the line origin restored to
+      // the bottom-left corner.
+      const usableEndX = ORIGIN_X + (potentialEnd.x - ORIGIN_X) * ratio;
+      const usableEndY = ORIGIN_Y + (potentialEnd.y - ORIGIN_Y) * ratio;
       hasUsableLine = true;
       primaryEnd = { x: usableEndX, y: usableEndY };
       elements.push(
-        `<line x1="${MIDPOINT_X}" y1="${MIDPOINT_Y}" x2="${usableEndX.toFixed(1)}" y2="${usableEndY.toFixed(1)}" stroke="${USABLE_LINE_COLOR}" stroke-width="3" data-element="usable-trajectory" />`
+        `<line x1="${ORIGIN_X}" y1="${ORIGIN_Y}" x2="${usableEndX.toFixed(1)}" y2="${usableEndY.toFixed(1)}" stroke="${USABLE_LINE_COLOR}" stroke-width="3" data-element="usable-trajectory" />`
       );
       elements.push(
         `<circle cx="${potentialEnd.x}" cy="${potentialEnd.y}" r="2" fill="none" stroke="${POTENTIAL_LINE_COLOR}" stroke-width="1" opacity="0.6" data-element="potential-endpoint" />`
@@ -292,7 +284,7 @@ function svgTrajectoryLines(
     }
   }
   if (!hasUsableLine) {
-    // No limiter / ratio==1 — Potential IS the primary, render its
+    // No limiter / ratio==1 — Potential IS the primary; render its
     // endpoint marker with the usable styling so the chart is still
     // legible for legacy sessions.
     elements.push(
@@ -301,12 +293,8 @@ function svgTrajectoryLines(
   }
   void primaryEnd;
 
-  // Consolidated readout above the endpoint. Position is clamped to the
-  // viewBox so the readout never clips. The angle replaces the legacy
-  // in-chart angle label (which sometimes overlapped Drift in the SW).
+  // Consolidated readout above the endpoint.
   if (potentialLength > 0) {
-    // CC-MOMENTUM-HONESTY — readout leads with Usable (the line the
-    // user actually has), with Potential as the trailing reference.
     const dragPercent =
       usableLength !== null && potentialLength > 0
         ? Math.max(0, Math.round((1 - usableLength / potentialLength) * 100))
@@ -315,7 +303,6 @@ function svgTrajectoryLines(
       usableLength !== null && dragPercent !== null
         ? `${Math.round(angle)}° · Usable ${usableLength.toFixed(1)} of potential ${potentialLength.toFixed(1)} (-${dragPercent}% drag)`
         : `${Math.round(angle)}° · Potential ${potentialLength.toFixed(1)}`;
-    // Approximate half-width for clamping (italic 9px font, ~5px/char).
     const halfWidth = Math.min(120, readout.length * 2.6);
     const clampedX = clamp(
       potentialEnd.x,
@@ -330,43 +317,59 @@ function svgTrajectoryLines(
   return elements.join("\n  ");
 }
 
-// Element 4: Grip drag marker. CC-103 — direction is now endpoint→
-// midpoint (not endpoint→absolute-origin), and marker length scales
-// proportionally to the new, shorter trajectory line so the "fraction
-// of trajectory that is drag" semantic survives the anchor shift.
+// Element 4: Grip drag marker. CC-105 — tail at Usable endpoint, arrow
+// points back along the trajectory toward score (0, 0). Length
+// proportional to (Potential − Usable) distance in SVG units.
 // Renders only when Grip > 0 and movement > 0.
 function svgGripDragMarker(
   goal: number,
   soul: number,
   gripScore: number,
-  gripDragModifier: number | null
+  gripDragModifier: number | null,
+  potentialLength: number,
+  usableLength: number | null
 ): string {
   if (gripScore <= 0) return "";
   if (goal === 0 && soul === 0) return "";
   const endpoint = mapToSvg(goal, soul);
-  // Direction: endpoint → midpoint (the new anchor).
-  const dx = MIDPOINT_X - endpoint.x;
-  const dy = MIDPOINT_Y - endpoint.y;
+  // Direction: endpoint → origin (the trajectory origin at score 0,0).
+  const dx = ORIGIN_X - endpoint.x;
+  const dy = ORIGIN_Y - endpoint.y;
   const dist = Math.sqrt(dx * dx + dy * dy);
   if (dist <= 0) return "";
   const ux = dx / dist;
   const uy = dy / dist;
-  // Proportional scaling: ratio of new line length (midpoint→endpoint)
-  // to legacy line length (absolute-origin→endpoint). Preserves the
-  // marker's "fraction of trajectory" intuition.
-  const legacyDx = endpoint.x - ORIGIN_X;
-  const legacyDy = endpoint.y - ORIGIN_Y;
-  const legacyDist = Math.sqrt(legacyDx * legacyDx + legacyDy * legacyDy);
-  const lineLengthRatio = legacyDist > 0 ? dist / legacyDist : 1;
-  const dragDeficit = gripDragModifier !== null ? 1 - gripDragModifier : gripScore / 100;
-  const rawMarkerLen = dragDeficit * DRAG_MARKER_MAX_LENGTH * 2.2 * lineLengthRatio;
-  // Marker must not extend past the midpoint anchor — keep it inside
-  // the rendered trajectory line (dist - 5 leaves room for the
-  // marker's 5px start offset and the arrowhead).
-  const upperBound = Math.min(DRAG_MARKER_MAX_LENGTH, Math.max(3, dist - 8));
+
+  // CC-105 — marker tail anchored at the Usable endpoint (when one
+  // exists). Marker length proportional to the SVG distance between
+  // Usable and Potential endpoints, capped at DRAG_MARKER_MAX_LENGTH.
+  // When no usable/potential split exists, scales with gripScore.
+  let tailX = endpoint.x;
+  let tailY = endpoint.y;
+  let rawMarkerLen: number;
+  if (usableLength !== null && potentialLength > 0 && usableLength < potentialLength) {
+    const ratio = clamp(usableLength / potentialLength, 0, 1);
+    tailX = ORIGIN_X + (endpoint.x - ORIGIN_X) * ratio;
+    tailY = ORIGIN_Y + (endpoint.y - ORIGIN_Y) * ratio;
+    const svgGap = Math.sqrt(
+      (endpoint.x - tailX) ** 2 + (endpoint.y - tailY) ** 2
+    );
+    rawMarkerLen = svgGap;
+  } else {
+    const dragDeficit =
+      gripDragModifier !== null ? 1 - gripDragModifier : gripScore / 100;
+    rawMarkerLen = dragDeficit * DRAG_MARKER_MAX_LENGTH * 2.2;
+  }
+  const upperBound = Math.min(
+    DRAG_MARKER_MAX_LENGTH,
+    Math.max(3, dist - 8)
+  );
   const markerLen = clamp(rawMarkerLen, 3, upperBound);
-  const startX = endpoint.x + ux * 5;
-  const startY = endpoint.y + uy * 5;
+
+  // Push the start slightly toward origin so the marker sits visibly
+  // inside the trajectory rather than at the endpoint dot.
+  const startX = tailX + ux * 3;
+  const startY = tailY + uy * 3;
   const endX = startX + ux * markerLen;
   const endY = startY + uy * markerLen;
   const perpX = -uy;
@@ -381,21 +384,8 @@ function svgGripDragMarker(
   ].join("\n  ");
 }
 
-// CC-103 — canonical baseline dot. Sits at SVG (160, 124), the score
-// (50/50) anchor. Rendered AFTER the trajectory lines so the dot is
-// visible at the line's origin (otherwise the 3px usable-line stroke
-// covers it).
-function svgMidpointMarker(): string {
-  return [
-    `<circle cx="${MIDPOINT_X}" cy="${MIDPOINT_Y}" r="3" fill="#fff" stroke="${CONE_COLOR}" stroke-width="0.8" data-element="midpoint-baseline-halo" />`,
-    `<circle cx="${MIDPOINT_X}" cy="${MIDPOINT_Y}" r="2" fill="${CONE_COLOR}" data-element="midpoint-baseline-marker" />`,
-  ].join("\n  ");
-}
-
 // Legend block below the plot. Explains each chart element + surfaces
-// the Primal annotation when present. The Primal annotation moved out
-// of the plot area to stop "Pulling: <Primal>" from colliding with the
-// drag marker / length readout near the endpoint.
+// the Primal annotation when present.
 function svgLegend(opts: {
   hasTolerance: boolean;
   toleranceDegrees: number | null;
@@ -407,20 +397,20 @@ function svgLegend(opts: {
   let row = 0;
   const rowY = () => LEGEND_START_Y + row * LEGEND_LINE_HEIGHT;
 
-  // 1. Solid (primary) line: usable movement — CC-MOMENTUM-HONESTY
-  //    inverted the emphasis so the bold line is what the user has.
-  //    CC-103 — wording now references the midpoint baseline anchor.
+  // 1. Solid (primary) line: usable movement. CC-105 — wording no
+  //    longer references "midpoint baseline"; the line originates at
+  //    the canonical Goal/Soul (0,0) corner.
   entries.push(
     `<line x1="${LEGEND_SWATCH_X1}" y1="${rowY()}" x2="${LEGEND_SWATCH_X2}" y2="${rowY()}" stroke="${USABLE_LINE_COLOR}" stroke-width="3" />`
   );
   entries.push(
-    `<text x="${LEGEND_TEXT_X}" y="${rowY() + 3}" font-size="8" font-family="system-ui, sans-serif" fill="${INK_MUTE}" data-element="legend-usable">Solid line: usable movement from midpoint baseline (what's actually available)</text>`
+    `<text x="${LEGEND_TEXT_X}" y="${rowY() + 3}" font-size="8" font-family="system-ui, sans-serif" fill="${INK_MUTE}" data-element="legend-usable">Solid line: usable movement (what's actually available)</text>`
   );
   row++;
 
-  // 2. Dashed/faint line: potential trajectory — context reference.
+  // 2. Solid/faint line: potential trajectory — context reference.
   entries.push(
-    `<line x1="${LEGEND_SWATCH_X1}" y1="${rowY()}" x2="${LEGEND_SWATCH_X2}" y2="${rowY()}" stroke="${POTENTIAL_LINE_COLOR}" stroke-width="1" stroke-dasharray="2 2" opacity="0.7" />`
+    `<line x1="${LEGEND_SWATCH_X1}" y1="${rowY()}" x2="${LEGEND_SWATCH_X2}" y2="${rowY()}" stroke="${POTENTIAL_LINE_COLOR}" stroke-width="1" opacity="0.45" />`
   );
   entries.push(
     `<text x="${LEGEND_TEXT_X}" y="${rowY() + 3}" font-size="8" font-family="system-ui, sans-serif" fill="${INK_MUTE}" data-element="legend-potential">Faint line: potential trajectory before Grip drag + Aim governance</text>`
@@ -453,18 +443,15 @@ function svgLegend(opts: {
     row++;
   }
 
-  // 5. CC-103 — Midpoint dot: canonical baseline (50/50). Always
-  //    rendered since the dot is always present on the chart.
+  // 5. CC-105B — Grip Zone triangle legend. Always rendered (always
+  //    visible on the chart).
   {
     const swatchY = rowY();
     entries.push(
-      `<circle cx="${(LEGEND_SWATCH_X1 + LEGEND_SWATCH_X2) / 2}" cy="${swatchY}" r="3" fill="#fff" stroke="${CONE_COLOR}" stroke-width="0.8" />`
+      `<polygon points="${LEGEND_SWATCH_X1},${swatchY + 5} ${LEGEND_SWATCH_X2},${swatchY + 5} ${LEGEND_SWATCH_X1},${swatchY - 5}" fill="${CONE_COLOR}" opacity="${GRIP_ZONE_OPACITY}" />`
     );
     entries.push(
-      `<circle cx="${(LEGEND_SWATCH_X1 + LEGEND_SWATCH_X2) / 2}" cy="${swatchY}" r="2" fill="${CONE_COLOR}" />`
-    );
-    entries.push(
-      `<text x="${LEGEND_TEXT_X}" y="${swatchY + 3}" font-size="8" font-family="system-ui, sans-serif" fill="${INK_MUTE}" data-element="legend-midpoint">Midpoint dot: canonical baseline (50/50) — above = progress; below = direction of work</text>`
+      `<text x="${LEGEND_TEXT_X}" y="${swatchY + 3}" font-size="8" font-family="system-ui, sans-serif" fill="${INK_MUTE}" data-element="legend-grip-zone">Shaded triangle: Grip Zone — the stuck-in-FUD area near origin</text>`
     );
     row++;
   }
@@ -535,7 +522,7 @@ export function generateTrajectoryChartSvg(
     return [
       svgOpen,
       `  ${svgAxes()}`,
-      `  ${svgQuadrantGuides()}`,
+      `  ${svgGripTriangle()}`,
       `  ${svgAxisLabels()}`,
       `  ${svgZeroMovement()}`,
       svgClose,
@@ -556,8 +543,15 @@ export function generateTrajectoryChartSvg(
     potentialMovement,
     usableMovement
   );
-  const drag = svgGripDragMarker(goal, soul, gripScore, gripDragModifier);
-  const midpointMarker = svgMidpointMarker();
+  const drag = svgGripDragMarker(
+    goal,
+    soul,
+    gripScore,
+    gripDragModifier,
+    potentialMovement,
+    usableMovement
+  );
+  const gripTriangle = svgGripTriangle();
   const hedge = isCrisis ? svgCrisisHedge() : "";
   const legend = svgLegend({
     hasTolerance: toleranceDegrees !== null,
@@ -575,15 +569,12 @@ export function generateTrajectoryChartSvg(
   return [
     svgOpen,
     `  ${svgAxes()}`,
-    `  ${svgQuadrantGuides()}`,
+    `  ${gripTriangle}`,
     `  ${svgAxisLabels()}`,
     cornerLabels.length > 0 ? `  ${cornerLabels}` : "",
     cone.length > 0 ? `  ${cone}` : "",
     `  ${lines}`,
     drag.length > 0 ? `  ${drag}` : "",
-    // CC-103 — midpoint dot sits on top of the trajectory lines so the
-    // canonical baseline is visible at the line origin.
-    `  ${midpointMarker}`,
     hedge.length > 0 ? `  ${hedge}` : "",
     `  ${legend}`,
     svgClose,

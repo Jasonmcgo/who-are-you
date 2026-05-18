@@ -790,15 +790,15 @@ function runAudit(): AssertionResult[] {
     const upperY = parseAttr(upperTag, "y2");
     const potX = parseAttr(potentialTag, "x2");
     const potY = parseAttr(potentialTag, "y2");
-    // CC-103: cone arms emanate from canonical midpoint SVG (160, 124),
-    // not the absolute origin. Compare arm angles to the *rendered*
-    // line direction (midpoint → potential endpoint) ± toleranceDegrees.
+    // CC-105: cone arms emanate from SVG origin (60, 224) corresponding
+    // to score (0, 0). Compare arm angles to the *rendered* line
+    // direction (origin → potential endpoint) ± toleranceDegrees.
     const lineAngle =
-      (Math.atan2(124 - potY, potX - 160) * 180) / Math.PI;
+      (Math.atan2(224 - potY, potX - 60) * 180) / Math.PI;
     const lowerAngle =
-      (Math.atan2(124 - lowerY, lowerX - 160) * 180) / Math.PI;
+      (Math.atan2(224 - lowerY, lowerX - 60) * 180) / Math.PI;
     const upperAngle =
-      (Math.atan2(124 - upperY, upperX - 160) * 180) / Math.PI;
+      (Math.atan2(224 - upperY, upperX - 60) * 180) / Math.PI;
     const lowerDelta = Math.abs(lowerAngle - lineAngle);
     const upperDelta = Math.abs(upperAngle - lineAngle);
     chartConeChecked++;

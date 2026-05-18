@@ -448,7 +448,7 @@ function runAudit(): AssertionResult[] {
 
   // ── 9. movement-honesty-chart-usable-is-primary ─────────────────────
   // The chart's Usable line must be drawn bold (#222 / stroke-width=3)
-  // and Potential must be ghosted (dashed, opacity < 1). Verify via the
+  // and Potential must be ghosted (solid, opacity < 1). Verify via the
   // module source AND via a rendered Jason chart.
   const chartSrc = readFileSync(TRAJECTORY_FILE, "utf-8");
   const chartSrcFails: string[] = [];
@@ -469,19 +469,19 @@ function runAudit(): AssertionResult[] {
     ) {
       chartSrcFails.push("usable-trajectory line not bold #222 stroke-width=3");
     }
-    // Potential line should be dashed with reduced opacity. Tag
+    // Potential line should be solid with reduced opacity. Tag
     // attribute order is implementation-defined; check the line tag's
-    // full body for all three markers.
+    // full body for the canonical ghosted markers.
     const potentialTagMatch = svg.match(
       /<line[^>]*data-element="potential-trajectory"[^>]*\/>/
     );
     const potentialTag = potentialTagMatch ? potentialTagMatch[0] : "";
     if (
-      !/stroke-dasharray="2 2"/.test(potentialTag) ||
-      !/opacity="0\.7"/.test(potentialTag)
+      /stroke-dasharray=/.test(potentialTag) ||
+      !/opacity="0\.45"/.test(potentialTag)
     ) {
       chartSrcFails.push(
-        `potential-trajectory line not dashed/ghosted (tag=${potentialTag.slice(0, 200)})`
+        `potential-trajectory line not solid/ghosted (tag=${potentialTag.slice(0, 200)})`
       );
     }
   }
@@ -490,7 +490,7 @@ function runAudit(): AssertionResult[] {
       ? {
           ok: true,
           assertion: "movement-honesty-chart-usable-is-primary",
-          detail: "Usable bold (#222, sw=3); Potential dashed ghost (opacity 0.7)",
+          detail: "Usable bold (#222, sw=3); Potential solid ghost (opacity 0.45)",
         }
       : {
           ok: false,

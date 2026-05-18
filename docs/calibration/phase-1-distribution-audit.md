@@ -64,24 +64,24 @@ Engine-version split: sessions created before `2026-05-12T00:00:00.000Z` are buc
 |---|---:|---:|---:|
 | 0–5 | 0 | 0 | +0 |
 | 5–10 | 0 | 0 | +0 |
-| 10–15 | 0 | 0 | +0 |
-| 15–20 | 1 | 0 | -1 |
-| 20–25 | 3 | 0 | -3 |
-| 25–30 | 1 | 0 | -1 |
+| 10–15 | 1 | 0 | -1 |
+| 15–20 | 0 | 0 | +0 |
+| 20–25 | 4 | 0 | -4 |
+| 25–30 | 0 | 0 | +0 |
 | 30–35 | 0 | 1 | +1 |
 | 35–40 | 0 | 1 | +1 |
 | 40–45 | 0 | 0 | +0 |
 | 45–50 | 0 | 3 | +3 |
-| 50–55 | 0 | 1 | +1 |
-| 55–60 | 1 | 0 | -1 |
+| 50–55 | 1 | 1 | +0 |
+| 55–60 | 0 | 0 | +0 |
 | 60–65 | 0 | 0 | +0 |
-| 65–70 | 0 | 0 | +0 |
-| 70–75 | 1 | 0 | -1 |
-| 75–80 | 0 | 1 | +1 |
-| 80–85 | 2 | 0 | -2 |
+| 65–70 | 1 | 0 | -1 |
+| 70–75 | 0 | 0 | +0 |
+| 75–80 | 2 | 1 | -1 |
+| 80–85 | 0 | 1 | +1 |
 | 85–90 | 0 | 4 | +4 |
 | 90–95 | 0 | 0 | +0 |
-| 95–100 | 0 | 1 | +1 |
+| 95–100 | 0 | 0 | +0 |
 
 ## Soul-axis × Q-A2 response (F3, F4)
 
@@ -95,9 +95,9 @@ Engine-version split: sessions created before `2026-05-12T00:00:00.000Z` are buc
 | 30–40 | 0 | 0 | 0 | 0 | 0 |
 | 40–50 | 0 | 0 | 0 | 0 | 0 |
 | 50–60 | 1 | 0 | 0 | 0 | 0 |
-| 60–70 | 0 | 0 | 0 | 0 | 0 |
-| 70–80 | 0 | 0 | 0 | 1 | 0 |
-| 80–90 | 0 | 0 | 2 | 0 | 0 |
+| 60–70 | 0 | 0 | 0 | 1 | 0 |
+| 70–80 | 0 | 0 | 2 | 0 | 0 |
+| 80–90 | 0 | 0 | 0 | 0 | 0 |
 | 90–100 | 0 | 0 | 0 | 0 | 0 |
 
 ### Live
@@ -112,8 +112,8 @@ Engine-version split: sessions created before `2026-05-12T00:00:00.000Z` are buc
 | 50–60 | 1 | 0 | 0 | 0 | 0 |
 | 60–70 | 0 | 0 | 0 | 0 | 0 |
 | 70–80 | 0 | 0 | 0 | 1 | 0 |
-| 80–90 | 2 | 1 | 0 | 1 | 0 |
-| 90–100 | 0 | 1 | 0 | 0 | 0 |
+| 80–90 | 2 | 2 | 0 | 1 | 0 |
+| 90–100 | 0 | 0 | 0 | 0 | 0 |
 
 ## Cause-Soul / Person-Soul proxy scatter (F4)
 
@@ -121,23 +121,23 @@ Per session: engine Soul score, cause-Soul-proxy, person-Soul-proxy, plus domina
 
 | Source | Id | Name | Soul | Cause-proxy | Person-proxy | Dominant |
 |---|---|---|---:|---:|---:|---|
-| fixture | `fi-quiet-resister.json` | Fi Quiet Resister (CC-COHORT-EXPANSION-SI-SE-CRISIS Addition 4) | 56 | 100 | 0 | cause |
-| fixture | `grasp-without-substance-` | Grasp Without Substance — Relational (CC-COHORT-EXPANSION-SI-SE-CRISIS Addition 5) | 15 | 0 | 0 | tie |
+| fixture | `fi-quiet-resister.json` | Fi Quiet Resister (CC-COHORT-EXPANSION-SI-SE-CRISIS Addition 4) | 52 | 100 | 0 | cause |
+| fixture | `grasp-without-substance-` | Grasp Without Substance — Relational (CC-COHORT-EXPANSION-SI-SE-CRISIS Addition 5) | 14 | 0 | 0 | tie |
 | fixture | `paralysis-shame-without-` | Paralysis — Shame Without Project (CC-COHORT-EXPANSION-SI-SE-CRISIS Addition 6) | 21 | 0 | 33 | person |
-| fixture | `qp2-express-carefully-da` | Q-P2 Express-Carefully Daniel-Shape (CC-094 anchor) | 84 | 34 | 0 | cause |
-| fixture | `restless-reinvention-no-` | Restless Reinvention Without Anchor (CC-COHORT-EXPANSION-SI-SE-CRISIS Addition 8) | 24 | 0 | 0 | tie |
-| fixture | `se-high-extraversion-res` | Se High-Extraversion Responder (CC-COHORT-EXPANSION-SI-SE-CRISIS Addition 2) | 72 | 34 | 0 | cause |
-| fixture | `si-tradition-steward.jso` | Si Tradition Steward (CC-COHORT-EXPANSION-SI-SE-CRISIS Addition 1) | 84 | 34 | 0 | cause |
-| fixture | `ti-systems-analyst.json` | Ti Systems Analyst (CC-COHORT-EXPANSION-SI-SE-CRISIS Addition 3) | 26 | 67 | 0 | cause |
+| fixture | `qp2-express-carefully-da` | Q-P2 Express-Carefully Daniel-Shape (CC-094 anchor) | 77 | 34 | 0 | cause |
+| fixture | `restless-reinvention-no-` | Restless Reinvention Without Anchor (CC-COHORT-EXPANSION-SI-SE-CRISIS Addition 8) | 23 | 0 | 0 | tie |
+| fixture | `se-high-extraversion-res` | Se High-Extraversion Responder (CC-COHORT-EXPANSION-SI-SE-CRISIS Addition 2) | 67 | 34 | 0 | cause |
+| fixture | `si-tradition-steward.jso` | Si Tradition Steward (CC-COHORT-EXPANSION-SI-SE-CRISIS Addition 1) | 77 | 34 | 0 | cause |
+| fixture | `ti-systems-analyst.json` | Ti Systems Analyst (CC-COHORT-EXPANSION-SI-SE-CRISIS Addition 3) | 24 | 67 | 0 | cause |
 | fixture | `withdrawal-movement-coll` | Withdrawal — Movement Collapse (CC-COHORT-EXPANSION-SI-SE-CRISIS Addition 7) | 21 | 0 | 33 | person |
 | live | `31b4e006-3dc6-4a43-b705-` | (unnamed) | 39 | 0 | 33 | person |
-| live | `35d61070-fff7-497e-a518-` | (unnamed) | 95 | 67 | 33 | cause |
+| live | `35d61070-fff7-497e-a518-` | (unnamed) | 88 | 67 | 33 | cause |
 | live | `3629ddb6-edb8-49a5-9211-` | (unnamed) | 46 | 33 | 0 | cause |
 | live | `3e6abe27-ec0f-41ed-925e-` | (unnamed) | 47 | 0 | 0 | tie |
 | live | `3e940638-dabf-4c3c-95fd-` | (unnamed) | 48 | 33 | 0 | cause |
 | live | `5063c920-dc37-44a3-8931-` | (unnamed) | 100 | 0 | 100 | person |
-| live | `54265a13-ab24-4c70-95fd-` | (unnamed) | 53 | 100 | 0 | cause |
-| live | `5740f936-9488-4400-943f-` | (unnamed) | 88 | 33 | 33 | tie |
+| live | `54265a13-ab24-4c70-95fd-` | (unnamed) | 50 | 100 | 0 | cause |
+| live | `5740f936-9488-4400-943f-` | (unnamed) | 83 | 33 | 33 | tie |
 | live | `7a68e4d5-a8eb-4a1d-b9fd-` | (unnamed) | 85 | 0 | 33 | person |
 | live | `9ff07fd7-ac59-4cec-9f24-` | (unnamed) | 33 | 33 | 0 | cause |
 | live | `c2a7984e-b662-430b-9a9e-` | (unnamed) | 87 | 0 | 0 | tie |
@@ -196,11 +196,11 @@ Mapping note: the CC's 'Safety / Security / Belonging / Worth / Recognition / Co
 
 | Bucket | Fixtures (n) | Live (n) | Δ (live − fixtures) |
 |---|---:|---:|---:|
-| Open-Handed Aim | 0 | 2 | +2 |
+| Open-Handed Aim | 4 | 6 | +2 |
 | White-Knuckled Aim | 0 | 1 | +1 |
 | Grip-Governed | 5 | 1 | -4 |
-| Ungoverned Movement | 3 | 7 | +4 |
-| Lightly Governed Movement | 1 | 2 | +1 |
+| Ungoverned Movement | 0 | 3 | +3 |
+| Lightly Governed Movement | 0 | 2 | +2 |
 | Strained Integration | 0 | 0 | +0 |
 | (unset) | 0 | 0 | +0 |
 
@@ -284,7 +284,7 @@ No data gaps: every histogram in this artifact was producible from the cohort.
 
 ## Inputs
 
-- **Git SHA**: `704d71400ba7cdd8dad7b0cb695397fa8ea0fbbc`
+- **Git SHA**: `da2453beedc100951d87d777797702ed4d11466c`
 - **Engine entry point**: `buildInnerConstitution(answers, [], demographics)` from `lib/identityEngine.ts`
 - **Engine-version cutoff**: `2026-05-12T00:00:00.000Z` (timestamp-based; `engine_shape_version` column absent because CC-STALE-SHAPE-DETECTOR has not shipped)
 - **Fixtures cohort dir**: `tests/fixtures/cohort/` (9 files)

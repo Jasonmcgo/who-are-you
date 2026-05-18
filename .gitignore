@@ -68,3 +68,4 @@ question-bank-relationship-table-v[3-9]*.xlsx
 
 # tsconfig build info (regenerated locally, sandbox-permission issues)
 tsconfig.tsbuildinfo
+.commit-msg.txt

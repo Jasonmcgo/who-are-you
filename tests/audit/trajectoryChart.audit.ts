@@ -128,18 +128,19 @@ const CHART_ORIGIN_X = 60;
 const CHART_ORIGIN_Y = 224;
 const CHART_VIEWBOX_HEIGHT = 320;
 const LEGEND_START_Y = 246;
-// CC-103 — trajectory line + tolerance cone anchor at the canonical
-// midpoint, score (50/50) → SVG (160, 124).
+// CC-105 — trajectory line + tolerance cone anchor restored to score
+// (0,0) = SVG (60, 224). Midpoint constants retained only for plot-
+// half orientation assertions elsewhere.
 const MIDPOINT_X = 160;
 const MIDPOINT_Y = 124;
+void MIDPOINT_X;
+void MIDPOINT_Y;
 
-// CC-103 — tolerance cone arms now emanate from midpoint. Compute the
-// arm angle relative to the midpoint anchor (not absolute origin).
-// (The legacy origin-anchored `svgPointToAngle` was removed when the
-// cone assertion switched to midpoint-relative math.)
-function svgPointToAngleFromMidpoint(x: number, y: number): number {
-  const dx = x - MIDPOINT_X;
-  const dy = MIDPOINT_Y - y; // svg y grows downward
+// CC-105 — tolerance cone arms emanate from origin (60, 224). Compute
+// the arm angle relative to that origin.
+function svgPointToAngleFromOrigin(x: number, y: number): number {
+  const dx = x - CHART_ORIGIN_X;
+  const dy = CHART_ORIGIN_Y - y; // svg y grows downward
   if (dx === 0 && dy === 0) return 0;
   return (Math.atan2(dy, dx) * 180) / Math.PI;
 }
@@ -349,13 +350,13 @@ function runAudit(): AssertionResult[] {
     } else {
       const potEndX = readAttrNum(potentialTag, "x2") ?? 0;
       const potEndY = readAttrNum(potentialTag, "y2") ?? 0;
-      const renderedLineAngle = svgPointToAngleFromMidpoint(potEndX, potEndY);
+      const renderedLineAngle = svgPointToAngleFromOrigin(potEndX, potEndY);
       const lowerX = readAttrNum(lowerTag, "x2") ?? 0;
       const lowerY = readAttrNum(lowerTag, "y2") ?? 0;
       const upperX = readAttrNum(upperTag, "x2") ?? 0;
       const upperY = readAttrNum(upperTag, "y2") ?? 0;
-      const lowerAngle = svgPointToAngleFromMidpoint(lowerX, lowerY);
-      const upperAngle = svgPointToAngleFromMidpoint(upperX, upperY);
+      const lowerAngle = svgPointToAngleFromOrigin(lowerX, lowerY);
+      const upperAngle = svgPointToAngleFromOrigin(upperX, upperY);
       // SVG rotation (y grows downward): the cone "lower" arm rotates
       // by -tolerance in screen space, which corresponds to +tolerance
       // in the Goal/Soul plane (where Soul is up). Use absolute deltas.

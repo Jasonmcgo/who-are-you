@@ -105,20 +105,31 @@ export const DIRECT_GOAL_BONUS = {
   goalLogicExplanationTop2: 1,
 } as const;
 
+// CC-105-CHART-GEOMETRY-AND-SOUL-SYMMETRY Phase 2 — Soul direct
+// bonus trim. Pre-CC-105 max direct bonus stacked to ~29 (vs Goal's
+// ~14), saturating Soul at 100 for 4/7 real-person cohort fixtures
+// (Cindy/Daniel/Harry/Kevin). The cap destroyed discrimination at
+// the top of the cohort. Halving magnitudes restores symmetric
+// architecture: Soul max direct bonus now ~15, matching Goal's ~14.
+// Relative ratios within Soul preserved; canon-asymmetric Vulnerability
+// lift coefficients onto Soul (per `goalSoulGive.ts` line 178)
+// unchanged.
 export const DIRECT_SOUL_BONUS = {
   // Q-GS1 direct soul-coded items.
-  soulPeopleTop1: 6,
-  soulPeopleTop3: 3,
-  soulCallingTop1: 6,
-  soulCallingTop3: 3,
-  creativeTruthTop1: 4,
-  creativeTruthTop3: 2,
+  soulPeopleTop1: 3, // CC-105: 6 → 3
+  soulPeopleTop3: 2, // CC-105: 3 → 2
+  soulCallingTop1: 3, // CC-105: 6 → 3
+  soulCallingTop3: 2, // CC-105: 3 → 2
+  creativeTruthTop1: 2, // CC-105: 4 → 2
+  creativeTruthTop3: 1, // CC-105: 2 → 1
   // Q-GS1 durable_creation also lifts Soul (synthesis with Goal).
-  durableCreationTop1: 3,
-  durableCreationTop3: 1,
-  // Q-V1 strong direct lift — naming the beloved is the canonical Soul tell.
-  soulBelovedNamedTop1: 10,
-  soulBelovedNamedTop2: 6,
+  durableCreationTop1: 2, // CC-105: 3 → 2
+  durableCreationTop3: 1, // CC-105: 1 → 1 (already minimum)
+  // Q-V1 strong direct lift — naming the beloved is the canonical Soul
+  // tell. Heaviest single direct bonus; halving has most impact on
+  // saturation per the CC's analysis.
+  soulBelovedNamedTop1: 5, // CC-105: 10 → 5
+  soulBelovedNamedTop2: 3, // CC-105: 6 → 3
 } as const;
 
 export const DIRECT_VULNERABILITY_BONUS = {
