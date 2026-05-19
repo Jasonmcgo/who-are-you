@@ -330,47 +330,38 @@ export default function MirrorSection({
     return readCachedKeystoneRewrite(inputs);
   })();
 
-  // CC-107-REACT-PARITY — match the markdown user-mode mask. The two
-  // preamble emissions below (the function-voice opening via
-  // shapeInOneSentence, and the allocation disclaimer via
-  // uncomfortableButTrue) were already suppressed in the markdown path
-  // by CC-107's PREAMBLE_USER_SUPPRESS_PATTERNS. The React surface
-  // rendered them straight through, which is what was leaking into the
-  // live web report. Default to user mode (hide); only show when an
-  // explicit clinician-mode caller (admin sessions page, clinician
-  // markdown route) opts in. Mirrors the MbtiDisclosure pattern at
-  // app/components/MbtiDisclosure.tsx.
-  const isClinicianMode = renderMode === "clinician";
+  // CC-107-REACT-PARITY-V2 (2026-05-18) — preamble is now ALWAYS hidden
+  // on the React surface, regardless of renderMode. Earlier CC-107-
+  // REACT-PARITY gated on renderMode === "clinician" to mirror the
+  // markdown user/clinician split — but Jason confirmed (twice) that
+  // the preamble doesn't belong on the React surface even for admin
+  // audit. The clinician audit need is still served by the markdown
+  // path: downloading/copying the markdown gives the full artifact
+  // with preamble intact (PREAMBLE_USER_SUPPRESS_PATTERNS in
+  // lib/renderMirror.ts suppresses only in user-mode markdown;
+  // clinician-mode markdown preserves everything).
+  //
+  // The three preamble emissions affected:
+  //   1. mirror.shapeInOneSentence (function-voice opening)
+  //   2. mirror.uncomfortableButTrue (allocation disclaimer)
+  //   3. constitution.lens_stack.mbtiCode (MBTI disclosure via mbtiSlot)
+  //
+  // MbtiDisclosure.tsx still defaults to user mode → null, so even if
+  // the admin caller passes renderMode="clinician", the React surface
+  // stays clean. The renderMode prop is preserved on the component
+  // signature so callers don't have to change; it just no longer
+  // controls preamble visibility (it still controls the Core Signal
+  // Map's "MBTI, provisional" Surface Label cell rendering for
+  // admin/clinician — see CoreSignalMap.tsx).
 
   return (
     <section className="flex flex-col" style={{ gap: 0 }}>
-      {/* 1. Shape in One Sentence — drop cap (clinician-only per CC-107) */}
-      <div style={{ paddingTop: 8 }}>
-        {isClinicianMode ? (
-          <>
-            <DropCapParagraph text={mirror.shapeInOneSentence} />
-            <div style={{ clear: "both" }} />
-          </>
-        ) : null}
-        {/* CC-058 — Mirror Layer uncomfortable-but-true slot (CC-048 Rule 5).
-            Single italic paragraph in ink-mute, signaling the calibration-
-            question register adjacent to the gift. Silent (no slot, no
-            orphan whitespace) when the engine returned `null`/empty per
-            the canon: silence is the canonical fallback, never a generic
-            horoscope sentence.
-            CC-107-REACT-PARITY — also gated to clinician mode; the
-            allocation-disclaimer phrasing reads as preamble register
-            and was already suppressed in the markdown user-mode mask. */}
-        {isClinicianMode &&
-        mirror.uncomfortableButTrue &&
-        mirror.uncomfortableButTrue.length > 0 ? (
-          <UncomfortableButTrueDetails
-            line={mirror.uncomfortableButTrue}
-            archetype={constitution?.profileArchetype?.primary ?? "unmappedType"}
-          />
-        ) : null}
-        {mbtiSlot ? <div style={{ paddingTop: 12 }}>{mbtiSlot}</div> : null}
-      </div>
+      {/* Preamble removed from React surface entirely (CC-107-REACT-PARITY-V2).
+          The masthead block above this component (in InnerConstitutionPage)
+          still renders "The Inner Constitution / a possibility, not a verdict".
+          What used to live here (drop-cap shapeInOneSentence, uncomfortable-
+          but-true disclaimer, MBTI disclosure) now appears only in the
+          downloaded clinician markdown artifact. */}
 
       {/* 1c. CC-PROSE-1 — Executive Read. 2-sentence distillation
           (gift/danger + thesis), lifted from the existing Synthesis

@@ -341,6 +341,16 @@ async function runAudit(): Promise<AssertionResult[]> {
   );
 
   // ── 4. hedge-cap: ≤2 hedges per section per fixture ─────────────
+  // CC-108 — `whatOthersMayExperience` now closes with a translation
+  // sentence in the canonical format `*The useful sentence may be:
+  // "..."*`. The framing phrase contains "may be" and the quoted
+  // sentence routinely contains "I may X" — together they consume the
+  // entire hedge budget by themselves. Strip the translation sentence
+  // (framing + quote) before counting hedges, so the cap measures the
+  // rest of the prose. The translation sentence's shape is enforced
+  // by Phase 3's section target plus a separate audit pass; the hedge
+  // budget shouldn't double-tax it.
+  const TRANSLATION_RE = /\*The useful sentence may be:\s*"[^"]+\."?\s*\*/i;
   const hedgeViolations: string[] = [];
   for (const [key, entry] of Object.entries(cache)) {
     let parsed: { sectionId?: V3SectionId };
@@ -349,7 +359,13 @@ async function runAudit(): Promise<AssertionResult[]> {
     } catch {
       continue;
     }
-    const text = entry.rewrite.toLowerCase();
+    // Also strip markdown headers — section titles like
+    // "## What Others May Experience" contain "May" as the literal name,
+    // not as a softening hedge. Same for any "## ..." line.
+    const stripped = entry.rewrite
+      .replace(TRANSLATION_RE, "")
+      .replace(/^#+\s+.*$/gm, "");
+    const text = stripped.toLowerCase();
     let count = 0;
     for (const h of HEDGE_TERMS) {
       const re = new RegExp(`\\b${h.replace(/\s+/g, "\\s+")}\\b`, "g");

@@ -297,40 +297,24 @@ function AccordionToggle({
       >
         <div
           className="flex flex-col"
-          style={{ gap: 6, minWidth: 0, flex: hasCompactColumns ? "0 0 30%" : "1" }}
+          style={{ gap: 6, minWidth: 0, flex: "1" }}
         >
           {children}
         </div>
-        {hasCompactColumns ? (
-          <>
-            <p
-              className="font-serif map-card-read"
-              style={{
-                margin: 0,
-                fontSize: 14,
-                lineHeight: 1.5,
-                color: "var(--ink)",
-                flex: "1 1 0",
-                minWidth: 0,
-              }}
-            >
-              {compactRead ?? ""}
-            </p>
-            <p
-              className="font-serif italic map-card-practice"
-              style={{
-                margin: 0,
-                fontSize: 13.5,
-                lineHeight: 1.5,
-                color: "var(--ink-soft)",
-                flex: "1 1 0",
-                minWidth: 0,
-              }}
-            >
-              {compactPractice ?? ""}
-            </p>
-          </>
-        ) : null}
+        {/* CC-108-PHASE-2-REVERT (2026-05-18) — the compact-row columns
+            (compactRead / compactPractice) were removed per Jason's
+            "get rid of this" call. The three-column collapsed view
+            scanned as adjacent prose blocks without clear semantic
+            framing; adding column headers (STRENGTH / EDGE) didn't
+            fully resolve the visual read. Collapsed cards now show
+            kicker-only; click-to-expand reveals the full canonical
+            card body (with its existing STRENGTH / GROWTH EDGE /
+            PRACTICE section labels) which Jason confirmed is the
+            right canonical UX. The compactRead/compactPractice props
+            remain in the component signature but render no UI — kept
+            so the per-card call sites in MapSection.tsx don't need
+            simultaneous edits; a follow-up cleanup CC can remove the
+            props entirely. */}
       </div>
       <span
         aria-hidden="true"
