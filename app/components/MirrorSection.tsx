@@ -330,19 +330,40 @@ export default function MirrorSection({
     return readCachedKeystoneRewrite(inputs);
   })();
 
+  // CC-107-REACT-PARITY — match the markdown user-mode mask. The two
+  // preamble emissions below (the function-voice opening via
+  // shapeInOneSentence, and the allocation disclaimer via
+  // uncomfortableButTrue) were already suppressed in the markdown path
+  // by CC-107's PREAMBLE_USER_SUPPRESS_PATTERNS. The React surface
+  // rendered them straight through, which is what was leaking into the
+  // live web report. Default to user mode (hide); only show when an
+  // explicit clinician-mode caller (admin sessions page, clinician
+  // markdown route) opts in. Mirrors the MbtiDisclosure pattern at
+  // app/components/MbtiDisclosure.tsx.
+  const isClinicianMode = renderMode === "clinician";
+
   return (
     <section className="flex flex-col" style={{ gap: 0 }}>
-      {/* 1. Shape in One Sentence — drop cap */}
+      {/* 1. Shape in One Sentence — drop cap (clinician-only per CC-107) */}
       <div style={{ paddingTop: 8 }}>
-        <DropCapParagraph text={mirror.shapeInOneSentence} />
-        <div style={{ clear: "both" }} />
+        {isClinicianMode ? (
+          <>
+            <DropCapParagraph text={mirror.shapeInOneSentence} />
+            <div style={{ clear: "both" }} />
+          </>
+        ) : null}
         {/* CC-058 — Mirror Layer uncomfortable-but-true slot (CC-048 Rule 5).
             Single italic paragraph in ink-mute, signaling the calibration-
             question register adjacent to the gift. Silent (no slot, no
             orphan whitespace) when the engine returned `null`/empty per
             the canon: silence is the canonical fallback, never a generic
-            horoscope sentence. */}
-        {mirror.uncomfortableButTrue && mirror.uncomfortableButTrue.length > 0 ? (
+            horoscope sentence.
+            CC-107-REACT-PARITY — also gated to clinician mode; the
+            allocation-disclaimer phrasing reads as preamble register
+            and was already suppressed in the markdown user-mode mask. */}
+        {isClinicianMode &&
+        mirror.uncomfortableButTrue &&
+        mirror.uncomfortableButTrue.length > 0 ? (
           <UncomfortableButTrueDetails
             line={mirror.uncomfortableButTrue}
             archetype={constitution?.profileArchetype?.primary ?? "unmappedType"}
