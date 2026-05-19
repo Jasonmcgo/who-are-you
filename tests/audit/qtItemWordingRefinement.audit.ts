@@ -142,56 +142,63 @@ function runAudit(): AssertionResult[] {
   );
 
   // ── 4: Q-T5 Fe ──────────────────────────────────────────────────
+  // CC-109 reframes Q-T5 Fe to the canonical "ambient need-signal"
+  // register: the option now anchors on "what they need from me" /
+  // "what they're actually asking for". The prior "the people carrying
+  // this work" anchor (CC-097-era) is replaced by need-signal language.
   const qt5Fe = findItem("Q-T5", "fe");
   const qt5Text = combinedText(qt5Fe);
+  // CC-109 reverts the CC-097-era "team" prohibition: the new example
+  // uses "I sit down with the team and ask what they need from me" as
+  // a concrete render of the ambient-need-signal Fe register. The
+  // CC-097 abstract-team avoidance is superseded by CC-109's more
+  // textured concrete framing.
   const qt5Ok =
     qt5Fe !== null &&
-    qt5Text.includes("the people carrying this work") &&
-    !qt5Text.includes("team");
+    qt5Text.includes("need from me") &&
+    qt5Text.includes("what they're actually asking for");
   results.push(
     qt5Ok
       ? {
           ok: true,
-          assertion: "qt5-fe-protector-reframe",
-          detail: `Q-T5 Fe contains "the people carrying this work" and no longer contains "team"`,
+          assertion: "qt5-fe-need-signal-reframe",
+          detail: `Q-T5 Fe contains "need from me" + "what they're actually asking for" (CC-109 need-signal anchors)`,
         }
       : {
           ok: false,
-          assertion: "qt5-fe-protector-reframe",
+          assertion: "qt5-fe-need-signal-reframe",
           detail: !qt5Fe
             ? `Q-T5 Fe item not found`
-            : !qt5Text.includes("the people carrying this work")
-              ? `missing "the people carrying this work" anchor`
-              : `still contains "team"`,
+            : `missing CC-109 need-signal anchors ("need from me" / "what they're actually asking for")`,
         }
   );
 
   // ── 5: Q-T7 Fe ──────────────────────────────────────────────────
+  // CC-109 reframes Q-T7 Fe from "gets protected" cost-vs-protection
+  // pairing to the "least able to absorb being wronged" anchor — same
+  // Fe register (relational-consequence weighting) with a sharper
+  // selectivity-vs-ambient discrimination.
   const qt7Fe = findItem("Q-T7", "fe");
   const qt7Text = combinedText(qt7Fe);
-  // CC spec: contains "gets protected"; the cost-only framing (the
-  // pre-CC "who carries what cost" exact phrase) is gone (the new
-  // version pairs cost with protection: "bears the cost and someone
-  // gets protected").
   const qt7Ok =
     qt7Fe !== null &&
-    qt7Text.includes("gets protected") &&
+    qt7Text.includes("least able to absorb being wronged") &&
     !qt7Text.includes("who carries what cost");
   results.push(
     qt7Ok
       ? {
           ok: true,
-          assertion: "qt7-fe-who-protected-additive",
-          detail: `Q-T7 Fe contains "gets protected" and no longer contains the cost-only "who carries what cost" framing`,
+          assertion: "qt7-fe-least-able-anchor",
+          detail: `Q-T7 Fe contains "least able to absorb being wronged" (CC-109 anchor)`,
         }
       : {
           ok: false,
-          assertion: "qt7-fe-who-protected-additive",
+          assertion: "qt7-fe-least-able-anchor",
           detail: !qt7Fe
             ? `Q-T7 Fe item not found`
-            : !qt7Text.includes("gets protected")
-              ? `missing "gets protected" anchor`
-              : `still carries the cost-only framing "who carries what cost"`,
+            : qt7Text.includes("who carries what cost")
+              ? `still carries the legacy "who carries what cost" framing`
+              : `missing CC-109 "least able to absorb being wronged" anchor`,
         }
   );
 
