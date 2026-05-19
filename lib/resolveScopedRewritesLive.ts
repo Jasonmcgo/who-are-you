@@ -26,6 +26,7 @@ import {
 } from "./launchPolishV3LlmServer";
 import {
   V3_SECTION_IDS,
+  deriveQuieterAxis,
   type V3RewriteInputs,
   type V3SectionId,
 } from "./launchPolishV3Llm";
@@ -255,6 +256,14 @@ export async function resolveScopedRewritesLive(
   const topCompassValueLabels = getTopCompassValues(args.constitution.signals)
     .map((r) => COMPASS_LABEL[r.signal_id] ?? r.signal_id)
     .filter((s) => s.length > 0);
+  // CC-106 — quieter Goal/Soul axis for pathTriptych's "**This week** —"
+  // paragraph. Threaded on every section's inputs so the hash stays
+  // uniform across sections.
+  const v3Dashboard = args.constitution.goalSoulMovement?.dashboard;
+  const quieterAxis = deriveQuieterAxis(
+    v3Dashboard?.goalScore ?? null,
+    v3Dashboard?.soulScore ?? null
+  );
   const v3Tasks: Array<{
     sectionId: V3SectionId;
     promise: Promise<string | null>;
@@ -277,6 +286,7 @@ export async function resolveScopedRewritesLive(
       engineSectionBody: body,
       topCompassValueLabels,
       reservedCanonLines: RESERVED_CANON_LINES,
+      quieterAxis,
     };
     v3Tasks.push({
       sectionId,

@@ -493,9 +493,30 @@ const VERDICT_PHRASES: RegExp = new RegExp(
   "g"
 );
 
+// CC-107 — Pre-Executive-Read preamble suppression in user mode.
+// Each pattern matches a WHOLE LINE (anchored). The mask removes the
+// matched line entirely (not just the matched substring) — these are
+// preamble paragraphs that should disappear, not be hollowed-out.
+// Clinician mode preserves all three; they remain part of the
+// downloaded clinician artifact.
+const PREAMBLE_USER_SUPPRESS_PATTERNS: RegExp[] = [
+  // The function-voice opening composed at identityEngine.ts:6808.
+  // FUNCTION_VOICE values: "the precedent-checker", "the room-reader",
+  // "the pattern-reader", "the framework-builder", "the now-mover",
+  // "the meaning-keeper", "the value-anchor", "the logic-checker".
+  // Match on the structural prefix — any value substitution lands here.
+  // Italic wrap (`*…*`) optional to cover both forms.
+  /^\*?Yours is a shape led by .+ supported by .+ — one that .+\.\*?$/,
+  // Allocation disclaimer at identityEngine.ts:6886. Italic wrap optional.
+  /^\*?You can claim what you haven't yet allocated toward .+\.\*?$/,
+  // MBTI disclosure line emitted at renderMirror.ts:770. Whole-line
+  // suppression in user mode — the React surface MbtiDisclosure.tsx
+  // already gates this to clinician mode; the markdown path needs the
+  // same gate. The line is emitted as italics (surrounding *…*).
+  /^\*Possible surface label: .+\.\*$/,
+];
+
 function isProtectedLine(line: string): boolean {
-  // Possible surface label disclaimer — masthead's allowed-MBTI line.
-  if (line.includes("Possible surface label")) return true;
   // SVG content (chart) — leave unchanged.
   if (line.includes("<svg") || line.includes("</svg>")) return true;
   // SVG body lines (text/line elements / attribute-rich).
@@ -576,6 +597,18 @@ function applyUserModeMask(md: string, userName?: string | null): string {
       out.push(line);
       continue;
     }
+    // CC-107 — Preamble line suppression (user mode only). If any
+    // preamble pattern matches the whole trimmed line, skip emission
+    // entirely. Runs before STRIP_PATTERNS so the line is gone before
+    // substring strips would have a chance to hollow it out.
+    let suppressedAsPreamble = false;
+    for (const re of PREAMBLE_USER_SUPPRESS_PATTERNS) {
+      if (re.test(line.trim())) {
+        suppressedAsPreamble = true;
+        break;
+      }
+    }
+    if (suppressedAsPreamble) continue;
     let s = line;
     // CC-LAUNCH-VOICE-POLISH B1 — name swap runs before the rest. The
     // masthead "For: {name}" line is excluded.
@@ -773,10 +806,9 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
 
   // 1c. CC-PROSE-1 — Executive Read. 2-sentence distillation lifted from the
   // existing Synthesis composer (gift/danger parallel-line close + "not X,
-  // but Y" thesis). Sits between the masthead block (drop-cap +
-  // uncomfortableButTrue + MBTI disclosure) and "How to Read This."
-  // Second-person register; no invented claims; engine canon phrases
-  // preserved verbatim.
+  // but Y" thesis). Sits immediately after the masthead block (drop-cap +
+  // uncomfortableButTrue + MBTI disclosure). Second-person register; no
+  // invented claims; engine canon phrases preserved verbatim.
   //
   // CC-PROSE-1A Fix 1 — render as a markdown blockquote (`> *...*`) so the
   // distillation reads as a callout, distinct from the surrounding italic
@@ -805,19 +837,6 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
       constitution,
       args.renderMode ?? "user"
     )
-  );
-
-  // 1b. CC-025 — How to Read This preamble. Sets reader disposition before
-  // any specific claim. Same paragraph for every report.
-  out.push("");
-  out.push("## How to Read This");
-  out.push("");
-  out.push(
-    "*This profile is not meant to define you from the outside. It is meant to give language to a pattern your answers suggest: how you notice reality, what you protect, who you trust, where responsibility tends to land, and how your gifts behave when life puts pressure on them.*"
-  );
-  out.push("");
-  out.push(
-    "*The model proposes. You confirm. The most useful reading is not the one that flatters you or corners you. It is the one that helps you become more grounded, more honest, more legible, and more free inside the person you already are.*"
   );
 
   // 2. Core Pattern

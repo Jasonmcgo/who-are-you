@@ -219,6 +219,37 @@ export default function MapSection({
     };
   }, [shape.weather, demographics]);
 
+  // CC-108 — compact-row Read + Practice for each card's collapsed
+  // header. Engine-derived (the LLM rewrite body shows on expand; the
+  // compact row stays consistent regardless of LLM resolution state).
+  function firstSentence(text: string | null | undefined): string {
+    if (!text) return "";
+    const m = text.match(/^[^.!?]+[.!?]/);
+    return (m ? m[0] : text).trim();
+  }
+  const compact = useMemo(
+    () => ({
+      lens: { read: firstSentence(shape.lens.gift.text), practice: firstSentence(shape.lens.growthEdge.text) },
+      compass: { read: firstSentence(shape.compass.gift.text), practice: firstSentence(shape.compass.growthEdge.text) },
+      // Hands data lives at constitution.handsCard, not shape.hands.
+      hands: {
+        read: firstSentence(constitution.handsCard?.strength ?? null),
+        practice: firstSentence(constitution.handsCard?.practice ?? null),
+      },
+      // Conviction's "Practice" analog is `posture`; growthEdge doesn't exist.
+      conviction: {
+        read: firstSentence(shape.conviction.gift.text),
+        practice: firstSentence(shape.conviction.posture),
+      },
+      gravity: { read: firstSentence(shape.gravity.gift.text), practice: firstSentence(shape.gravity.growthEdge.text) },
+      trust: { read: firstSentence(shape.trust.gift.text), practice: firstSentence(shape.trust.growthEdge.text) },
+      weather: { read: firstSentence(weatherOutput.gift.text), practice: firstSentence(weatherOutput.growthEdge.text) },
+      fire: { read: firstSentence(shape.fire.gift.text), practice: firstSentence(shape.fire.growthEdge.text) },
+      path: { read: firstSentence(pathOutput.work), practice: firstSentence(pathOutput.growthCounterweight) },
+    }),
+    [shape, weatherOutput, pathOutput, constitution.handsCard]
+  );
+
   return (
     <section className="flex flex-col" data-print-expand="map" style={{ gap: 0 }}>
       {/* Section header */}
@@ -291,6 +322,8 @@ export default function MapSection({
         onToggle={() => toggle("lens")}
         synthesisLine={synthLines.lens}
         llmRewriteMarkdown={liveScopedRewrites?.lens ?? null}
+        compactRead={compact.lens.read}
+        compactPractice={compact.lens.practice}
       />
       <CrossCardPatternBlock
         cardId="lens"
@@ -306,6 +339,8 @@ export default function MapSection({
         onToggle={() => toggle("compass")}
         synthesisLine={synthLines.compass}
         llmRewriteMarkdown={liveScopedRewrites?.compass ?? null}
+        compactRead={compact.compass.read}
+        compactPractice={compact.compass.practice}
       />
       {/* CC-054 — Peace + Faith cross-signal disambiguation. Renders
           inside the expanded Compass card body (gated on expanded.compass)
@@ -547,6 +582,8 @@ export default function MapSection({
         expanded={expanded.conviction}
         onToggle={() => toggle("conviction")}
         synthesisLine={synthLines.conviction}
+        compactRead={compact.conviction.read}
+        compactPractice={compact.conviction.practice}
       />
       <CrossCardPatternBlock
         cardId="conviction"
@@ -561,6 +598,8 @@ export default function MapSection({
         expanded={expanded.gravity}
         onToggle={() => toggle("gravity")}
         synthesisLine={synthLines.gravity}
+        compactRead={compact.gravity.read}
+        compactPractice={compact.gravity.practice}
       />
       <CrossCardPatternBlock
         cardId="gravity"
@@ -575,6 +614,8 @@ export default function MapSection({
         expanded={expanded.trust}
         onToggle={() => toggle("trust")}
         synthesisLine={synthLines.trust}
+        compactRead={compact.trust.read}
+        compactPractice={compact.trust.practice}
       />
       <CrossCardPatternBlock
         cardId="trust"
@@ -589,6 +630,8 @@ export default function MapSection({
         expanded={expanded.weather}
         onToggle={() => toggle("weather")}
         synthesisLine={synthLines.weather}
+        compactRead={compact.weather.read}
+        compactPractice={compact.weather.practice}
       />
       <CrossCardPatternBlock
         cardId="weather"
@@ -603,6 +646,8 @@ export default function MapSection({
         expanded={expanded.fire}
         onToggle={() => toggle("fire")}
         synthesisLine={synthLines.fire}
+        compactRead={compact.fire.read}
+        compactPractice={compact.fire.practice}
       />
       <CrossCardPatternBlock
         cardId="fire"
@@ -619,6 +664,8 @@ export default function MapSection({
         pathMasterSynthesis={synthLines.pathMaster}
         llmRewriteMarkdown={liveScopedRewrites?.path ?? null}
         pathTriptychOverride={liveScopedRewrites?.pathTriptych ?? null}
+        compactRead={compact.path.read}
+        compactPractice={compact.path.practice}
       />
       <CrossCardPatternBlock
         cardId="path"

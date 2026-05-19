@@ -277,7 +277,7 @@ export default function MirrorSection({
 
   // CC-PROSE-1 Layer 1 — Executive Read. 2-sentence distillation lifted
   // from existing Synthesis composer (gift/danger + thesis). Renders
-  // between the masthead block and "How to Read This."
+  // immediately after the masthead block.
   const executiveRead = constitution
     ? composeExecutiveRead(constitution)
     : null;
@@ -394,8 +394,10 @@ export default function MirrorSection({
         </>
       ) : null}
 
-      {/* CC-PROSE-1B Layer 4 — Core Signal Map. 12-cell at-a-glance grid
-          immediately after the Executive Read, before "How to Read This." */}
+      {/* CC-PROSE-1B Layer 4 — Core Signal Map. Compact at-a-glance grid
+          immediately after the Executive Read. CC-106 trimmed the 12-row
+          original to non-duplicate rows; remaining rows live in
+          CORE_SIGNAL_CELL_LABELS. */}
       {constitution ? (
         <>
           <HairlineRule />
@@ -408,26 +410,6 @@ export default function MirrorSection({
           </div>
         </>
       ) : null}
-
-      <HairlineRule />
-
-      {/* 1b. CC-025 — How to Read This preamble. Sets reader disposition
-          before any specific claim. Same paragraph for every report. */}
-      <div className="flex flex-col" style={{ gap: 12 }}>
-        <SectionLabel>How to Read This</SectionLabel>
-        <p
-          className="font-serif italic text-[15px] md:text-[15.5px]"
-          style={{ color: "var(--ink-soft)", lineHeight: 1.65, margin: 0 }}
-        >
-          This profile is not meant to define you from the outside. It is meant to give language to a pattern your answers suggest: how you notice reality, what you protect, who you trust, where responsibility tends to land, and how your gifts behave when life puts pressure on them.
-        </p>
-        <p
-          className="font-serif italic text-[15px] md:text-[15.5px]"
-          style={{ color: "var(--ink-soft)", lineHeight: 1.65, margin: 0 }}
-        >
-          The model proposes. You confirm. The most useful reading is not the one that flatters you or corners you. It is the one that helps you become more grounded, more honest, more legible, and more free inside the person you already are.
-        </p>
-      </div>
 
       <HairlineRule />
 

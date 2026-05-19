@@ -64,6 +64,7 @@ import { deriveSynthesis3Inputs } from "../lib/synthesis3Inputs";
 import { gripInputsHash } from "../lib/gripTaxonomyLlm";
 import { deriveGripInputs } from "../lib/gripTaxonomyInputs";
 import {
+  deriveQuieterAxis,
   v3RewriteHash,
   V3_SECTION_IDS,
   type V3RewriteInputs,
@@ -313,6 +314,13 @@ function buildBundleForSession(
   const topCompassValueLabels = getTopCompassValues(constitution.signals)
     .map((r) => COMPASS_LABEL[r.signal_id] ?? r.signal_id)
     .filter((s) => s.length > 0);
+  // CC-106 — quieter Goal/Soul axis hint for pathTriptych. Carried on
+  // every section's inputs so the cache hash composition stays uniform.
+  const v3Dashboard = constitution.goalSoulMovement?.dashboard;
+  const quieterAxis = deriveQuieterAxis(
+    v3Dashboard?.goalScore ?? null,
+    v3Dashboard?.soulScore ?? null
+  );
   for (const sectionId of V3_SECTION_IDS) {
     const body =
       sectionId === "pathTriptych"
@@ -328,6 +336,7 @@ function buildBundleForSession(
       engineSectionBody: body,
       topCompassValueLabels,
       reservedCanonLines: RESERVED_CANON_LINES,
+      quieterAxis,
     };
     const key = v3RewriteHash(inputs);
     const entry = V3_CACHE[key];

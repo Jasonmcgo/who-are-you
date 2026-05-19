@@ -30,6 +30,7 @@ import {
 } from "../../lib/identityEngine";
 import { renderMirrorAsMarkdown } from "../../lib/renderMirror";
 import {
+  deriveQuieterAxis,
   v3RewriteHash,
   V3_SECTION_IDS,
   type V3RewriteInputs,
@@ -195,6 +196,12 @@ function buildInputs(
   const topCompassValueLabels = getTopCompassValues(constitution.signals)
     .map((r) => COMPASS_LABEL[r.signal_id] ?? r.signal_id)
     .filter((s) => s.length > 0);
+  // CC-106 — quieter Goal/Soul axis hint for pathTriptych.
+  const dashboard = constitution.goalSoulMovement?.dashboard;
+  const quieterAxis = deriveQuieterAxis(
+    dashboard?.goalScore ?? null,
+    dashboard?.soulScore ?? null
+  );
   return {
     inputs: {
       sectionId,
@@ -207,6 +214,7 @@ function buildInputs(
         "the work is not to care less; it is to let love become sustainable enough to last",
         "the work is not to abandon what has endured; it is to let what has endured remain alive enough to update",
       ],
+      quieterAxis,
     },
     archetype,
   };
@@ -281,6 +289,7 @@ async function runAudit(): Promise<AssertionResult[]> {
       "## Executive Read\n\n*non-cohort engine prose used to force a cache miss in the audit*",
     topCompassValueLabels: ["Knowledge"],
     reservedCanonLines: [],
+    quieterAxis: "balanced",
   };
   const fallback = await resolveV3RewriteLive(dummyInputs, {
     liveSession: false,

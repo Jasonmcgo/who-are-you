@@ -76,6 +76,13 @@ type CommonAccordionProps = {
   // prop (`llmResolving`) was removed. Engine prose is the visible
   // default until the rewrite arrives; the swap happens silently.
   llmRewriteMarkdown?: string | null;
+  // CC-108 — when set, the collapsed-card header renders a tabular
+  // row (kicker · read · practice · toggle) instead of the kicker-
+  // only header. Click-to-expand reveals the full body unchanged.
+  // The two strings are typically the leading sentence of the card's
+  // Strength prose and Practice prose.
+  compactRead?: string | null;
+  compactPractice?: string | null;
 };
 
 type Props =
@@ -244,11 +251,19 @@ function AccordionToggle({
   expanded,
   onToggle,
   children,
+  compactRead,
+  compactPractice,
 }: {
   expanded: boolean;
   onToggle: () => void;
   children: ReactNode;
+  // CC-108 — optional Read + Practice columns rendered alongside the
+  // kicker in the collapsed-card header. When omitted, render the
+  // legacy kicker-only header (preserves non-Map call sites).
+  compactRead?: string | null;
+  compactPractice?: string | null;
 }) {
+  const hasCompactColumns = Boolean(compactRead || compactPractice);
   return (
     <button
       type="button"
@@ -269,8 +284,53 @@ function AccordionToggle({
         color: "var(--ink)",
       }}
     >
-      <div className="flex flex-col" style={{ gap: 6, minWidth: 0, flex: 1 }}>
-        {children}
+      <div
+        className="map-card-row"
+        style={{
+          display: "flex",
+          flexDirection: "row",
+          alignItems: "flex-start",
+          gap: 18,
+          minWidth: 0,
+          flex: 1,
+        }}
+      >
+        <div
+          className="flex flex-col"
+          style={{ gap: 6, minWidth: 0, flex: hasCompactColumns ? "0 0 30%" : "1" }}
+        >
+          {children}
+        </div>
+        {hasCompactColumns ? (
+          <>
+            <p
+              className="font-serif map-card-read"
+              style={{
+                margin: 0,
+                fontSize: 14,
+                lineHeight: 1.5,
+                color: "var(--ink)",
+                flex: "1 1 0",
+                minWidth: 0,
+              }}
+            >
+              {compactRead ?? ""}
+            </p>
+            <p
+              className="font-serif italic map-card-practice"
+              style={{
+                margin: 0,
+                fontSize: 13.5,
+                lineHeight: 1.5,
+                color: "var(--ink-soft)",
+                flex: "1 1 0",
+                minWidth: 0,
+              }}
+            >
+              {compactPractice ?? ""}
+            </p>
+          </>
+        ) : null}
       </div>
       <span
         aria-hidden="true"
@@ -358,7 +418,7 @@ export default function ShapeCard(props: Props) {
             borderBottom: "1px solid var(--rule-soft)",
           }}
         >
-          <AccordionToggle expanded={expanded} onToggle={onToggle}>
+          <AccordionToggle expanded={expanded} onToggle={onToggle} compactRead={props.compactRead} compactPractice={props.compactPractice}>
             {header}
           </AccordionToggle>
           {expanded ? <div style={{ paddingBottom: 18 }}>{body}</div> : null}
@@ -424,7 +484,7 @@ export default function ShapeCard(props: Props) {
             borderBottom: "1px solid var(--rule-soft)",
           }}
         >
-          <AccordionToggle expanded={expanded} onToggle={onToggle}>
+          <AccordionToggle expanded={expanded} onToggle={onToggle} compactRead={props.compactRead} compactPractice={props.compactPractice}>
             {header}
           </AccordionToggle>
           {expanded ? <div style={{ paddingBottom: 18 }}>{body}</div> : null}
@@ -492,7 +552,7 @@ export default function ShapeCard(props: Props) {
           borderBottom: "1px solid var(--rule-soft)",
         }}
       >
-        <AccordionToggle expanded={expanded} onToggle={onToggle}>
+        <AccordionToggle expanded={expanded} onToggle={onToggle} compactRead={props.compactRead} compactPractice={props.compactPractice}>
           {header}
         </AccordionToggle>
         {expanded ? <div style={{ paddingBottom: 18 }}>{body}</div> : null}

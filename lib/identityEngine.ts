@@ -7945,7 +7945,7 @@ function thesisFor(
 //
 // 2-sentence top-of-report distillation rendered immediately after the
 // masthead block (drop-cap shapeInOneSentence + uncomfortableButTrue +
-// MBTI disclosure) and before "How to Read This." Lifts directly from
+// MBTI disclosure). Lifts directly from
 // the existing Synthesis composer's two load-bearing one-liners:
 //   1. The gift/danger parallel-line close (GIFT_DANGER_LINES keyed to
 //      Lens dominant function).

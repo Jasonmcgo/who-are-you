@@ -123,24 +123,27 @@ async function runAudit(): Promise<void> {
     );
   }
 
-  // ── 2. leak-1-core-signal-map-clinician-preserves-mbti ─────────────
-  //   Clinician mode: Surface-label cell still contains the four-letter
-  //   code prefix when stack confidence is high. Tested via Jason
-  //   (known high-confidence INTJ).
+  // ── 2. leak-1-core-signal-map-surface-label-removed ────────────────
+  //   CC-106 trimmed the Core Signal Map's "Surface label" row (it
+  //   duplicated the masthead MBTI disclosure). The prior leak (the
+  //   stripped "<MBTI>, provisional" emitting an orphan ", provisional"
+  //   in user mode) is therefore impossible — the row no longer renders
+  //   in EITHER mode. This assertion verifies absence in both.
   {
     const jason = renders.find((r) => r.fx.id === "Jason")!;
-    const hasMbti = /\|\s*[IE][NS][TF][JP],\s*provisional\s*\|/.test(jason.clinMd);
+    const userHasRow = /\|\s*Surface label\s*\|/.test(jason.userMd);
+    const clinHasRow = /\|\s*Surface label\s*\|/.test(jason.clinMd);
     results.push(
-      hasMbti
+      !userHasRow && !clinHasRow
         ? {
             ok: true,
-            assertion: "leak-1-core-signal-map-clinician-preserves-mbti",
-            detail: `Jason clinician Surface-label cell preserves "<MBTI>, provisional"`,
+            assertion: "leak-1-core-signal-map-surface-label-removed",
+            detail: `Jason CSM has no Surface label row in either user or clinician mode (CC-106 trim)`,
           }
         : {
             ok: false,
-            assertion: "leak-1-core-signal-map-clinician-preserves-mbti",
-            detail: `Jason clinician Surface-label cell does not contain "<MBTI>, provisional"`,
+            assertion: "leak-1-core-signal-map-surface-label-removed",
+            detail: `userHasRow=${userHasRow} clinHasRow=${clinHasRow}`,
           }
     );
   }

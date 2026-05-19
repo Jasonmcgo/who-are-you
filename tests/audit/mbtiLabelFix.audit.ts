@@ -6,7 +6,6 @@ import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { buildCoreSignalCells } from "../../lib/coreSignalMap";
 import { buildInnerConstitution } from "../../lib/identityEngine";
 import {
   aggregateLensStack,
@@ -186,9 +185,16 @@ function runAudit(): AssertionResult[] {
       fixture.demographics
     );
     const legacy = legacyStack(constitution.signals);
-    const cells = buildCoreSignalCells(constitution);
+    // CC-106 removed the "Surface label" Core Signal Map cell; the audit's
+    // intent is to verify high-confidence MBTI label emission, so we
+    // derive `surface` directly from lens_stack (the source of truth that
+    // the Core Signal Map cell USED to lift from) rather than reading it
+    // out of the trimmed grid.
+    const stack = constitution.lens_stack;
     const surface =
-      cells.find((cell) => cell.label === "Surface label")?.value ?? "";
+      stack.confidence === "high" && stack.mbtiCode
+        ? `${stack.mbtiCode}, provisional`
+        : "";
     return { fixture, constitution, legacy, surface };
   });
 

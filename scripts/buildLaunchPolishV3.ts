@@ -28,6 +28,7 @@ import {
 import { renderMirrorAsMarkdown } from "../lib/renderMirror";
 import { composeV3Rewrite } from "../lib/launchPolishV3LlmServer";
 import {
+  deriveQuieterAxis,
   v3RewriteHash,
   V3_SECTION_IDS,
   type V3RewriteInputs,
@@ -209,6 +210,13 @@ async function main(): Promise<void> {
     const topCompassValueLabels = getTopCompassValues(constitution.signals)
       .map((r) => COMPASS_LABEL[r.signal_id] ?? r.signal_id)
       .filter((s) => s.length > 0);
+    // CC-106 — quieter Goal/Soul axis hint for pathTriptych. Carried on
+    // every section's inputs so cache hash composition stays uniform.
+    const dashboard = constitution.goalSoulMovement?.dashboard;
+    const quieterAxis = deriveQuieterAxis(
+      dashboard?.goalScore ?? null,
+      dashboard?.soulScore ?? null
+    );
 
     for (const sectionId of sections) {
       const engineSectionBody =
@@ -226,6 +234,7 @@ async function main(): Promise<void> {
         engineSectionBody,
         topCompassValueLabels,
         reservedCanonLines,
+        quieterAxis,
       };
       const key = v3RewriteHash(inputs);
       if (!force && cache[key]?.rewrite) {

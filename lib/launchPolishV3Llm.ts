@@ -56,6 +56,28 @@ export interface V3RewriteInputs {
   /** Canon lines reserved elsewhere in the report — the LLM must NOT
    *  echo any of these to preserve canon-line scarcity (Rules §4). */
   reservedCanonLines: string[];
+  /** CC-106 — which Goal/Soul axis is quieter for this fixture. Used by
+   *  the pathTriptych section's 4th-paragraph this-week move (the LLM
+   *  targets the quieter axis). Compute via {@link deriveQuieterAxis}.
+   *  Carried on all section inputs (not pathTriptych-only) so the cache
+   *  hash composition stays uniform across sections.
+   */
+  quieterAxis: "Goal" | "Soul" | "balanced";
+}
+
+/**
+ * CC-106 — derive which Goal/Soul axis is quieter from the engine's
+ * goal/soul scores. Threshold for "balanced" is a 10-point gap (matches
+ * the Movement panel's direction descriptor canon).
+ */
+export function deriveQuieterAxis(
+  goalScore: number | null | undefined,
+  soulScore: number | null | undefined
+): "Goal" | "Soul" | "balanced" {
+  if (goalScore == null || soulScore == null) return "balanced";
+  const gap = soulScore - goalScore;
+  if (Math.abs(gap) < 10) return "balanced";
+  return gap > 0 ? "Goal" : "Soul";
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -82,19 +104,19 @@ const ARCHETYPE_VOICE: Record<ProfileArchetype, string> = {
 
 const V3_SECTION_TARGETS: Record<V3SectionId, string> = {
   executiveRead:
-    "Section: Executive Read. The bold-italic pull-quote line at the TOP of the engine output stays VERBATIM as the first line. BELOW it, add 2-3 sustained-prose paragraphs that develop the read: paragraph 1 opens with a confident 'You are…' or equivalent declarative framing; paragraph 2 names the growth edge with concrete texture; paragraph 3 (optional) lands the directional verb. Do NOT paraphrase the pull-quote — keep the engine line at the top and write fresh prose underneath.",
+    "Section: Executive Read. The bold-italic pull-quote line at the TOP of the engine output stays VERBATIM as the first line. BELOW it, add 2-3 sustained-prose paragraphs that develop the read. CC-108 Beat 0 (REQUIRED first sentence of paragraph 1, before any other framing): open with one sentence that names the user as a *shape* using the pattern: 'You may look like a [surface read], but the report is better read as a [warmer reframe] who [native-language verb].' The reframe must reconcile the engine read (driver + protected value) with the human experience of it. Example for a structurer + Family + high-Goal shape: 'You may look like a pure operator on the surface, but the report is better read as a warm, loyal, people-protecting shape that uses structure as its native language.' Example for a present-tense + Family + Soul-leaning shape: 'You may look like an in-the-moment responder, but the report is better read as a deeply loyal caregiver whose attention IS the gift.' The surface-read and reframe must be SHAPE-SPECIFIC, not template-substituted across archetypes. FORBIDDEN openings: 'You are a structurer.' (engine-internal vocabulary); 'You are an ISFJ.' (borrowed-system label); 'You're someone who likes order.' (flat trait, not shape); any opening that doesn't pair surface-read with warmer reframe via 'but the report is better read as'. After Beat 0, continue paragraph 1 with the existing 'You are…' or equivalent declarative framing; paragraph 2 names the growth edge with concrete texture; paragraph 3 (optional) lands the directional verb. Do NOT paraphrase the pull-quote — keep the engine line at the top and write fresh prose underneath.",
   corePattern:
     "Section: Your Core Pattern. Declarative voice that opens with the value-at-center idea (e.g., 'Faith sits at the center of your shape.') and delivers it with confidence and texture across 1-2 paragraphs. Name the value at center in the user's protective vocabulary, then state what it is NOT (decoration / sentimental softness / abstract preference) and what it IS (load-bearing posture). Same shape per archetype with archetype-appropriate substance.",
   whatOthersMayExperience:
-    "Section: What Others May Experience. Committed second-person prose that names the perception gap honestly, capped at ≤2 hedges. CRITICAL — the engine version for this section is SHAPE-BLIND TEMPLATE PROSE (it reads roughly 'Others experience the [driver] as clarity when they trust you and as judgment when they do not. Your willingness to bear cost reads as steadiness to people who trust your shape and as rigidity to people who don't yet.' across all fixtures). Do NOT paraphrase it. Do NOT mirror its sentence shapes. Ignore the engine text entirely for STRUCTURE — use it only to confirm what conclusion the engine reached. Write from scratch in the archetype's voice. The perception gap is ARCHETYPE-SPECIFIC, and every archetype must produce structurally DIFFERENT prose — different opening sentence shape, different concrete imagery, different named-gap. Architect: open with concrete behavior the room sees in present tense — e.g. 'Walk into a working meeting and the first thing the room notices is…' or 'The structure shows up before the warmth does.' Anchor in clarity-reads-as-correction, structure-reads-as-coldness, long-arc steadiness reads-as-remoteness. Gap: between people who experience your structure as a gift and people who experience it as a verdict. Caregiver: open with the felt arrival or the textured noticing — e.g. 'There is a way you arrive in a room that some people lean toward and some people quietly back away from.' or 'The first time someone receives your care, two things happen…'. Anchor in care-reads-as-smothering, presence-reads-as-enmeshment, loyalty-reads-as-self-erasure. Gap: between people who feel held by your continuity and people who feel kept inside it. Steward: open with a time-anchored frame — e.g. 'Over years, the people around you learn…' or 'Sit with you long enough and a pattern surfaces…' or 'What the room reads in you on day one and what it reads on year ten are different reads.' Anchor in faithfulness-reads-as-rigidity, slow-yes-reads-as-no, maintenance-reads-as-resistance-to-change. Gap: between people who feel safe inside what you preserve and people who feel constrained by it. Unmapped: open with the user's specific shape from their engine read in plain language; do not borrow archetype language. FORBIDDEN PHRASES (these are from the engine template — replace with archetype-voice prose): 'Others experience the X as clarity when they trust you', 'reads as steadiness to the people inside your circle', 'as withholding to people outside it', 'people who trust your shape and as rigidity to people who don't yet', 'the translation is rarely about doing less of yourself'. Two archetypes given the same engine reference must produce structurally divergent prose — not the same scaffold with value-name swaps.",
+    "Section: What Others May Experience. Committed second-person prose that names the perception gap honestly, capped at ≤2 hedges. CRITICAL — the engine version for this section is SHAPE-BLIND TEMPLATE PROSE (it reads roughly 'Others experience the [driver] as clarity when they trust you and as judgment when they do not. Your willingness to bear cost reads as steadiness to people who trust your shape and as rigidity to people who don't yet.' across all fixtures). Do NOT paraphrase it. Do NOT mirror its sentence shapes. Ignore the engine text entirely for STRUCTURE — use it only to confirm what conclusion the engine reached. Write from scratch in the archetype's voice. The perception gap is ARCHETYPE-SPECIFIC, and every archetype must produce structurally DIFFERENT prose — different opening sentence shape, different concrete imagery, different named-gap. Architect: open with concrete behavior the room sees in present tense — e.g. 'Walk into a working meeting and the first thing the room notices is…' or 'The structure shows up before the warmth does.' Anchor in clarity-reads-as-correction, structure-reads-as-coldness, long-arc steadiness reads-as-remoteness. Gap: between people who experience your structure as a gift and people who experience it as a verdict. Caregiver: open with the felt arrival or the textured noticing — e.g. 'There is a way you arrive in a room that some people lean toward and some people quietly back away from.' or 'The first time someone receives your care, two things happen…'. Anchor in care-reads-as-smothering, presence-reads-as-enmeshment, loyalty-reads-as-self-erasure. Gap: between people who feel held by your continuity and people who feel kept inside it. Steward: open with a time-anchored frame — e.g. 'Over years, the people around you learn…' or 'Sit with you long enough and a pattern surfaces…' or 'What the room reads in you on day one and what it reads on year ten are different reads.' Anchor in faithfulness-reads-as-rigidity, slow-yes-reads-as-no, maintenance-reads-as-resistance-to-change. Gap: between people who feel safe inside what you preserve and people who feel constrained by it. Unmapped: open with the user's specific shape from their engine read in plain language; do not borrow archetype language. FORBIDDEN PHRASES (these are from the engine template — replace with archetype-voice prose): 'Others experience the X as clarity when they trust you', 'reads as steadiness to the people inside your circle', 'as withholding to people outside it', 'people who trust your shape and as rigidity to people who don't yet', 'the translation is rarely about doing less of yourself'. Two archetypes given the same engine reference must produce structurally divergent prose — not the same scaffold with value-name swaps. CC-108 closing beat (REQUIRED final paragraph, after the perception-gap prose): add one portable translation sentence the user could speak aloud to bridge the misread. Format: `*The useful sentence may be: \"[verbatim quote in the user's voice].\"*` The quoted sentence must (a) be ≤ 35 words, (b) be speakable aloud — no clinical vocabulary, no semicolons, no parenthetical asides, (c) follow a 2-part shape: 'I'm trying to X, but [misread risk]. [Concrete ask of the listener].' (d) be shape-specific — a structuring caregiver's sentence must read differently from a present-tense responder's. FORBIDDEN: generic phrases like 'Just tell me what you need.'; apologies like 'I'm sorry for being too direct.'; quoted restatements of the perception-gap paragraph. Example for a structuring-caregiver shape: 'The useful sentence may be: \"I'm trying to help by making this stable, but I may be moving too quickly into fixing. Tell me what you need before I solve the wrong problem.\"' The translation sentence is the LAST line of the section.",
   whenTheLoadGetsHeavy:
-    "Section: When the Load Gets Heavy. Textured second-person prose that names the failure-mode shapes specifically — name them as nouns or short images (the 'private-fact closure', the 'responsiveness-as-collapse', the 'mastery as locked door'). The engine output is procedural; your version is alive.",
+    "Section: When the Load Gets Heavy. Textured second-person prose that names the failure-mode shapes specifically — name them as nouns or short images (the 'private-fact closure', the 'responsiveness-as-collapse', the 'mastery as locked door'). The engine output is procedural; your version is alive. CRITICAL hedge discipline: the topic (pressure modes) naturally invites 'may' / 'tends to' / 'likely' stacking. DO NOT stack. Write declaratively — 'You tighten' not 'you may tighten'; 'The conviction sharpens into rigidity' not 'the conviction may sharpen'. The Rules §1 cap of two hedges TOTAL across this section is enforced; treat it as a hard limit, not a soft target. Speak the failure mode in its concrete form, not its conditional form.",
   synthesis:
     "Section: A Synthesis. ONE paragraph cross-card synthesis that genuinely synthesizes — names what the cards together say that no single card says alone. Compass + Lens + Hands together produce a read the user has not yet seen in the report. End the paragraph; DO NOT include the 'To keep X without Y' parallel-line close — that part is rendered deterministically by the engine and concatenated after your output.",
   closingRead:
-    "Section: Closing Read. 2-3 sentences of context that EARN the archetype canon line, then the canon line itself as the closing beat. The user prompt names which canon line is yours (architect / caregiver / steward variant). Land with 'Keep this shape honest as the seasons turn.' as the final sentence — preserve that verbatim.",
+    "Section: Closing Read. 5-8 sentences total, hitting these beats in order: (1) ONE sentence naming the shape's organizing pattern. (2) ONE sentence of behavioral observation — what the reader *does*, not what they *are* (canonical example: 'You do not merely value [the value at center]; you act as if it must be held, fed, defended, and kept.'). (3) TWO sentences: what this gift costs and what it returns. (4) ONE sentence on the growth path framed as becoming more rooted in who they already are, NOT becoming someone else. (5) OPTIONAL one shape-specific parallel-line close if it lands cleanly (canonical caregiver example: 'The work is not to care less. It is to let love become sustainable enough to last.'). End with 'Keep this shape honest as the seasons turn.' as the final sentence — preserve that verbatim. The archetype canon line is reserved (see canon-line scarcity rule) and should NOT be quoted here. The user prompt also names which canon line is yours (architect / caregiver / steward variant) for reference only.",
   pathTriptych:
-    "Section: Path triptych (Work / Love / Give). Three paragraphs, one per facet, in archetype voice. Same three-section structure (each opens with a bold field label) but the prose inside each section reads as written for the user's specific shape, not as templated. Preserve the field labels and the closing growth-path line if present.",
+    "Section: Path triptych (Work / Love / Give / this-week move). FOUR paragraphs total. Paragraphs 1-3: one per facet (Work, Love, Give), in archetype voice. Each opens with the bold field label the engine emitted (preserve `**Work** —`, `**Love** —`, `**Give** —`). The prose inside each facet reads as written for the user's specific shape, not as templated. Paragraph 4 (NEW): one paragraph headed `**This week** — ` that names ONE concrete move targeting the quieter Goal/Soul axis (the user prompt names which axis is quieter). If Goal is quieter, the move is something the reader will commit to that does NOT require emotional buy-in from anyone else — a clarifying action, a structural decision, a deliverable they own end-to-end. If Soul is quieter, the move names a person, practice, or place they have not given full attention to in 30+ days and will this week — specific noun-form (a name, a discipline, a location), not abstraction. If the axes are balanced, the move names one bridging act that lifts both. Stay second-person, present tense. NOT a self-help list — one specific move. Preserve the closing growth-path line if present.",
 };
 
 // ─────────────────────────────────────────────────────────────────────
@@ -137,6 +159,8 @@ WARM PRECISION WITH MORAL NERVE. Capture warmth (not coldness), precision (not v
 
 7. **Voice differentiation.** Each archetype sounds DIFFERENT. Not one template with swapped nouns. Jason architectural; Cindy relational; Daniel precedent-bound. Sentence shapes vary across archetypes.
 
+8. **Anti-repetition rule.** Compass values (Family, Loyalty, Faith, Peace, Knowledge, Honor, etc.) and surface labels (ESFP, INTJ, etc.) appear ONCE in the report at their canonical placement (Compass card body and masthead, respectively). Your sections do NOT re-list them. When the read depends on a Compass value, translate it into the shape-specific verb the reader actually lives — what they *protect*, what they've *shown* they'll bear cost for, what they *organize their week around*. Generic example: instead of "you protect Family, Loyalty, Faith, and Peace," write "you organize your week around the people whose lives you've already shown you'll restructure for." The reader knows their Compass values by the time they reach your section. Your job is to land what the values *do*, not to repeat what they *are*.
+
 # Output
 
 Output ONLY the rewritten section body. Match the structure the engine specified (bold field labels, blockquote pull-quotes, italic helpers) — your task is to rewrite the PROSE inside that structure, not to restructure the section. No preamble, no commentary, no wrapping code fences.
@@ -161,7 +185,7 @@ export function buildV3UserPrompt(inputs: V3RewriteInputs): string {
   ];
   if (inputs.topCompassValueLabels.length > 0) {
     lines.push(
-      `Top protected values (use these as the grounding for value-at-center prose): ${inputs.topCompassValueLabels.join(", ")}`
+      `Top protected values (grounding only — DO NOT re-list these by name in your output; translate them into the shape-specific verb the reader actually lives per the Anti-repetition rule): ${inputs.topCompassValueLabels.join(", ")}`
     );
     lines.push("");
   }
@@ -172,6 +196,13 @@ export function buildV3UserPrompt(inputs: V3RewriteInputs): string {
     for (const c of inputs.reservedCanonLines) {
       lines.push(`  - "${c}"`);
     }
+    lines.push("");
+  }
+  // CC-106 — pathTriptych's 4th paragraph targets the quieter axis. Only
+  // this section consumes the field, but we always pass it (the cache
+  // hash composition stays uniform; other sections' rewriters ignore it).
+  if (inputs.sectionId === "pathTriptych") {
+    lines.push(`Quieter axis (target of paragraph 4 "**This week** —"): ${inputs.quieterAxis}`);
     lines.push("");
   }
   lines.push(
@@ -195,6 +226,7 @@ export function v3RewriteHash(inputs: V3RewriteInputs): string {
   const sorted = {
     archetype: inputs.archetype,
     engineSectionBody: inputs.engineSectionBody,
+    quieterAxis: inputs.quieterAxis,
     reservedCanonLines: [...inputs.reservedCanonLines].sort(),
     sectionId: inputs.sectionId,
     topCompassValueLabels: [...inputs.topCompassValueLabels].sort(),

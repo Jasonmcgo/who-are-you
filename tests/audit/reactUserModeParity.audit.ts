@@ -116,70 +116,34 @@ async function runAudit(): Promise<void> {
     );
   }
 
-  // ── 3. CoreSignalMap user-mode (Jason) suppresses "INTJ, provisional" ─
+  // ── 3. CoreSignalMap — CC-106 removed the "Surface label" cell. ────
+  //     The prior leak-test (user-mode masks MBTI) and retention-test
+  //     (clinician keeps "<MBTI>, provisional") are now satisfied by
+  //     absence: the cell does not render in either mode.
   {
     const constitution = loadJasonConstitution();
     const mbtiCode = constitution.lens_stack.mbtiCode ?? "";
-    const markup = renderToStaticMarkup(
-      createElement(CoreSignalMap, { constitution })
+    const userMarkup = renderToStaticMarkup(createElement(CoreSignalMap, { constitution }));
+    const clinMarkup = renderToStaticMarkup(
+      createElement(CoreSignalMap, { constitution, renderMode: "clinician" })
     );
-    const leakedMbti = mbtiCode.length > 0
-      ? new RegExp(`${mbtiCode}, provisional`).test(markup)
-      : false;
-    const hasProvisional = />provisional</.test(markup);
-    if (leakedMbti) {
-      results.push({
-        ok: false,
-        assertion: "react-core-signal-map-user-mode-suppresses",
-        detail: `CoreSignalMap user mode leaked "${mbtiCode}, provisional" — Surface label cell not masked`,
-      });
-    } else if (mbtiCode.length > 0 && !hasProvisional) {
-      results.push({
-        ok: false,
-        assertion: "react-core-signal-map-user-mode-suppresses",
-        detail: `CoreSignalMap user mode did not emit the "provisional" replacement value for Surface label`,
-      });
-    } else {
-      results.push({
-        ok: true,
-        assertion: "react-core-signal-map-user-mode-suppresses",
-        detail: `CoreSignalMap user mode renders Surface label as "provisional" (no "<MBTI>, provisional" leak)`,
-      });
-    }
-  }
-
-  // ── 4. CoreSignalMap clinician-mode retains "<MBTI>, provisional" ──
-  {
-    const constitution = loadJasonConstitution();
-    const mbtiCode = constitution.lens_stack.mbtiCode ?? "";
-    if (mbtiCode.length === 0) {
-      results.push({
-        ok: false,
-        assertion: "react-core-signal-map-clinician-retains",
-        detail: `Jason fixture produced empty mbtiCode — cannot assert clinician retention`,
-      });
-    } else {
-      const markup = renderToStaticMarkup(
-        createElement(CoreSignalMap, {
-          constitution,
-          renderMode: "clinician",
-        })
-      );
-      const hasFullForm = new RegExp(`${mbtiCode}, provisional`).test(markup);
-      results.push(
-        hasFullForm
-          ? {
-              ok: true,
-              assertion: "react-core-signal-map-clinician-retains",
-              detail: `CoreSignalMap clinician mode renders "${mbtiCode}, provisional" in Surface label cell`,
-            }
-          : {
-              ok: false,
-              assertion: "react-core-signal-map-clinician-retains",
-              detail: `CoreSignalMap clinician mode did NOT render "${mbtiCode}, provisional" (Surface label cell did not retain artifact)`,
-            }
-      );
-    }
+    const userLeak = mbtiCode.length > 0 && new RegExp(`${mbtiCode}, provisional`).test(userMarkup);
+    const clinLeak = mbtiCode.length > 0 && new RegExp(`${mbtiCode}, provisional`).test(clinMarkup);
+    const userHasSurfaceLabelCell = />Surface label</.test(userMarkup);
+    const clinHasSurfaceLabelCell = />Surface label</.test(clinMarkup);
+    results.push(
+      !userLeak && !clinLeak && !userHasSurfaceLabelCell && !clinHasSurfaceLabelCell
+        ? {
+            ok: true,
+            assertion: "react-core-signal-map-surface-label-removed",
+            detail: `CoreSignalMap renders no Surface label cell in either render mode (CC-106 trim)`,
+          }
+        : {
+            ok: false,
+            assertion: "react-core-signal-map-surface-label-removed",
+            detail: `userLeak=${userLeak} clinLeak=${clinLeak} userCell=${userHasSurfaceLabelCell} clinCell=${clinHasSurfaceLabelCell}`,
+          }
+    );
   }
 
   // ── 5. Admin page wires renderMode="clinician" ─────────────────────

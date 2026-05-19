@@ -17,25 +17,13 @@ import type { InnerConstitution } from "../../lib/types";
 
 type Props = {
   constitution: InnerConstitution;
-  // CC-REACT-USER-MODE-PARITY — mirror the markdown `renderCore
-  // SignalMapMarkdown` user/clinician split so the "Surface label"
-  // cell doesn't leak the MBTI four-letter code on the user surface.
-  // User mode replaces the cell value with "provisional" (same as
-  // markdown user-mode behavior); clinician keeps the full "<MBTI>,
-  // provisional" form for audit.
+  // CC-106 removed the "Surface label" row that this mode flag used to
+  // gate; kept the prop for call-site compatibility, no longer read.
   renderMode?: "user" | "clinician";
 };
 
-export default function CoreSignalMap({ constitution, renderMode }: Props) {
-  const mode = renderMode ?? "user";
+export default function CoreSignalMap({ constitution }: Props) {
   const cells = buildCoreSignalCells(constitution);
-  if (mode === "user") {
-    for (const cell of cells) {
-      if (cell.label === "Surface label" && cell.value.length > 0) {
-        cell.value = "provisional";
-      }
-    }
-  }
 
   return (
     <div

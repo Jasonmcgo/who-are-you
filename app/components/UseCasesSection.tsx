@@ -122,48 +122,61 @@ export default function UseCasesSection({
       ? { ...useCase, body: familyBody }
       : useCase
   );
+  // CC-106 — user-mode React render collapses the 10-item appendix to a
+  // <details> disclosure so the closing real-estate goes to the warmer
+  // LLM Closing Read. Clinician-mode markdown emission (renderMirror /
+  // humanityRendering) continues to write the full section per
+  // feedback_two_tier_render_canon.md.
   return (
     <section
       className="flex flex-col"
       aria-labelledby="use-cases-heading"
       style={{ gap: 14, paddingTop: 12, paddingBottom: 12 }}
     >
-      <p
-        id="use-cases-heading"
-        className="font-serif"
-        style={{
-          fontSize: 28,
-          color: "var(--ink)",
-          margin: 0,
-          lineHeight: 1.1,
-        }}
-      >
-        {USE_CASES_SECTION_TITLE}
-      </p>
-      <p
-        className="font-serif italic text-[15px] md:text-[16px]"
-        style={{
-          color: "var(--ink-soft)",
-          margin: 0,
-          lineHeight: 1.55,
-        }}
-      >
-        {USE_CASES_SECTION_SUBHEAD}
-      </p>
-      {useCases.map((useCase) => (
-        <p
-          key={useCase.title}
-          className="font-serif text-[15.5px] md:text-[16px]"
+      <details>
+        <summary
+          id="use-cases-heading"
+          className="font-serif"
           style={{
+            fontSize: 18,
             color: "var(--ink)",
-            lineHeight: 1.65,
-            margin: 0,
+            lineHeight: 1.35,
+            cursor: "pointer",
+            listStyle: "none",
           }}
         >
-          <strong>{useCase.title}</strong>{" "}
-          {useCase.body}
-        </p>
-      ))}
+          10 places this read earns its keep ▾
+        </summary>
+        <div
+          className="flex flex-col"
+          style={{ gap: 14, marginTop: 12 }}
+        >
+          <p
+            className="font-serif italic text-[15px] md:text-[16px]"
+            style={{
+              color: "var(--ink-soft)",
+              margin: 0,
+              lineHeight: 1.55,
+            }}
+          >
+            {USE_CASES_SECTION_SUBHEAD}
+          </p>
+          {useCases.map((useCase) => (
+            <p
+              key={useCase.title}
+              className="font-serif text-[15.5px] md:text-[16px]"
+              style={{
+                color: "var(--ink)",
+                lineHeight: 1.65,
+                margin: 0,
+              }}
+            >
+              <strong>{useCase.title}</strong>{" "}
+              {useCase.body}
+            </p>
+          ))}
+        </div>
+      </details>
     </section>
   );
 }

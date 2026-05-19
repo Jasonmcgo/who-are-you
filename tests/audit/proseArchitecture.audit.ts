@@ -62,10 +62,11 @@
 //
 //   Layer 4 — Core Signal Map:
 //     - prose-1b-core-signal-map-rendered      (## Core Signal Map header
-//                                               renders between Executive
-//                                               Read and How to Read This)
-//     - prose-1b-core-signal-map-12-cells      (all 12 canonical cell
-//                                               labels appear in render)
+//                                               renders after Executive
+//                                               Read)
+//     - prose-1b-core-signal-map-cells         (all canonical cell labels
+//                                               appear in render — CC-106
+//                                               trimmed from 12 to 8)
 //     - prose-1b-core-signal-map-italic-line   (canonical engine-close
 //                                               italic line below grid)
 //
@@ -539,12 +540,12 @@ function runFixture(record: FixtureRecord): {
         }
   );
 
-  // Order check: Core Signal Map must sit between Executive Read and
-  // How to Read This (CC-PROSE-1B render position canon).
+  // Order check: Core Signal Map must sit after the Executive Read
+  // (CC-PROSE-1B render position canon; CC-106 removed the prior
+  // upper bound "How to Read This").
   const idxExec = markdown.search(/^## Executive Read$/m);
   const idxCsm = markdown.search(/^## Core Signal Map$/m);
-  const idxHow = markdown.search(/^## How to Read This$/m);
-  const orderedCsm = idxExec >= 0 && idxCsm > idxExec && idxCsm < idxHow;
+  const orderedCsm = idxExec >= 0 && idxCsm > idxExec;
   if (idxCsm >= 0) {
     results.push(
       orderedCsm
@@ -552,7 +553,7 @@ function runFixture(record: FixtureRecord): {
         : {
             ok: false,
             assertion: "prose-1b-core-signal-map-position",
-            detail: `expected idxExec(${idxExec}) < idxCsm(${idxCsm}) < idxHow(${idxHow})`,
+            detail: `expected idxExec(${idxExec}) < idxCsm(${idxCsm})`,
           }
     );
   }
@@ -562,10 +563,10 @@ function runFixture(record: FixtureRecord): {
   );
   results.push(
     missingCells.length === 0
-      ? { ok: true, assertion: "prose-1b-core-signal-map-12-cells" }
+      ? { ok: true, assertion: "prose-1b-core-signal-map-cells" }
       : {
           ok: false,
-          assertion: "prose-1b-core-signal-map-12-cells",
+          assertion: "prose-1b-core-signal-map-cells",
           detail: `missing canonical cell labels: ${missingCells.join(" | ")}`,
         }
   );
