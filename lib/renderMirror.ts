@@ -239,11 +239,9 @@ function emitGripSection(
   } else if (renderMode === "clinician") {
     // Engine fallback for rendered mode — emit the four-line three-
     // concept block from the engine's canonical templates.
-    // CC-111 — clinician only. User mode drops these labeled
-    // `Field: value` lines (they are clinical, not warm prose) and
-    // leaves the warm-narrative slot empty when the LLM paragraph is
-    // unavailable. In production the LLM paragraph is always
-    // present, so this user-mode no-emit path is the no-API fallback.
+    // CC-111 — clinician only. User mode gets a composed prose
+    // paragraph below (CC-115); the labeled block stays here for
+    // audit/debug reversibility.
     const distorted =
       grip.distortedStrategy?.text ??
       `Under pressure, this question can pull you toward ${PRIMAL_FALLBACK_COST[grip.primary] ?? "the patterns that follow the question"}.`;
@@ -257,6 +255,26 @@ function emitGripSection(
     out.push(`Distorted Strategy: ${distorted}`);
     out.push("");
     out.push(`Healthy Gift: ${healthy}`);
+  } else {
+    // CC-115 — user-mode rendered-fallback prose. CC-111 gated the
+    // labeled block above to clinician; user mode previously fell
+    // through to nothing, leaving the `## Your Grip` heading empty on
+    // any session that didn't have a cached `gripParagraphLlm`. This
+    // branch composes a short prose paragraph from the same engine
+    // fields the labeled block uses — no labels, varied cadence, per
+    // CC-112 canon (interpretation over recitation). The warm
+    // blockquote and hedged-prose branches above are unchanged.
+    //
+    // `formatHealthyGiftFallback` returns a full second-person sentence
+    // ("You X…"), so the healthy-gift beat is its own sentence rather
+    // than the tail of a "becomes …" phrase (which reads awkwardly).
+    const distorted =
+      grip.distortedStrategy?.text ??
+      `Under pressure, this question can pull you toward ${PRIMAL_FALLBACK_COST[grip.primary] ?? "the patterns that follow the question"}.`;
+    const healthy = formatHealthyGiftFallback(grip.primary, grip.healthyGift);
+    out.push(
+      `Under pressure the surface clue is ${grip.surfaceGrip.toLowerCase()}; underneath it runs a quieter question — *${underlyingQuestion}* ${distorted} At its steadier, the same instrument turns the other way. ${healthy}`
+    );
   }
 
   // CC-111 — raw diagnostic field block is clinician-only. User mode
@@ -1227,7 +1245,11 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
     } else {
       out.push(`- **Grip:** ${dash.grippingPull.score} / 100`);
     }
-    if (dash.grippingPull.signals.length > 0) {
+    // CC-114 — gate raw grip-component bullets to clinician mode. User
+    // mode keeps the single `**Grip:**` headline metric line above; the
+    // grip *meaning* is carried in the warm "When the Load Gets Heavy"
+    // prose (CC-110) and the Grip narrative, not as a raw signal list.
+    if (renderMode === "clinician" && dash.grippingPull.signals.length > 0) {
       for (const sig of dash.grippingPull.signals) {
         out.push(`  - ${sig.humanReadable}`);
       }

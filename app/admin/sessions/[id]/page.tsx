@@ -102,19 +102,35 @@ function AdminExportPanel({
   sessionDate: Date | null;
 }) {
   const [copiedFlash, setCopiedFlash] = useState(false);
+  // CC-113 — Clinician | User markdown toggle. Default "clinician" matches
+  // the admin's primary reference (the rest of this page pins the React
+  // preview to clinician); flipping to "user" lets the owner review what
+  // the warm/interpreted markdown export emits for end-user delivery.
+  const [previewMode, setPreviewMode] = useState<"clinician" | "user">(
+    "clinician"
+  );
 
-  function buildMarkdown(): string {
+  function buildMarkdown(mode: "clinician" | "user"): string {
     return renderMirrorAsMarkdown({
       constitution,
       demographics,
       answers,
       includeBeliefAnchor: true,
+      renderMode: mode,
     });
   }
 
+  // CC-113 — live preview of the selected-mode markdown, memoized so
+  // toggling doesn't re-render on every keystroke elsewhere on the page.
+  const previewMarkdown = useMemo(
+    () => buildMarkdown(previewMode),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [previewMode, constitution, demographics, answers]
+  );
+
   async function handleCopyMarkdown() {
     try {
-      await navigator.clipboard.writeText(buildMarkdown());
+      await navigator.clipboard.writeText(buildMarkdown(previewMode));
       setCopiedFlash(true);
       window.setTimeout(() => setCopiedFlash(false), 2000);
     } catch {
@@ -124,12 +140,17 @@ function AdminExportPanel({
   }
 
   function handleDownloadMarkdown() {
-    const md = buildMarkdown();
+    const md = buildMarkdown(previewMode);
     const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = buildFilename(demographics, sessionDate);
+    // CC-113 — append the mode to the filename so the two modes don't
+    // collide on disk (e.g. `<session>-clinician.md` / `<session>-user.md`).
+    const baseName = buildFilename(demographics, sessionDate);
+    a.download = baseName.endsWith(".md")
+      ? `${baseName.slice(0, -3)}-${previewMode}.md`
+      : `${baseName}-${previewMode}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -168,6 +189,42 @@ function AdminExportPanel({
       >
         Repeated export available; engine re-renders against current code on each load.
       </p>
+      {/* CC-113 — Clinician | User markdown toggle. Controls which mode
+          the Copy / Download buttons emit AND which mode the live
+          preview below renders. The React preview further down this
+          page is a separate render path and is unaffected by this
+          toggle (it stays pinned to clinician). */}
+      <div
+        role="group"
+        aria-label="Preview mode"
+        className="flex flex-row"
+        style={{ gap: 0, alignItems: "center", marginTop: 4 }}
+      >
+        {(["clinician", "user"] as const).map((mode) => {
+          const selected = previewMode === mode;
+          return (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setPreviewMode(mode)}
+              aria-pressed={selected}
+              className="font-mono uppercase"
+              style={{
+                fontSize: 11,
+                letterSpacing: "0.12em",
+                color: selected ? "var(--paper, #fff)" : "var(--umber)",
+                background: selected ? "var(--umber)" : "transparent",
+                border: "1px solid var(--rule)",
+                padding: "6px 12px",
+                cursor: "pointer",
+                marginRight: -1,
+              }}
+            >
+              {mode}
+            </button>
+          );
+        })}
+      </div>
       <div className="flex flex-row" style={{ gap: 10, alignItems: "center" }}>
         <button
           type="button"
@@ -210,6 +267,31 @@ function AdminExportPanel({
           </span>
         ) : null}
       </div>
+      {/* CC-113 — Live preview of the selected-mode markdown. No
+          markdown-renderer dependency exists in this project; the raw
+          markdown is rendered in a monospace pre block with wrap +
+          bounded max-height + scroll. Flipping the toggle above
+          re-renders this block via the memoized buildMarkdown call. */}
+      <pre
+        aria-label={`Markdown preview (${previewMode} mode)`}
+        style={{
+          marginTop: 8,
+          padding: "12px 14px",
+          border: "1px solid var(--rule)",
+          background: "var(--paper, #fff)",
+          color: "var(--ink)",
+          fontFamily:
+            "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+          fontSize: 12,
+          lineHeight: 1.5,
+          maxHeight: 480,
+          overflow: "auto",
+          whiteSpace: "pre-wrap",
+          wordBreak: "break-word",
+        }}
+      >
+        {previewMarkdown}
+      </pre>
     </section>
   );
 }
