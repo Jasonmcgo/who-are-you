@@ -146,7 +146,17 @@ async function runAudit(): Promise<void> {
     );
   }
 
-  // ── 5. Admin page wires renderMode="clinician" ─────────────────────
+  // ── 5. Admin page wires renderMode driven by previewMode, default
+  //      "clinician" ─────────────────────────────────────────────────
+  //   CC-117 anchor refresh: the admin page used to pin
+  //   renderMode="clinician" as a literal. The CC-117 toggle now lets
+  //   the admin flip preview between clinician/user in-place, so the
+  //   prop is `renderMode={previewMode}` where `previewMode` is a
+  //   `useState<"clinician" | "user">("clinician")` that *defaults* to
+  //   clinician. The audit's invariant — admin retains MBTI artifacts
+  //   out-of-the-box — is preserved by the default; the previous
+  //   literal-string check is no longer expressible because the prop
+  //   is now dynamic.
   {
     const src = readFileSync(
       join(
@@ -161,20 +171,24 @@ async function runAudit(): Promise<void> {
       ),
       "utf-8"
     );
-    const ok = /<InnerConstitutionPage[\s\S]*?renderMode="clinician"[\s\S]*?\/>/.test(
-      src
-    );
+    const propWired =
+      /<InnerConstitutionPage[\s\S]*?renderMode=\{previewMode\}[\s\S]*?\/>/.test(
+        src
+      );
+    const defaultsToClinician =
+      /useState<"clinician"\s*\|\s*"user">\(\s*"clinician"\s*\)/.test(src);
+    const ok = propWired && defaultsToClinician;
     results.push(
       ok
         ? {
             ok: true,
             assertion: "admin-page-passes-clinician-mode",
-            detail: `app/admin/sessions/[id]/page.tsx passes renderMode="clinician" to <InnerConstitutionPage>`,
+            detail: `app/admin/sessions/[id]/page.tsx wires renderMode={previewMode} with previewMode defaulting to "clinician" (CC-117 toggle)`,
           }
         : {
             ok: false,
             assertion: "admin-page-passes-clinician-mode",
-            detail: `app/admin/sessions/[id]/page.tsx does NOT pass renderMode="clinician" — admin would lose MBTI artifacts`,
+            detail: `admin page must wire renderMode={previewMode} AND default previewMode to "clinician" — propWired=${propWired} defaultsToClinician=${defaultsToClinician}`,
           }
     );
   }

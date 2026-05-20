@@ -66,7 +66,7 @@ export const USE_CASES: ReadonlyArray<{
 }> = [
   {
     title: "Career decisions.",
-    body: "When the next role is on the table, the question is not which job sounds best. It's whether the role would draw on the gifts the read named, leave the gravity you ranked highest intact, and let your driver function operate without distortion. Run the role against your top three gifts and your top three Compass values; if the answer is structurally flat, the role is wrong for you regardless of the title.",
+    body: "When the next role is on the table, the question is not which job sounds best. It's whether the role would draw on the gifts the read named, leave the gravity that holds you intact, and let your driver function operate without distortion. Run the role against your top three gifts and your top three Compass values; if the answer is structurally flat, the role is wrong for you regardless of the title.",
   },
   {
     title: "Work-energy choices.",

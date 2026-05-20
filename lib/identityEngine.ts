@@ -835,7 +835,8 @@ export function detectTensions(
       tension_id: "T-001",
       type: "Truth vs Belonging",
       description:
-        "The user values truth, but may soften or withhold it when relationships are at risk.",
+        // CC-116 — second person, meaning-first (was third-person "The user…").
+        "Truth matters to you, and so do the people who would be hurt by hearing it raw. Where those two pull against each other, your default leans toward softening or withholding rather than risking the relationship.",
       signals_involved: [
         ref(signals, "truth_priority_high", "conviction"),
         ref(signals, "adapts_under_social_pressure", "pressure"),
@@ -857,7 +858,8 @@ export function detectTensions(
       tension_id: "T-002",
       type: "Conviction vs Economic Security",
       description:
-        "The user may hold strong beliefs internally while limiting expression when financial security is at risk.",
+        // CC-116 — second person, meaning-first.
+        "Conviction stays intact in private; the expression of it narrows when financial security is on the line. The belief doesn't move; the visible signal of holding it does.",
       signals_involved: [
         has(signals, "truth_priority_high")
           ? ref(signals, "truth_priority_high", "conviction")
@@ -882,7 +884,8 @@ export function detectTensions(
       tension_id: "T-005",
       type: "Stability vs Freedom",
       description:
-        "The user values freedom, but current responsibilities or stability needs may constrain how freely they can act.",
+        // CC-116 — second person, meaning-first.
+        "Freedom matters to you; current responsibilities, or the need for stability that holds others, narrow how freely you can actually act on it. The pull is real on both sides.",
       signals_involved: [
         ref(signals, "stability_priority", "sacred"),
         ref(signals, "freedom_priority", "sacred"),
@@ -910,7 +913,8 @@ export function detectTensions(
       tension_id: "T-006",
       type: "Creator vs Maintainer",
       description:
-        "The user may see themselves as a builder or creator, while current life demands keep them in maintenance or reaction mode.",
+        // CC-116 — second person, meaning-first.
+        "The shape of how you'd like to spend your effort — building, creating — sits one register apart from how the days actually run, which keep you in maintenance and reaction. The aspirational and the lived have separated.",
       signals_involved: [
         ref(signals, "proactive_creator", "agency"),
         ref(signals, rightId, "agency"),
@@ -937,7 +941,8 @@ export function detectTensions(
       tension_id: "T-007",
       type: "Family vs Truth",
       description:
-        "The user may experience tension when protecting family conflicts with speaking or pursuing truth.",
+        // CC-116 — second person, meaning-first.
+        "Family and truth both sit near the center of what you protect. Where the cost of one is borne by the other, the tradeoff is genuinely hard — not a matter of which you care about more.",
       signals_involved: [
         ref(signals, "family_priority", "sacred"),
         ref(signals, rightId, rightCard),
@@ -963,7 +968,8 @@ export function detectTensions(
       tension_id: "T-008",
       type: "Order vs Reinvention",
       description:
-        "The user may value order and stability while also wanting freedom to create or reinvent.",
+        // CC-116 — second person, meaning-first.
+        "You want structures stable enough to hold weight AND open enough to be reinvented. Some weeks one of those wins out and the other has to wait; the shape of the conflict is real, not preferential.",
       signals_involved: [
         ref(signals, "stability_priority", "sacred"),
         ref(signals, rightId, rightCard),
@@ -989,7 +995,8 @@ export function detectTensions(
       tension_id: "T-010",
       type: "Inherited Stability vs Present Chaos",
       description:
-        "The user may have been formed in stability but currently lives under pressure, overload, or constant reaction.",
+        // CC-116 — second person, meaning-first.
+        "Your inherited baseline is stability, but the current register of your life is pressure, overload, or constant reaction. The gap between formation and present means default expectations no longer match what the day demands.",
       signals_involved: [
         ref(signals, "stability_baseline_high", "formation"),
         ref(signals, rightId, rightCard),
@@ -1014,7 +1021,8 @@ export function detectTensions(
       tension_id: "T-011",
       type: "Chaos Formation vs Control Need",
       description:
-        "The user may value order or stability partly because early life felt uncertain or chaotic.",
+        // CC-116 — second person, meaning-first.
+        "The instinct to protect order or stability has a formation history: earlier life had enough uncertainty in it that ordered structure carries weight beyond convenience now.",
       signals_involved: [
         ref(signals, "chaos_exposure", "formation"),
         ref(signals, rightId, rightCard),
@@ -1048,7 +1056,8 @@ export function detectTensions(
       // CC-025 Step 2.5A — descriptive UI name per spec table.
       type: "Sacred Values in Conflict",
       description:
-        "The user may hold multiple sacred values that cannot always be protected at the same time.",
+        // CC-116 — second person, meaning-first.
+        "More than one of what you hold sacred sits at the top of the same ranking. Most of the time they cohere; in the moments when life forces a tradeoff, the cost falls on one of them — and that's the cost you'd feel hardest.",
       signals_involved: involved.slice(0, 4).map((s) => ({
         signal_id: s.signal_id,
         from_card: s.from_card,
@@ -1323,7 +1332,11 @@ function detectAllocationOverlayTensions(
         // CC-060 — Rule 4 closure (synthesis variant). T-015 templates do not
         // interpolate ${value}; pass empty string. 3-state question close is
         // embedded in each locked T-015 template, so no separate close.
-        user_prompt: `Across multiple allocation domains, you marked categories where the current flow doesn't match what you wish. The gap shows up in ${joinSynthesisLabels(triggeringQids)}.\n\n${getAllocationSharpQuestion("T-015", "", driveOutput)}`,
+        // CC-116 — interpretation over recitation. "You marked categories"
+        // narrated the act of selecting; the new framing names what the
+        // gap reveals (a recurring mismatch across multiple domains is
+        // structural, not incidental).
+        user_prompt: `A recurring gap is showing up across multiple allocation domains — where current flow and what you'd protect have separated by more than one ranking. The pattern surfaces in ${joinSynthesisLabels(triggeringQids)}.\n\n${getAllocationSharpQuestion("T-015", "", driveOutput)}`,
       },
     ];
   }
@@ -1339,7 +1352,10 @@ function detectAllocationOverlayTensions(
       // synthesis variants ("Current and Aspirational Allocation").
       type: "Current and Aspirational Allocation",
       description:
-        "The user marked at least two categories within a single allocation ranking where the current flow doesn't match what they wish.",
+        // CC-116 — interpretation over recitation. Was third-person and
+        // a count of selections ("The user marked at least two
+        // categories…"); now names what the within-ranking gap reveals.
+        "Within a single allocation ranking, current flow and what you would protect diverge in more than one place — a gap wide enough to be a pattern, not a single mismatched line.",
       signals_involved: [],
       confidence: "high",
       status: "unconfirmed",
@@ -1347,7 +1363,10 @@ function detectAllocationOverlayTensions(
       // CC-060 — Rule 4 closure (per-instance variant). Same pattern as the
       // synthesis variant above; T-015 templates do not interpolate ${value}.
       // 3-state question close is embedded in each locked T-015 template.
-      user_prompt: `When you ranked ${label}, you marked at least two categories where the current flow doesn't match what you wish.\n\n${getAllocationSharpQuestion("T-015", "", driveOutput)}`,
+      // CC-116 — interpretation over recitation. Was "you marked at
+      // least two categories"; now names the gap as a pattern inside
+      // the named ranking.
+      user_prompt: `Inside the ${label} ranking, current flow and what you'd protect have separated in more than one place. The gap is wider than a single mismatched line.\n\n${getAllocationSharpQuestion("T-015", "", driveOutput)}`,
     };
   });
 }
@@ -3765,7 +3784,7 @@ export function valueListPhrase(
     case 2:
       return "what you protect";
     case 3:
-      return `the ${labels.length} values you ranked highest`;
+      return "the values your shape protects";
     default:
       return verbatim;
   }
@@ -6415,7 +6434,7 @@ function valuesPlural(topCompass: SignalRef[], variantIdx: number): string {
     case 0:  return joinList(labels);
     case 1:  return "your top values";
     case 2:  return "the values you protect";
-    case 3:  return `the ${labels.length} values you ranked highest`;
+    case 3:  return "the values your shape protects";
     default: return joinList(labels);
   }
 }

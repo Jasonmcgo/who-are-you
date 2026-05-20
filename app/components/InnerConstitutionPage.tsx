@@ -42,6 +42,46 @@ import {
 import { composeReportCallouts } from "../../lib/composeReportCallouts";
 import { composeClosingReadProse } from "../../lib/identityEngine";
 
+// CC-117 — local copies of the CC-115 user-mode fallback helpers from
+// `lib/renderMirror.ts`. Duplicated (not imported) because the prompt
+// explicitly forbids markdown-renderer dependencies and the helpers are
+// not exported. The shared mode-policy CC noted in CC-117 follow-up
+// should later collapse these duplicates against the markdown emitter.
+const PRIMAL_FALLBACK_COST_REACT: Record<string, string> = {
+  "Am I safe?": "avoidance, control, retreat, or overprotection",
+  "Am I secure?": "hoarding, over-planning, or scarcity logic",
+  "Am I loved?": "emotional dependency, testing, overgiving, or withdrawal",
+  "Am I wanted?": "approval-seeking, self-editing, or room compliance",
+  "Am I successful?":
+    "achievement addiction, comparison, or hollow productivity",
+  "Am I good enough?": "shame, perfectionism, hiding, or overproving",
+  "Do I have purpose?":
+    "urgency, savior-complex, abstraction, or restless reinvention",
+};
+function formatHealthyGiftFallbackReact(
+  primary: string,
+  healthyGift: string
+): string {
+  switch (primary) {
+    case "Am I safe?":
+      return "You read what could harm what you protect before others have noticed the risk.";
+    case "Am I secure?":
+      return "You keep things from falling apart that others would let slip.";
+    case "Am I loved?":
+      return "You hold what others entrust to you with steady, attentive care.";
+    case "Am I wanted?":
+      return "You read what the room needs and respond before others have noticed it shifting.";
+    case "Am I successful?":
+      return "You finish what you start at a standard others can rely on.";
+    case "Am I good enough?":
+      return "You turn unfinished thinking into form that earns its keep.";
+    case "Do I have purpose?":
+      return "You make the work mean something past the work itself.";
+    default:
+      return `You carry the gift of ${healthyGift}.`;
+  }
+}
+
 type Confirmation = {
   status: TensionStatus;
   note?: string;
@@ -693,7 +733,13 @@ export default function InnerConstitutionPage({
                       ) : (
                         `${movementDashboard.grippingPull.score} / 100`
                       )}
-                      {movementDashboard.grippingPull.signals.length > 0 ? (
+                      {/* CC-117 — gate the raw grip-component bullets to
+                          clinician mode (mirrors CC-114 in renderMirror.ts).
+                          User mode keeps the headline Grip metric only; the
+                          grip *meaning* is carried in the warm Grip section
+                          below, not as a raw signal list. */}
+                      {mode === "clinician" &&
+                      movementDashboard.grippingPull.signals.length > 0 ? (
                         <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
                           {movementDashboard.grippingPull.signals.map((sig) => (
                             <li key={sig.id}>{sig.humanReadable}</li>
@@ -851,7 +897,9 @@ export default function InnerConstitutionPage({
                     — but the signal is thin enough that the question is
                     worth noticing rather than governing.
                   </p>
-                ) : (
+                ) : mode === "clinician" ? (
+                  // CC-117 — clinician keeps the labeled engine-fallback
+                  // block (mirrors CC-111 in renderMirror.ts).
                   <dl
                     className="font-serif"
                     style={{
@@ -888,52 +936,92 @@ export default function InnerConstitutionPage({
                       {constitution.gripTaxonomy.healthyGift}
                     </dd>
                   </dl>
+                ) : (
+                  // CC-117 — user-mode rendered-fallback prose mirrors
+                  // CC-115 in renderMirror.ts. Without this, the section
+                  // would render an empty box on sessions with no cached
+                  // gripParagraphLlm + a non-hedged proseMode.
+                  <p
+                    className="font-serif italic"
+                    style={{
+                      fontSize: 15.5,
+                      color: "var(--ink)",
+                      lineHeight: 1.65,
+                      margin: 0,
+                    }}
+                  >
+                    Under pressure the surface clue is{" "}
+                    {constitution.gripTaxonomy.surfaceGrip.toLowerCase()};
+                    underneath it runs a quieter question —{" "}
+                    <em>
+                      {constitution.gripPattern?.underlyingQuestion ??
+                        "What is this pressure asking of me that I have not yet named?"}
+                    </em>{" "}
+                    {constitution.gripTaxonomy.distortedStrategy?.text ??
+                      `Under pressure, this question can pull you toward ${
+                        PRIMAL_FALLBACK_COST_REACT[
+                          constitution.gripTaxonomy.primary
+                        ] ?? "the patterns that follow the question"
+                      }.`}{" "}
+                    At its steadier, the same instrument turns the other way.{" "}
+                    {formatHealthyGiftFallbackReact(
+                      constitution.gripTaxonomy.primary,
+                      constitution.gripTaxonomy.healthyGift
+                    )}
+                  </p>
                 )}
               </div>
-              <dl
-                className="font-serif"
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "max-content 1fr",
-                  columnGap: 12,
-                  rowGap: 6,
-                  margin: 0,
-                  fontSize: 14,
-                  color: "var(--ink)",
-                }}
-              >
-                <dt style={{ fontWeight: 700 }}>Grip Pattern</dt>
-                <dd style={{ margin: 0 }}>
-                  {constitution.gripPattern?.renderedLabel ??
-                    "Grip Pattern (not yet classified)"}
-                </dd>
-                <dt style={{ fontWeight: 700 }}>Underlying Question</dt>
-                <dd style={{ margin: 0, fontStyle: "italic" }}>
-                  {constitution.gripPattern?.underlyingQuestion ??
-                    "What is this pressure asking of me that I have not yet named?"}
-                </dd>
-                {constitution.gripTaxonomy.contributingGrips.length > 0 ? (
-                  <>
-                    <dt style={{ fontWeight: 700 }}>Contributing grips</dt>
-                    <dd style={{ margin: 0 }}>
-                      {constitution.gripTaxonomy.contributingGrips.join(", ")}
-                    </dd>
-                  </>
-                ) : null}
-                {constitution.gripTaxonomy.subRegister ? (
-                  <>
-                    <dt style={{ fontWeight: 700 }}>Sub-register</dt>
-                    <dd style={{ margin: 0 }}>
-                      {constitution.gripTaxonomy.subRegister}
-                    </dd>
-                  </>
-                ) : null}
-                <dt style={{ fontWeight: 700 }}>Confidence</dt>
-                <dd style={{ margin: 0 }}>
-                  {constitution.gripPattern?.confidence ??
-                    constitution.gripTaxonomy.confidence}
-                </dd>
-              </dl>
+              {/* CC-117 — raw grip diagnostic field panel (Grip Pattern /
+                  Underlying Question / Contributing grips / Sub-register /
+                  Confidence) is clinician-only. User mode shows grip as
+                  the warm prose above; this labeled block is a clinician/
+                  diagnostic artifact. Mirrors CC-111 in renderMirror.ts. */}
+              {mode === "clinician" ? (
+                <dl
+                  className="font-serif"
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "max-content 1fr",
+                    columnGap: 12,
+                    rowGap: 6,
+                    margin: 0,
+                    fontSize: 14,
+                    color: "var(--ink)",
+                  }}
+                >
+                  <dt style={{ fontWeight: 700 }}>Grip Pattern</dt>
+                  <dd style={{ margin: 0 }}>
+                    {constitution.gripPattern?.renderedLabel ??
+                      "Grip Pattern (not yet classified)"}
+                  </dd>
+                  <dt style={{ fontWeight: 700 }}>Underlying Question</dt>
+                  <dd style={{ margin: 0, fontStyle: "italic" }}>
+                    {constitution.gripPattern?.underlyingQuestion ??
+                      "What is this pressure asking of me that I have not yet named?"}
+                  </dd>
+                  {constitution.gripTaxonomy.contributingGrips.length > 0 ? (
+                    <>
+                      <dt style={{ fontWeight: 700 }}>Contributing grips</dt>
+                      <dd style={{ margin: 0 }}>
+                        {constitution.gripTaxonomy.contributingGrips.join(", ")}
+                      </dd>
+                    </>
+                  ) : null}
+                  {constitution.gripTaxonomy.subRegister ? (
+                    <>
+                      <dt style={{ fontWeight: 700 }}>Sub-register</dt>
+                      <dd style={{ margin: 0 }}>
+                        {constitution.gripTaxonomy.subRegister}
+                      </dd>
+                    </>
+                  ) : null}
+                  <dt style={{ fontWeight: 700 }}>Confidence</dt>
+                  <dd style={{ margin: 0 }}>
+                    {constitution.gripPattern?.confidence ??
+                      constitution.gripTaxonomy.confidence}
+                  </dd>
+                </dl>
+              ) : null}
             </section>
             <SectionRule />
           </>

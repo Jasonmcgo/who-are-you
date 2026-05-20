@@ -302,12 +302,13 @@ export function noAnchorLine(): string {
 
 // ── CC-022b Item 3 — Keystone Reflection selection citation ─────────────
 //
-// Cite the user's actual Q-I2 / Q-I3 selections back to them by source-
-// question label. Replaces (augments, when answers are available) the
-// generic dimension-label posture line with structurally specific prose:
-// "Of the six trust sources you ranked highest — Education, Press, Own
-// counsel — you marked one (Own counsel) as potentially capable of
-// revising this belief."
+// CC-112 — interpretation over recitation. Q-I2 / Q-I3 selections feed
+// the citation prose, but the prose now reads what the pattern reveals
+// (open posture / one named exit / closed; load-bearing cost surface /
+// single named price / refusal-as-read), not a tally of which sources
+// or stakes were marked. The composers below build the meaning; the
+// pre-CC-112 stale "Of the N you ranked highest, you marked one (X)"
+// recitation has been retired across all branches.
 //
 // The citation prose is additive: when `answers` is not provided (or the
 // selections are unavailable), the existing generic dimension-label prose
