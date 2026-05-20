@@ -593,6 +593,25 @@ The rewrite-track rules (Rule 1-10 above) remain the engine's canonical constrai
 
 **Sentence 2 anchors (Rule 2 implementation per CC-052/CC-052b) and the Peace/Faith disambiguation prose (Rule 10/Rule 11 per CC-054) are engine-owned. The polish layer cannot edit them, even when adding sentences before or after them.**
 
+## § Interpretation over recitation (CC-112, 2026-05-19)
+
+**The report translates the user's selections into meaning; it never recites the mechanics of their input.**
+
+Forbidden:
+
+- Counts of what they selected as the substance of a finding ("you marked N of M", "the N values you ranked highest" as a tally).
+- Listing selections as evidence of themselves — a list that reads back what the user already chose and asks them to recognize it.
+- "Your selections place / your shape places" framings that narrate the act of choosing rather than what's been chosen.
+- Repeating the same sentence opener across adjacent sentences in a reflective passage.
+
+Required:
+
+- State what the *pattern* reveals. A wide cost surface across relationships, reputation, money, and livelihood is load-bearing (meaning); not "you marked 4 of 5 stakes" (mechanics).
+- A list is allowed only when it carries new meaning the reader can't already infer from having answered (e.g., a value-cluster names the values the engine derived; a tally of stakes the user themselves selected is recitation, not derivation).
+- Vary cadence — never repeat the same sentence opener across adjacent sentences. The reflective register depends on it.
+
+This principle is engine-layer canon: the engine cannot author its way out of a reciting paragraph, and the polish layer cannot reintroduce it. The keystone-specific application is in `keystone-reflection-rules.md`.
+
 ## § Markdown Export Parity (procedural — CODEX-066, 2026-05-02)
 
 Every CC that adds, removes, or restructures an on-page report surface in `app/components/InnerConstitutionPage.tsx` or its child components MUST also update `lib/renderMirror.ts` to maintain markdown export parity. Markdown is the canonical handoff format for downstream LLM review (per the manual A/B workflow), share-without-account flow (per `project_mvp_product_vision.md`), and any future PDF generation pipeline. Drift between on-page and markdown invalidates the comparison surface.

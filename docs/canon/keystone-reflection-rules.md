@@ -170,3 +170,14 @@ When future Keystone prose paths detect closed-revision (or analogous patterns w
 | Canonical rule | Code-level surface |
 |---|---|
 | CC-025 closed-revision softening | `lib/beliefHeuristics.ts` (`temperatureLine`, `postureLine`, `qi2CitationLine`); the locked text is also referenced in `result-writing-canon.md § CC-025`. |
+
+## CC-112 — Interpretation over recitation (Keystone-specific application)
+
+The general principle lives in `result-writing-canon.md § Interpretation over recitation`. Applied to the Keystone Reflection:
+
+- **Value cluster:** the engine derives the value-cluster the belief sits inside, but does NOT narrate the act of selection. Forbidden openers: *"Your selections place this belief inside …"*, *"Your shape places this belief inside …"*. The cluster must be folded into prose that names what the cluster *does* to the belief (load-bearing? close to the people it names? carried across time?).
+- **Cost surface:** breadth is the read, not the count. *"You marked 4 of the 5 stakes — a wide cost surface"* recites; *"This is a belief you would pay for across relationships, reputation, money, and livelihood — load-bearing, not ornamental"* interprets. The specific costs appear only when they add meaning to the sentence, never as a counted tally.
+- **Revision-source line:** name what the openness/closure *implies* (open posture toward revision; held with conviction with revision paths kept open; closed in a way that may reflect conviction with the CC-025 softening), not which sources the user did or didn't select.
+- **Reflective voice is second-person.** The `name ? "${name} marked" : "you marked"` ternary is forbidden in reflective prose. Clinician-mode diagnostic *metadata* rows (separate panel) may still use the name; the reflective body does not.
+- **Adjacent-sentence cadence varies.** No two adjacent sentences in the Keystone body may share an opener (no "Your selections… / Your shape…" stacking).
+- **LLM warmth pass mirrors the rule.** `keystoneRewriteLlm.ts` carries an explicit anti-recitation / vary-cadence rule so the polish layer cannot reintroduce the tally on top of the engine fix.

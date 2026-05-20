@@ -43,6 +43,15 @@ import {
   readCachedKeystoneRewrite,
   type KeystoneRewriteInputs,
 } from "./keystoneRewriteLlm";
+import { readCachedV3Rewrite } from "./launchPolishV3Llm";
+// CC-110 — V3 splice into user-mode markdown. The shared helper builds
+// the same V3RewriteInputs the React surface uses, so the cache key
+// matches and every warm V3 entry appears in the Copy/Download export.
+import {
+  V3_HEADERS,
+  V3_MARKDOWN_SPLICE_SECTION_IDS,
+  buildV3SectionInputs,
+} from "./v3SectionInputs";
 import { composeKeystoneFallback } from "./keystoneFallback";
 import {
   summarizeQI2Selections,
@@ -162,7 +171,19 @@ function scrubFosterVocab(
   return out;
 }
 
-function emitGripSection(out: string[], constitution: InnerConstitution): void {
+function emitGripSection(
+  out: string[],
+  constitution: InnerConstitution,
+  // CC-111 — render-mode gate. Clinician keeps the raw diagnostic
+  // field block (Grip Pattern / Underlying Question / Named grips
+  // contributing / Sub-register / Confidence) and the labeled
+  // engine-fallback lines (Surface Grip / Grip Pattern / Underlying
+  // Question / Distorted Strategy / Healthy Gift). User mode keeps
+  // the warm narrative (LLM blockquote or hedged prose) and drops
+  // the labeled field clutter — the gold-standard user surface shows
+  // grip as prose, not as a clinical field panel.
+  renderMode: "user" | "clinician" = "user"
+): void {
   const grip = constitution.gripTaxonomy;
   if (!grip || !grip.primary) return;
   // CC-GRIP-CALIBRATION — `proseMode` is the legacy Primal classifier's
@@ -215,9 +236,14 @@ function emitGripSection(out: string[], constitution: InnerConstitution): void {
     out.push(
       `The pressure register reads quietly here. The surface clue is ${grip.surfaceGrip.toLowerCase()}; the underlying recognition may be "${underlyingQuestion}" — but the signal is thin enough that the question is worth noticing rather than governing. Under pressure this can pull toward ${cost}; for now, sit with whether the question has been doing more work than you realized.`
     );
-  } else {
+  } else if (renderMode === "clinician") {
     // Engine fallback for rendered mode — emit the four-line three-
     // concept block from the engine's canonical templates.
+    // CC-111 — clinician only. User mode drops these labeled
+    // `Field: value` lines (they are clinical, not warm prose) and
+    // leaves the warm-narrative slot empty when the LLM paragraph is
+    // unavailable. In production the LLM paragraph is always
+    // present, so this user-mode no-emit path is the no-API fallback.
     const distorted =
       grip.distortedStrategy?.text ??
       `Under pressure, this question can pull you toward ${PRIMAL_FALLBACK_COST[grip.primary] ?? "the patterns that follow the question"}.`;
@@ -233,22 +259,28 @@ function emitGripSection(out: string[], constitution: InnerConstitution): void {
     out.push(`Healthy Gift: ${healthy}`);
   }
 
-  out.push("");
-  out.push(`**Grip Pattern:** ${patternLabel}`);
-  out.push("");
-  out.push(`**Underlying Question:** ${underlyingQuestion}`);
-  if (grip.contributingGrips.length > 0) {
+  // CC-111 — raw diagnostic field block is clinician-only. User mode
+  // shows grip as prose (the warm narrative above); the labeled
+  // Grip Pattern / Underlying Question / Contributing grips / Sub-
+  // register / Confidence panel is a clinician/diagnostic artifact.
+  if (renderMode === "clinician") {
     out.push("");
-    out.push(
-      `**Named grips contributing to this read:** ${grip.contributingGrips.join(", ")}`
-    );
-  }
-  if (grip.subRegister) {
+    out.push(`**Grip Pattern:** ${patternLabel}`);
     out.push("");
-    out.push(`**Sub-register:** ${grip.subRegister}`);
+    out.push(`**Underlying Question:** ${underlyingQuestion}`);
+    if (grip.contributingGrips.length > 0) {
+      out.push("");
+      out.push(
+        `**Named grips contributing to this read:** ${grip.contributingGrips.join(", ")}`
+      );
+    }
+    if (grip.subRegister) {
+      out.push("");
+      out.push(`**Sub-register:** ${grip.subRegister}`);
+    }
+    out.push("");
+    out.push(`**Confidence:** ${pattern?.confidence ?? grip.confidence}`);
   }
-  out.push("");
-  out.push(`**Confidence:** ${pattern?.confidence ?? grip.confidence}`);
 }
 
 function formatHealthyGiftFallback(
@@ -1256,7 +1288,7 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
   //   2. Engine fallback prose (when LLM unavailable + cluster present)
   //   3. Section omitted entirely when cluster confidence is low (no
   //      named grips fired, or cluster genuinely tied)
-  emitGripSection(out, constitution);
+  emitGripSection(out, constitution, renderMode);
 
   // 10. CC-072 — Disposition Signal Mix (replaces the pre-CC-072
   // "Disposition Map" 100%-summing render). Section heading is exactly
@@ -1889,6 +1921,38 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
       raw = raw.slice(0, idx) + cached + "\n" + raw.slice(idx + sectionEnd);
     }
     void proseRewriteHash;
+  }
+
+  // CC-110 — launchPolishV3 splice for the 6 Part-A sections (user mode
+  // only; clinician mode has already returned above). Mirrors the four-
+  // card splice loop: extract engine body via the shared V3 helper,
+  // build inputs identical to the React surface, look up the cache,
+  // substitute on hit, fall through to engine prose on miss.
+  //
+  // pathTriptych is intentionally NOT spliced here — it sits inside the
+  // Path · Gait card body, which the four-card Path splice above
+  // already replaces wholesale. Splicing the triptych on top of an
+  // already-substituted Path card requires a separate scope decision
+  // (own CC).
+  for (const sectionId of V3_MARKDOWN_SPLICE_SECTION_IDS) {
+    const header = V3_HEADERS[sectionId];
+    if (!header) continue;
+    const idx = raw.indexOf(header);
+    if (idx < 0) continue;
+    const rest = raw.slice(idx);
+    const depth = header.startsWith("## ") && !header.startsWith("### ") ? 2 : 3;
+    const stopPattern = depth === 2 ? /\n## / : /\n## |\n### /;
+    const nextHeaderRel = rest.slice(header.length).search(stopPattern);
+    const sectionEnd =
+      nextHeaderRel < 0
+        ? raw.length - idx
+        : header.length + nextHeaderRel;
+    const inputs = buildV3SectionInputs(raw, constitution, sectionId);
+    if (!inputs) continue;
+    const cached = readCachedV3Rewrite(inputs);
+    if (cached) {
+      raw = raw.slice(0, idx) + cached + "\n" + raw.slice(idx + sectionEnd);
+    }
   }
 
   // CC-SMALL-FIXES-BUNDLE Fix 2 — enforce Hands template structure

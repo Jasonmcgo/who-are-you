@@ -126,11 +126,23 @@ function runAudit(): AssertionResult[] {
 
   for (const fix of fixtures) {
     const c = buildInnerConstitution(fix.answers, [], fix.demographics);
+    // CC-110 — render in clinician mode. This audit's intent is to
+    // verify engine output (the DEFAULT_PHRASE / ARRIVED_PHRASE
+    // closing-read templates live in the engine's prose, not in the
+    // LLM rewrite). Before CC-110 the user-mode markdown export
+    // happened to preserve the engine phrases because the markdown
+    // path didn't substitute V3 sections; CC-110 wires the V3 splice
+    // into user-mode markdown (matching the React surface), so the
+    // closingRead LLM rewrite now displaces the engine phrase in
+    // user mode. The engine-anchor check moves to clinician mode,
+    // where the substitution doesn't fire — preserving the audit's
+    // original intent.
     const md = renderMirrorAsMarkdown({
       constitution: c,
       demographics: fix.demographics,
       includeBeliefAnchor: false,
       generatedAt: new Date("2026-05-08T12:00:00Z"),
+      renderMode: "clinician",
     });
 
     // Quadrant line detection: rendered as `- **Quadrant:** {label}`.
@@ -150,20 +162,13 @@ function runAudit(): AssertionResult[] {
     // CC-AIM-CALIBRATION — the renderer prefers `riskFormFromAim.prose`
     // when present (canonical source); accept either reading's prose.
     //
-    // CC-LAUNCH-VOICE-POLISH B2 — user-mode strips "(formerly X)"
-    // parentheticals from the rendered output, so the engine prose
-    // (`renderedProse`) won't match the user-mode markdown verbatim
-    // when it carries a parenthetical. Apply the same strip to the
-    // expected text before doing the inclusion check.
+    // CC-110 — this audit now renders in clinician mode (see above
+    // comment). Clinician mode preserves the "(formerly X)"
+    // parentheticals; compare against the unstripped engine prose.
     const renderedProse = c.riskFormFromAim?.prose ?? c.riskForm?.prose;
-    const renderedProseUserMode = renderedProse?.replace(
-      /\s*\(formerly [^)]+\)/g,
-      ""
-    );
     const riskFormProsePresent =
       c.riskForm || c.riskFormFromAim
-        ? renderedProseUserMode !== undefined &&
-          md.includes(renderedProseUserMode)
+        ? renderedProse !== undefined && md.includes(renderedProse)
         : true;
 
     rows.push({

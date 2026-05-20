@@ -25,6 +25,17 @@ import {
   type KeystoneLiveResolveOptions,
 } from "./keystoneRewriteLlmServer";
 import {
+  resolveV3RewriteLive,
+  type V3LiveResolveOptions,
+} from "./launchPolishV3LlmServer";
+// CC-110 — V3 splice into markdown export. The shared helper builds the
+// same V3RewriteInputs the React surface uses, so the cache key matches
+// and the markdown user-mode output picks up every warm V3 entry.
+import {
+  V3_MARKDOWN_SPLICE_SECTION_IDS,
+  buildV3SectionInputs,
+} from "./v3SectionInputs";
+import {
   COMPASS_LABEL,
   getTopCompassValues,
 } from "./identityEngine";
@@ -71,6 +82,8 @@ export interface LiveRenderOptions {
   proseComposer?: ProseLiveResolveOptions["composer"];
   /** Test seam — inject a mock keystone composer. */
   keystoneComposer?: KeystoneLiveResolveOptions["composer"];
+  /** CC-110 — test seam — inject a mock V3 composer. */
+  v3Composer?: V3LiveResolveOptions["composer"];
   /** Override the per-call LLM timeout. Default: 10 s. */
   timeoutMs?: number;
   /**
@@ -159,13 +172,40 @@ export async function renderMirrorAsMarkdownLive(
     });
   }
 
+  // CC-110 — Step 3b: pre-resolve the 6 in-scope V3 sections so the
+  // synchronous markdown render's user-mode splice (renderMirror.ts)
+  // finds them in the runtime cache. The shared helper builds inputs
+  // identically to the React `/api/report-cards` surface, so the cache
+  // key matches and the LLM does no extra work when entries already
+  // exist in the committed/session cache. pathTriptych is out of scope
+  // here — it lives inside the Path · Gait card body, which the four-
+  // card splice already replaces.
+  const v3Tasks: Promise<unknown>[] = [];
+  for (const sectionId of V3_MARKDOWN_SPLICE_SECTION_IDS) {
+    const inputs = buildV3SectionInputs(clinMd, args.constitution, sectionId);
+    if (!inputs) continue;
+    v3Tasks.push(
+      resolveV3RewriteLive(inputs, {
+        liveSession: true,
+        budget,
+        timeoutMs: options.timeoutMs,
+        composer: options.v3Composer,
+        sessionLlmBundle: options.sessionLlmBundle ?? null,
+      })
+    );
+  }
+
   // Step 4 — wait for all resolutions. The runtime cache is now
   // populated for every successful section; failed sections leave the
   // synchronous splice to fall through to engine prose.
-  await Promise.all([...proseTasks, ...(keystoneTask ? [keystoneTask] : [])]);
+  await Promise.all([
+    ...proseTasks,
+    ...(keystoneTask ? [keystoneTask] : []),
+    ...v3Tasks,
+  ]);
 
   // Step 5 — synchronous user-mode render. `readCachedRewrite` /
-  // `readCachedKeystoneRewrite` now hit the runtime cache for any
-  // section the LLM successfully resolved.
+  // `readCachedKeystoneRewrite` / `readCachedV3Rewrite` now hit the
+  // runtime cache for any section the LLM successfully resolved.
   return renderMirrorAsMarkdown({ ...args, renderMode: "user" });
 }

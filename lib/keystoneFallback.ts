@@ -35,6 +35,11 @@ const ARCHETYPE_CLOSING: Record<ProfileArchetype, string> = {
     "The shape this points to is a belief held inside what you protect, not outside it.",
 };
 
+// CC-112 — Interpretation over recitation. The fallback composer no
+// longer narrates "Your selections place / You marked …". It names the
+// architectural position of the belief (lives inside the value cluster
+// the engine derived) and the breadth of the cost surface as the read,
+// not as a tally.
 function valueClusterSentence(inputs: KeystoneRewriteInputs): string {
   const labels: string[] = [];
   // Compose the cluster from the engine-derived top compass values, with
@@ -44,28 +49,24 @@ function valueClusterSentence(inputs: KeystoneRewriteInputs): string {
     if (!labels.includes(v)) labels.push(v);
   }
   if (labels.length === 0) {
-    return "This belief sits inside the values your selections protect.";
+    return "This belief lives inside the values your shape protects.";
   }
-  // NOTE — we drop the engine's "with X as the value most directly at
-  // risk for it" suffix on purpose. That phrase is the engine
-  // `valueOpener` signature and the CC explicitly forbids it in user
-  // mode.
-  return `Your selections place this belief inside ${joinList(labels)}.`;
+  return `This belief lives inside ${joinList(labels)} — held close to what you protect, not at a distance from it.`;
 }
 
 function costSurfaceSentence(inputs: KeystoneRewriteInputs): string | null {
   if (inputs.costSurfaceNoneSelected) {
-    return "You marked none of the offered stakes as something you would trade for it — the refusal is informative on its own.";
+    return "You named no concrete cost you would willingly trade for it — the refusal is itself the read.";
   }
   const cs = inputs.costSurfaceLabels.filter((s) => s.length > 0);
   if (cs.length === 0) return null;
   if (cs.length === 1) {
-    return `You marked ${cs[0]} as a concrete cost you would bear for it — a single named price.`;
+    return `${cs[0]} reads as the one stake this belief would justify paying — a single named price.`;
   }
   if (cs.length === 2) {
-    return `You marked ${cs[0]} and ${cs[1]} as concrete costs you would bear for it.`;
+    return `${cs[0]} and ${cs[1]} are stakes this belief would justify paying — costs you appear willing to absorb when it is on the line.`;
   }
-  return `You marked ${joinList(cs)} as concrete costs you would bear for it — a wide cost surface.`;
+  return `This is a belief you would pay for across ${joinList(cs)} — load-bearing, not ornamental.`;
 }
 
 /**

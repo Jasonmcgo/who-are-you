@@ -26,10 +26,13 @@ import {
 } from "./launchPolishV3LlmServer";
 import {
   V3_SECTION_IDS,
-  deriveQuieterAxis,
-  type V3RewriteInputs,
   type V3SectionId,
 } from "./launchPolishV3Llm";
+// CC-110 — V3 cache-key construction is shared with the markdown
+// render path (lib/renderMirror.ts + lib/renderMirrorLive.ts) via the
+// helper module below. A second copy of this construction would
+// silently desync the React and markdown surfaces.
+import { buildV3SectionInputs } from "./v3SectionInputs";
 import { COMPASS_LABEL, getTopCompassValues } from "./identityEngine";
 import {
   summarizeQI2Selections,
@@ -51,52 +54,10 @@ const SCOPED_HEADERS: Record<ProseCardId, string> = {
   path: "## Path — Gait",
 };
 
-// CC-LAUNCH-VOICE-POLISH-V3 — markdown header per V3 section. Used to
-// slice the clinician-mode markdown into per-section bodies that the
-// V3 LLM rewrites consume.
-const V3_HEADERS: Record<V3SectionId, string> = {
-  executiveRead: "## Executive Read",
-  corePattern: "## Your Core Pattern",
-  whatOthersMayExperience: "## What Others May Experience",
-  whenTheLoadGetsHeavy: "## When the Load Gets Heavy",
-  synthesis: "## A Synthesis",
-  closingRead: "## Closing Read",
-  // pathTriptych is special — extracted from inside the Path · Gait card
-  // (level 2 section), not at its own top-level header. Handled below.
-  pathTriptych: "",
-};
-
-// Extract the Work/Love/Give triptych from inside the Path · Gait card.
-// Pattern: lines starting with `**Work** — ...`, `**Love** — ...`,
-// `**Give** — ...`. Returns concatenated block, or null if all three
-// are absent.
-function extractPathTriptych(md: string): string | null {
-  const lines = md.split("\n");
-  const blocks: string[] = [];
-  for (const label of ["**Work**", "**Love**", "**Give**"]) {
-    const idx = lines.findIndex((l) => l.startsWith(label));
-    if (idx < 0) continue;
-    // Collect this line + any continuation lines until the next blank +
-    // bold marker, or end of file.
-    const chunk: string[] = [lines[idx]];
-    for (let i = idx + 1; i < lines.length; i++) {
-      const next = lines[i];
-      if (
-        /^\*\*(?:Work|Love|Give|Practice|Pattern Note|Pattern in motion|Movement Note)\*\*/.test(
-          next
-        ) ||
-        /^## /.test(next) ||
-        /^### /.test(next)
-      ) {
-        break;
-      }
-      chunk.push(next);
-    }
-    blocks.push(chunk.join("\n").trimEnd());
-  }
-  if (blocks.length === 0) return null;
-  return blocks.join("\n\n");
-}
+// CC-110 — V3_HEADERS, extractPathTriptych, and the V3 input
+// construction now live in `lib/v3SectionInputs.ts` so the React
+// surface (this file) and the markdown surface (renderMirror.ts +
+// renderMirrorLive.ts) share a single cache-key source of truth.
 
 const RESERVED_CANON_LINES = [
   "visible, revisable, present-tense structure",
@@ -253,41 +214,21 @@ export async function resolveScopedRewritesLive(
 
   // CC-LAUNCH-VOICE-POLISH-V3 — seven additional section resolutions,
   // dispatched in parallel with the prose card + keystone resolutions.
-  const topCompassValueLabels = getTopCompassValues(args.constitution.signals)
-    .map((r) => COMPASS_LABEL[r.signal_id] ?? r.signal_id)
-    .filter((s) => s.length > 0);
-  // CC-106 — quieter Goal/Soul axis for pathTriptych's "**This week** —"
-  // paragraph. Threaded on every section's inputs so the hash stays
-  // uniform across sections.
-  const v3Dashboard = args.constitution.goalSoulMovement?.dashboard;
-  const quieterAxis = deriveQuieterAxis(
-    v3Dashboard?.goalScore ?? null,
-    v3Dashboard?.soulScore ?? null
-  );
+  // CC-110 — input construction is now in `buildV3SectionInputs`, the
+  // single source of truth shared with the markdown render path.
   const v3Tasks: Array<{
     sectionId: V3SectionId;
     promise: Promise<string | null>;
   }> = [];
   for (const sectionId of V3_SECTION_IDS) {
-    const body =
-      sectionId === "pathTriptych"
-        ? extractPathTriptych(clinMd)
-        : extractSection(clinMd, V3_HEADERS[sectionId]);
-    if (!body) {
+    const inputs = buildV3SectionInputs(clinMd, args.constitution, sectionId);
+    if (!inputs) {
       v3Tasks.push({
         sectionId,
         promise: Promise.resolve<string | null>(null),
       });
       continue;
     }
-    const inputs: V3RewriteInputs = {
-      sectionId,
-      archetype,
-      engineSectionBody: body,
-      topCompassValueLabels,
-      reservedCanonLines: RESERVED_CANON_LINES,
-      quieterAxis,
-    };
     v3Tasks.push({
       sectionId,
       promise: resolveV3RewriteLive(inputs, {

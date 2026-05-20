@@ -1,98 +1,98 @@
 {
   "ocean/01-architectural-openness.json": {
-    "length": 41722,
-    "hash": "8277f9252f27b0c18716d278bc137d2b61c99239ab3c588a4c6e760d9c63ac84"
+    "length": 41727,
+    "hash": "d9ce348427339450e3e700463ad583ad13b935c52e4f843fa8b0a78d0107fbad"
   },
   "ocean/02-high-conscientiousness.json": {
     "length": 41357,
     "hash": "12925b25f4b308f7cae45567d2412bfbb59feeba7102d45881f7ca9ad50f8337"
   },
   "ocean/03-low-extraversion-high-soul.json": {
-    "length": 41750,
-    "hash": "7a1edf8ac804d1e695d00c6a6b73889877bc2a746e24e80018436198ebfe317b"
+    "length": 41755,
+    "hash": "4b7cd9c1c6f895d841121ef6b67b633f3befa0028065e7bf68c9bfd459ec6f14"
   },
   "ocean/04-high-agreeableness-loyalty.json": {
-    "length": 41658,
-    "hash": "6562912f8242e789983981b03ea1c8d7afb07b5af9266de2e396e418ce96e921"
+    "length": 41663,
+    "hash": "be0e639bbefed78174421d1b7fdf50ce17643b088df0151dccfe9f3c29ba8014"
   },
   "ocean/05-low-emotional-reactivity-proxy.json": {
-    "length": 41333,
-    "hash": "b05a51cf1b36a6890f0f3fb7fcb2d770104af5bd48c79d927d21ca3d5e2a3442"
+    "length": 41338,
+    "hash": "a31842b6082f8557e3f946c73ba46ebcdeac36dd451401ca0dd99ac51783179a"
   },
   "ocean/06-thin-signal-under-detected.json": {
     "length": 37378,
     "hash": "4d0690f271e26315fec22e23a1adcba1ccc102e91dcd8aba9154e477518ddafd"
   },
   "ocean/07-jason-real-session.json": {
-    "length": 43510,
-    "hash": "8b7490f0700d9e72657d9fe1e7f5883c06eb6aad8fe77add0a23daf25e2d5def"
+    "length": 43515,
+    "hash": "e2acc91ec22c2fad9ba72f7e11dfb023d1e635fea8551dd58fe203c07ba9144b"
   },
   "ocean/24-si-precedent-keeper.json": {
-    "length": 45552,
-    "hash": "64644193aab8c0684fa705c3d543cdecabdfdd636f837b9adf84417868c1854d"
+    "length": 45557,
+    "hash": "1cbe8e511efbb204d9c1b4ab91b18a889eb456e6f4c8b574988987fef7d848f0"
   },
   "ocean/25-ti-coherence-prober.json": {
-    "length": 45543,
-    "hash": "8c111647494cdceebb2949524426a8f6f5d9b2bed40f9811f8aab1377022f956"
+    "length": 45548,
+    "hash": "7267b677ae186d431d1725fec7750edaab9cd1ba605fd7bea9f37113d3409427"
   },
   "ocean/26-fi-inner-truth-anchor.json": {
-    "length": 44318,
-    "hash": "d73849c31ff3705fac9f5f327c6c75d292bc34d7b0ab1223b811550711698158"
+    "length": 44323,
+    "hash": "dad1cf8d93b1bcefc5e16d730ff901f2b4994bcc40b155829e4520522ff63c9d"
   },
   "ocean/27-fe-room-reader-attuned.json": {
-    "length": 45647,
-    "hash": "2abdb03401e8e087b6b5a1b0d5744e7d32dafe75be1918f5800015465f5d5fac"
+    "length": 45652,
+    "hash": "b950311c8c988eb69d455ba63b6bdbcc487b715cec8725af5ba6d27c79b308de"
   },
   "goal-soul-give/01-generative.json": {
-    "length": 44055,
-    "hash": "25e205b00472fd6c9dad2016b72bdeac8a0f4ada9c6d6ac94036335e1ef46296"
+    "length": 44060,
+    "hash": "0dea5962b53ad11e237b6623a746fed8ce3c047b1474cb14bdfdcfe196972f7f"
   },
   "goal-soul-give/02-compartmentalized.json": {
-    "length": 44479,
-    "hash": "ecac920cb018936a0609304501d669803ae577df3a7bf23d7ba94bf5552df361"
+    "length": 44484,
+    "hash": "a92604294a264882fc96dbbccb1f1ebb00a4926f55254e2957fab985a620e30a"
   },
   "goal-soul-give/03-striving.json": {
-    "length": 44763,
-    "hash": "d29bf7c3d779139d6efd07cfa6a64171f48ab20340e70b507b6dd90195c52679"
+    "length": 44768,
+    "hash": "1636319b234deafb8083fccbf1d2b3db9ad7b99b9a55459a27dd36a8233fe0b3"
   },
   "goal-soul-give/04-longing.json": {
-    "length": 44491,
-    "hash": "cb9c20910f66f2630747736ce13d9ca7f047073e1224d23791dbfa6cff534896"
+    "length": 44496,
+    "hash": "94089771755ccb69804dd190a00a6db65183ee9c1b4b7a4fcd4f21b226c04d76"
   },
   "goal-soul-give/05-steward-not-gripper.json": {
-    "length": 45091,
-    "hash": "543ae46ace8bdcb54193ae3d73d4da935c7ccb7b85871f86aaee30a49bb5afcd"
+    "length": 45096,
+    "hash": "b0d7a3d50f7ec09bb7a869ff481d877b0806355ba3480313d5032b9a7dc8125e"
   },
   "goal-soul-give/06-neutral.json": {
     "length": 37378,
     "hash": "4d0690f271e26315fec22e23a1adcba1ccc102e91dcd8aba9154e477518ddafd"
   },
   "goal-soul-give/07-true-gripping.json": {
-    "length": 44790,
-    "hash": "af535dc6b9aa39e480ee93d3103f9256edb28fd17df69fabd9276c477f68e94d"
+    "length": 44795,
+    "hash": "2c6b014cf834a24bf5d43a3ef0d005192dd4eed0f5392d6ed84b7e93b4330cfd"
   },
   "goal-soul-give/08-early-career-striving.json": {
-    "length": 43510,
-    "hash": "eb669b9191081b3fbf6371e8bb3adc81c77060273febc302e969e2134412eb5f"
+    "length": 43515,
+    "hash": "38f30945886bfeeba8642e1d20c7530ede706c8947e92c21e8df68c648b20a59"
   },
   "goal-soul-give/09-mid-career-balance.json": {
-    "length": 44217,
-    "hash": "4d1e6279f7c0bea2262099ac67836b03360d1eed4118af05ba7c935b976e02f6"
+    "length": 44222,
+    "hash": "5a224ac7bf12ee383f6c158e204eec05fd00e3bf1736c1bc9043334a742c66a0"
   },
   "goal-soul-give/10-entrepreneur-striving.json": {
-    "length": 43839,
-    "hash": "5512e16b0bef8e2244222d7c0314621c561797ec8792c1d6614d9d6a298327d5"
+    "length": 43844,
+    "hash": "5b4ad21897328eed17130e37122448c450b681b0d7f8a6677a6b4bd65edf9c74"
   },
   "goal-soul-give/11-retirement-longing.json": {
-    "length": 44625,
-    "hash": "c4940568032c5dd087a516397b02c46d473ba8554bf2620fbe327e42aaef2b78"
+    "length": 44630,
+    "hash": "3e7835e526810cbad0bc9cd058be3e1ed5508208d2f62747f2c01bab7deedd63"
   },
   "goal-soul-give/12-productive-ne-default-pair.json": {
-    "length": 43977,
-    "hash": "259da947bc2d2c6167b9025427349af5957a4f3ff707147c36c2f77aa172ecb7"
+    "length": 43982,
+    "hash": "1f9db530c0219d807b3e6bc4ff3621b39c7eca995ec41ad9ad6e4c5d1bbc9fb4"
   },
   "goal-soul-give/13-drive-inverted-case.json": {
-    "length": 45584,
-    "hash": "d2ec8d208f93a09ffed6efb95be964532ecaf9d6cf8768ea6cb0ae8469503705"
+    "length": 45589,
+    "hash": "3ccfc5861c86db17e6a7a1a470f1c80f8558829d9d0a384b5839dbf8b957f0cc"
   }
 }

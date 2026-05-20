@@ -224,14 +224,19 @@ const VALUE_DOMAIN_LABEL: Record<ValueDomain, string> = {
   unknown: "the value you protect",
 };
 
+// CC-112 — Interpretation over recitation. The opener names what the
+// value-cluster does to the belief; it does not narrate the act of
+// selecting. Forbidden register: "Your selections place this belief
+// inside …" — the reader already knows what they ranked; what the report
+// adds is the meaning of holding the belief inside that cluster.
 function valueOpener(
   belief: BeliefUnderTension,
   valuesPhraseFromCompass: string
 ): string {
   if (belief.value_domain !== "unknown") {
-    return `Your selections place this belief inside ${valuesPhraseFromCompass}, with ${VALUE_DOMAIN_LABEL[belief.value_domain]} as the value most directly at risk for it.`;
+    return `This belief lives inside ${valuesPhraseFromCompass} — ${VALUE_DOMAIN_LABEL[belief.value_domain]} is the value it puts most directly at risk.`;
   }
-  return `This belief sits inside ${valuesPhraseFromCompass}, not outside them.`;
+  return `This belief lives inside ${valuesPhraseFromCompass}, not outside them.`;
 }
 
 function temperatureLine(belief: BeliefUnderTension): string | null {
@@ -251,33 +256,41 @@ function temperatureLine(belief: BeliefUnderTension): string | null {
   }
 }
 
+// CC-112 — Interpretation over recitation. State what the openness or
+// closure implies; do not narrate which sources were ranked. The
+// reader already knows what they marked.
 function postureLine(belief: BeliefUnderTension): string | null {
   switch (belief.epistemic_posture) {
     case "open":
-      return "Your selections show three or more sources that could change your mind — an open posture toward revision.";
+      return "The posture is open to revision — multiple sources carry the standing to update this belief if they ever needed to.";
     case "reflective":
-      return "Your selections show one or two sources that could change your mind — open within a narrower frame.";
+      return "The posture is open within a narrower frame — a small number of trusted sources carry the standing to update this belief.";
     case "rigid":
       // CC-025 — positive-read-first softening. Architectural read
       // (no marked revision source) unchanged; emotional register softens
       // from "held without a revision path" to the LaCinda-rewrite frame.
-      return "Your selections show no source that could change your mind. That may reflect conviction, faithfulness, and spiritual stability. It may also be worth holding with awareness: when a belief is central enough to carry identity, it deserves not less care, but more humility in how it is expressed.";
+      // CC-112 — opener reframed away from "Your selections show".
+      return "The belief is closed to outside revision. That may reflect conviction, faithfulness, and spiritual stability. It may also be worth holding with awareness: when a belief is central enough to carry identity, it deserves not less care, but more humility in how it is expressed.";
     case "guarded":
-      return "Your only source for revising this belief is your own counsel — held privately rather than tested against external voices.";
+      return "Revision moves through one channel only — your own counsel. The belief is held privately rather than tested against external voices.";
     case "unknown":
     default:
       return null;
   }
 }
 
+// CC-112 — closing line interprets, not recites. The "Your shape places
+// this belief…" framing narrated the act of placement; the new framing
+// names where the belief sits in the architecture (a load-bearing
+// member, not an ornament).
 function closingLine(belief: BeliefUnderTension): string {
   // Two protected variants. Picked from the conviction_temperature signal —
   // when temperature is "high" (impervious + cost-bearing), the role-it-plays
-  // close fits; otherwise the values-place close fits.
+  // close fits; otherwise the architecture-position close fits.
   if (belief.conviction_temperature === "high") {
     return "The model does not judge whether this belief is correct. The model only sees the role it plays in your shape — and the role appears to be load-bearing.";
   }
-  return "Your shape places this belief inside what you protect, not outside it.";
+  return "The belief is a load-bearing member of what you protect, not an ornament resting on top of it.";
 }
 
 // CC-017 — fallback prose when no anchor was provided (Case C: Q-I1 skipped
@@ -423,62 +436,43 @@ function joinList(items: string[]): string {
   return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
 }
 
+// CC-112 — Interpretation over recitation. The qi2 citation now states
+// what the revision-source pattern reveals (closed / one named exit /
+// open within a frame / open) rather than reciting "Of the N sources
+// you ranked, you marked X". Reflective prose is second-person only;
+// the `name` parameter is no longer used (the prior `name ? `${name}
+// marked` : "you marked"` ternary leaked third-person voice into a
+// reflective passage and was the audience-leakage the CC names).
+//
+// The CC-025 closed-revision softening is preserved verbatim for the
+// closed branches (noneSelected + zero-derived-selections).
 function qi2CitationLine(
   summary: SelectionSummary,
-  name: string | null
+  _name: string | null
 ): string {
-  const You = name ? name : "you";
-  const youSubject = name ? name : "you";
-  const verb = name ? "ranked" : "ranked";
-  const offeredCount = summary.topAvailable.length;
-  const offeredCountWord = offeredCount === 6 ? "six" : `${offeredCount}`;
-  // CC-SMALL-FIXES-BUNDLE Fix 4 — the empty-topAvailable branch must
-  // NOT include a leading "the": call sites prepend "Of the" / "any of
-  // the", which used to produce "Of the the" / "any of the the"
-  // (double article). Drop the leading "the " from this branch.
-  const offered = summary.topAvailable.length > 0
-    ? `${offeredCountWord} trust sources ${youSubject} ${verb} highest`
-    : `trust sources ${youSubject} ${verb} highest`;
-  const offeredAside =
-    summary.topAvailable.length > 0
-      ? ` — ${joinList(summary.topAvailable)} —`
-      : "";
-  void You; // reserved for future re-keying; suppress unused-binding lint
-  // CC-025 — positive-read-first softening for the closed-revision branches.
-  // The architectural read (None marked, or no derived selection capable of
-  // revision) stays; the emotional close softens to the LaCinda-rewrite
-  // frame: "may reflect conviction, faithfulness, and spiritual stability"
-  // followed by "deserves not less care, but more humility."
+  void _name;
   const CLOSED_REVISION_SOFTENING =
     "That may reflect conviction, faithfulness, and spiritual stability. It may also be worth holding with awareness: when a belief is central enough to carry identity, it deserves not less care, but more humility in how it is expressed.";
   if (summary.noneSelected) {
     return (
-      `Of the ${offered}${offeredAside} ${name ? `${name} marked` : "you marked"} None as having the power to revise this belief. ` +
+      `No outside source carries the standing to revise this belief. ` +
       CLOSED_REVISION_SOFTENING
     );
   }
   const n = summary.selectedLabels.length;
   if (n === 0) {
     return (
-      `${name ? `${name} did not` : "You did not"} mark any of the ${offered}${offeredAside} as potentially capable of revising this belief. ` +
+      `No outside source surfaced as a path that could revise this belief. ` +
       CLOSED_REVISION_SOFTENING
     );
   }
   if (n === 1) {
-    return (
-      `Of the ${offered}${offeredAside} ${name ? `${name} marked` : "you marked"} one (${summary.selectedLabels[0]}) as potentially capable of revising this belief. ` +
-      `The belief is mostly closed; one named exit remains.`
-    );
+    return `The belief is mostly closed; one named exit remains — ${summary.selectedLabels[0]} carries the standing to revise it.`;
   }
   if (n === 2) {
-    return (
-      `Of the ${offered}, ${name ? `${name} marked` : "you marked"} two (${summary.selectedLabels[0]} and ${summary.selectedLabels[1]}) as potentially capable of revising this belief — held with care, but not closed.`
-    );
+    return `Revision is open within a narrow frame: ${summary.selectedLabels[0]} and ${summary.selectedLabels[1]} carry the standing to update this belief — held with care, but not closed.`;
   }
-  return (
-    `Of the ${offered}, ${name ? `${name} marked` : "you marked"} ${n} (${joinList(summary.selectedLabels)}) as potentially capable of revising this belief. ` +
-    `The belief is held with conviction but with multiple revision paths kept open.`
-  );
+  return `Conviction is held alongside an open posture: multiple sources — ${joinList(summary.selectedLabels)} — carry the standing to revise this belief, so the holding is durable but not sealed.`;
 }
 
 // CC-024 — Q-I3 citation prose. Post-CC-024, Q-I3 derives from Q-Stakes1
@@ -488,58 +482,40 @@ function qi2CitationLine(
 // verb ("would risk losing") now composes cleanly with the answer space
 // (concrete losses), so the CC-022b structural-acknowledgment hedge is
 // retired. None-selected reads as a clean refusal-to-bear-listed-cost.
+// CC-112 — Interpretation over recitation. The qi3 citation now names
+// the breadth of the cost surface as the read (load-bearing across the
+// named domains) rather than tallying "Of the N stakes you ranked, you
+// marked X". The specific costs are woven into the sentence when they
+// add meaning, never as a counted tally.
+//
+// Reflective voice is second-person; the `name` parameter is no longer
+// used (the prior `${name} marked / ${name} would bear` ternary leaked
+// third-person into the reflective passage). The CC-025-style softening
+// is preserved for the refusal branch.
 function qi3CitationLine(
   summary: SelectionSummary,
-  name: string | null
+  _name: string | null
 ): string {
-  const yourPossessive = name ? `${name}'s` : "your";
-  const youSubject = name ? name : "you";
-  const verb = "ranked";
-  const offeredCount = summary.topAvailable.length;
-  const offeredCountWord =
-    offeredCount === 3
-      ? "three"
-      : offeredCount === 5
-      ? "five"
-      : offeredCount === 6
-      ? "six"
-      : `${offeredCount}`;
-  // CC-SMALL-FIXES-BUNDLE Fix 4 — drop the leading "the" here for the
-  // same reason as qi2CitationLine above (call sites prepend "Of the" /
-  // "any of the").
-  const offered = summary.topAvailable.length > 0
-    ? `${offeredCountWord} stakes ${youSubject} ${verb} highest`
-    : `concrete stakes ${youSubject} ${verb} highest`;
-  const offeredAside =
-    summary.topAvailable.length > 0
-      ? ` — ${joinList(summary.topAvailable)} —`
-      : "";
+  void _name;
 
   if (summary.noneSelected) {
     return (
-      `Of the ${offered}${offeredAside} ${name ? `${name} marked` : "you marked"} None as something ${name ? name : "you"} would bear losing for this belief. ` +
-      `The refusal is informative — the belief sits inside what ${yourPossessive} answers protect, not what they would willingly trade.`
+      `You named no concrete cost you would willingly trade for this belief. ` +
+      `The refusal is itself the read — the belief sits inside what your answers protect, not inside what they would let go.`
     );
   }
   const n = summary.selectedLabels.length;
   if (n === 0) {
-    return (
-      `${name ? `${name} did not` : "You did not"} mark any of the ${offered}${offeredAside} as a cost ${yourPossessive} would bear for this belief.`
-    );
+    return `No concrete cost surfaced as something this belief would justify paying — the belief lives at a register your answers do not yet test against loss.`;
   }
   if (n === 1) {
-    return (
-      `Of the ${offered}${offeredAside} ${name ? `${name} marked` : "you marked"} one (${summary.selectedLabels[0]}) as a concrete cost ${name ? name : "you"} would bear for this belief — a single named price.`
-    );
+    return `${summary.selectedLabels[0]} reads as the one stake this belief would justify paying — a single named price, narrow but real.`;
   }
   if (n === 2) {
-    return (
-      `Of the ${offered}, ${name ? `${name} marked` : "you marked"} two (${summary.selectedLabels[0]} and ${summary.selectedLabels[1]}) as concrete costs ${name ? name : "you"} would bear for this belief — costs ${name ? name : "you"} appear willing to absorb.`
-    );
+    return `${summary.selectedLabels[0]} and ${summary.selectedLabels[1]} are stakes this belief would justify paying — costs you appear willing to absorb when the belief is on the line.`;
   }
-  return (
-    `Of the ${offered}, ${name ? `${name} marked` : "you marked"} ${n} (${joinList(summary.selectedLabels)}) as concrete costs ${name ? name : "you"} would bear for this belief — a wide cost surface.`
-  );
+  // 3+ costs → wide cost surface. The breadth IS the meaning.
+  return `This is a belief you would pay for across ${joinList(summary.selectedLabels)} — load-bearing, not ornamental. A belief one would shoulder cost for across that many domains sits at the center of what's protected, not at its edge.`;
 }
 
 export function generateBeliefContextProse(

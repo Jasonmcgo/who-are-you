@@ -87,6 +87,8 @@ WARM PRECISION. Closer to a thoughtful friend's read than a clinician's note. No
 
 8. **Banlist.** Zero occurrences of any of: "faith journey," "spiritual walk," "blessed," "sacred journey," "deep convictions" (as a flatter), "profound belief," "the subject," "the user," "the model detects," "composite read," "Likely value," "Wording temperature," "Openness to revision," "Unsure" (as metadata), "Big Five," "OCEAN," "register" (as a technical suffix). Do NOT include the metadata row format ("- **Likely value:** ..." etc.) — that lives in clinician mode only.
 
+9. **CC-112 — Interpretation over recitation.** The Keystone translates the user's selections into meaning; it never recites the mechanics of their input. FORBIDDEN: counts of what they selected ("you marked 4 of the 5 stakes", "the N values you ranked highest" as a tally), tallying selections as evidence of themselves, "your selections place / your shape places / Of the N you ranked" framings that narrate the act of choosing rather than what's been chosen, and the third-person name leakage of any "Name marked / Name would bear" form (the reflective voice is second-person). REQUIRED: state what the *pattern* reveals — a wide cost surface across relationships, reputation, money, and livelihood is load-bearing (meaning); not "you marked 4 of 5" (mechanics). The breadth IS the read, not the count. Specific costs/values may appear woven into prose when they carry meaning the reader cannot already infer from having answered; they may NOT appear as a counted tally. Vary cadence — no two adjacent sentences may share the same opener (no "Your selections… / Your shape… / Of the…" stacking). Extends Rule 3.
+
 # Output structure
 
 Output ONLY the section body (no header). Format exactly:

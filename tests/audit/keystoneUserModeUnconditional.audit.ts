@@ -468,11 +468,17 @@ async function runAudit(): Promise<void> {
           missing.push("Wording temperature");
         if (!section.includes("- **Openness to revision:**"))
           missing.push("Openness to revision");
-        // valueOpener signature must still appear in clinician.
-        // (Either the known-domain phrasing or unknown fallback.)
+        // CC-112 — valueOpener signature reworded. Known-domain phrasing
+        // changed from "Your selections place this belief inside X, with
+        // Y as the value most directly at risk for it." to "This belief
+        // lives inside X — Y is the value it puts most directly at risk."
+        // Unknown-fallback changed from "This belief sits inside …" to
+        // "This belief lives inside …". The audit's intent (clinician
+        // retains the value-opener prose) is preserved; the regex
+        // anchors are updated to match the new phrasing.
         const valueOpener =
-          section.includes("as the value most directly at risk for it") ||
-          /This belief sits inside .+, not outside them\./.test(section);
+          section.includes("is the value it puts most directly at risk") ||
+          /This belief lives inside .+, not outside them\./.test(section);
         if (!valueOpener) missing.push("engine valueOpener prose");
         if (missing.length > 0) {
           fails.push(`${set}/${f}: missing ${missing.join(", ")}`);
