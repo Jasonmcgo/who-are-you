@@ -1,5 +1,20 @@
 // CC-TWO-TIER-RENDER-SURFACE-CLEANUP audit.
 //
+// CC-119 — assertion #9 was redefined. Pre-CC-119, the Guide (clinician
+// mode) returned raw engine prose verbatim, so a byte-identity hash
+// check against a pre-CC baseline was the natural regression guard.
+// CC-119 made the Guide additive — it now inherits the Individual's
+// warm splice + retains scaffolding — so the byte-identity premise is
+// gone. The replacement is two assertions:
+//   9a. guide-superset-of-individual — for every cohort fixture, every
+//       non-empty Individual line appears in the Guide render (after
+//       applying the user-mode mask to the Guide to neutralize name-
+//       swap / jargon-strip / header-rename differences that aren't
+//       structural). Mask-applied-to-Guide ⊇ Individual.
+//   9b. guide-mode-snapshot-stable — Guide hash matches a fresh
+//       baseline (`twoTierBaseline.snapshot.json`, re-snapshotted post
+//       CC-119) for every fixture. Regression-stability check.
+//
 // Assertions:
 //   1. renderMode-switch-exists — renderMirrorAsMarkdown accepts renderMode
 //   2. user-mode-strips-borrowed-system-labels — Jason/Cindy/Daniel user
@@ -21,8 +36,9 @@
 //      metric lines + chart SVG
 //   8. appendix-dialog-strips-intj — UseCasesSection.tsx jasonType
 //      explanation no longer contains "I'm an INTJ"
-//   9. clinician-mode-byte-identical-to-baseline — clinician-mode
-//      output matches the pre-CC baseline hash for every fixture
+//   9a. guide-superset-of-individual — mask(Guide) ⊇ Individual (CC-119).
+//   9b. guide-mode-snapshot-stable — Guide hash matches new warm
+//       baseline for every cohort fixture (CC-119 re-snapshot).
 //  10. user-mode-cohort-renders-clean — full 24-fixture cohort sweep
 //      passes the suppression gates (informational on outliers)
 
@@ -31,8 +47,14 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { buildInnerConstitution } from "../../lib/identityEngine";
-import { renderMirrorAsMarkdown } from "../../lib/renderMirror";
+import {
+  buildInnerConstitution,
+  getUserName,
+} from "../../lib/identityEngine";
+import {
+  applyUserModeMask,
+  renderMirrorAsMarkdown,
+} from "../../lib/renderMirror";
 import type { Answer, DemographicSet } from "../../lib/types";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -168,7 +190,40 @@ function renderUser(set: string, file: string): string {
     constitution: c,
     includeBeliefAnchor: false,
     renderMode: "user",
+    // CC-119 — fixed timestamp so the Guide/Individual superset check
+    // can pair line-by-line without footer-timestamp drift.
+    generatedAt: new Date("2026-05-11T00:00:00Z"),
   });
+}
+
+// CC-119 — paired render helper: Individual + Guide for the same
+// fixture, with identical timestamp + demographics. Used by the
+// superset assertion.
+function renderPair(
+  set: string,
+  file: string
+): { individual: string; guide: string; userName: string | null } {
+  const raw = JSON.parse(
+    readFileSync(join(ROOT, set, file), "utf-8")
+  ) as { answers: Answer[]; demographics?: DemographicSet | null };
+  const demographics = raw.demographics ?? null;
+  const c = buildInnerConstitution(raw.answers, [], demographics);
+  const generatedAt = new Date("2026-05-11T00:00:00Z");
+  const individual = renderMirrorAsMarkdown({
+    constitution: c,
+    demographics,
+    includeBeliefAnchor: false,
+    renderMode: "user",
+    generatedAt,
+  });
+  const guide = renderMirrorAsMarkdown({
+    constitution: c,
+    demographics,
+    includeBeliefAnchor: false,
+    renderMode: "clinician",
+    generatedAt,
+  });
+  return { individual, guide, userName: getUserName(demographics) };
 }
 
 function renderClinician(set: string, file: string): string {
@@ -402,12 +457,75 @@ function runAudit(): AssertionResult[] {
         }
   );
 
-  // ── 9. clinician-mode-byte-identical-to-baseline ───────────────────
+  // ── 9a. guide-superset-of-individual (CC-119) ──────────────────────
+  //   For every cohort fixture, every non-empty Individual line must
+  //   appear in the Guide render after the user-mode mask is applied
+  //   to the Guide. The mask neutralizes name-swap / jargon-strip /
+  //   header-rename transformations that aren't structural; what's
+  //   left in maskedGuide minus Individual is the scaffolding
+  //   (grip raw-field panel, Movement grip-component bullets, MBTI
+  //   disclosure line stripped by the mask but originally Guide-only,
+  //   Keystone field bullets, engine valueOpener, etc.).
+  //
+  //   Lines compared after trim; empty lines + lines short enough to
+  //   collide spuriously (length < 4) are skipped. Verbatim line
+  //   match against the masked-Guide line-set is the canonical check;
+  //   if a line is a strict prefix of another Guide line (rare, but
+  //   possible when the Guide adds a trailing scaffolding suffix),
+  //   the line is accepted as covered.
+  {
+    const failingSamples: string[] = [];
+    let pairsChecked = 0;
+    for (const dir of ["ocean", "goal-soul-give"]) {
+      for (const f of readdirSync(join(ROOT, dir))
+        .filter((x) => x.endsWith(".json"))
+        .sort()) {
+        const { individual, guide, userName } = renderPair(dir, f);
+        const maskedGuide = applyUserModeMask(guide, userName);
+        const maskedGuideLines = new Set(
+          maskedGuide.split("\n").map((l) => l.trimEnd())
+        );
+        const missing: string[] = [];
+        for (const rawLine of individual.split("\n")) {
+          const line = rawLine.trimEnd();
+          if (line.trim().length < 4) continue;
+          if (maskedGuideLines.has(line)) continue;
+          missing.push(line);
+        }
+        if (missing.length > 0) {
+          failingSamples.push(
+            `${dir}/${f}: ${missing.length} missing line(s); first: "${missing[0]!.slice(0, 90)}"`
+          );
+        }
+        pairsChecked += 1;
+      }
+    }
+    results.push(
+      failingSamples.length === 0
+        ? {
+            ok: true,
+            assertion: "guide-superset-of-individual",
+            detail: `mask(Guide) ⊇ Individual for ${pairsChecked} cohort fixtures (every non-empty Individual line ≥4 chars is present in the masked Guide)`,
+          }
+        : {
+            ok: false,
+            assertion: "guide-superset-of-individual",
+            detail: failingSamples.slice(0, 5).join(" | "),
+          }
+    );
+  }
+
+  // ── 9b. guide-mode-snapshot-stable (CC-119) ────────────────────────
+  //   Regression check: the Guide render's hash matches the warm
+  //   baseline written by `twoTierBaseline.snapshot.ts` after CC-119.
+  //   Re-run that snapshot writer when an intentional Guide content
+  //   change ships; treat snapshot drift as a flagged regression
+  //   otherwise.
   if (!existsSync(BASELINE)) {
     results.push({
       ok: false,
-      assertion: "clinician-mode-byte-identical-to-baseline",
-      detail: "baseline snapshot missing",
+      assertion: "guide-mode-snapshot-stable",
+      detail: "baseline snapshot missing — run `npx tsx tests/audit/twoTierBaseline.snapshot.ts`",
     });
   } else {
     const baseline = JSON.parse(readFileSync(BASELINE, "utf-8")) as Record<
@@ -438,12 +556,12 @@ function runAudit(): AssertionResult[] {
       driftFails.length === 0
         ? {
             ok: true,
-            assertion: "clinician-mode-byte-identical-to-baseline",
-            detail: "clinician-mode output matches pre-CC baseline for every cohort fixture",
+            assertion: "guide-mode-snapshot-stable",
+            detail: "Guide-mode output matches CC-119 warm baseline for every cohort fixture",
           }
         : {
             ok: false,
-            assertion: "clinician-mode-byte-identical-to-baseline",
+            assertion: "guide-mode-snapshot-stable",
             detail: driftFails.slice(0, 5).join(" | "),
           }
     );

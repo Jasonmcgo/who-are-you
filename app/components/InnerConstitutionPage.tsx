@@ -897,50 +897,15 @@ export default function InnerConstitutionPage({
                     — but the signal is thin enough that the question is
                     worth noticing rather than governing.
                   </p>
-                ) : mode === "clinician" ? (
-                  // CC-117 — clinician keeps the labeled engine-fallback
-                  // block (mirrors CC-111 in renderMirror.ts).
-                  <dl
-                    className="font-serif"
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "max-content 1fr",
-                      columnGap: 14,
-                      rowGap: 8,
-                      margin: 0,
-                      fontSize: 15.5,
-                      color: "var(--ink)",
-                      lineHeight: 1.55,
-                    }}
-                  >
-                    <dt style={{ fontWeight: 700 }}>Surface Grip</dt>
-                    <dd style={{ margin: 0 }}>
-                      {constitution.gripTaxonomy.surfaceGrip}.
-                    </dd>
-                    <dt style={{ fontWeight: 700 }}>Grip Pattern</dt>
-                    <dd style={{ margin: 0 }}>
-                      {constitution.gripPattern?.renderedLabel ?? "Grip Pattern"}
-                    </dd>
-                    <dt style={{ fontWeight: 700 }}>Underlying Question</dt>
-                    <dd style={{ margin: 0, fontStyle: "italic" }}>
-                      {constitution.gripPattern?.underlyingQuestion ??
-                        "What is this pressure asking of me that I have not yet named?"}
-                    </dd>
-                    <dt style={{ fontWeight: 700 }}>Distorted Strategy</dt>
-                    <dd style={{ margin: 0 }}>
-                      {constitution.gripTaxonomy.distortedStrategy?.text ??
-                        "Under pressure, the question can start to drive instead of inform."}
-                    </dd>
-                    <dt style={{ fontWeight: 700 }}>Healthy Gift</dt>
-                    <dd style={{ margin: 0 }}>
-                      {constitution.gripTaxonomy.healthyGift}
-                    </dd>
-                  </dl>
                 ) : (
-                  // CC-117 — user-mode rendered-fallback prose mirrors
-                  // CC-115 in renderMirror.ts. Without this, the section
-                  // would render an empty box on sessions with no cached
-                  // gripParagraphLlm + a non-hedged proseMode.
+                  // CC-117 + CC-119 — warm rendered-fallback prose
+                  // emits for BOTH modes so the Guide inherits the
+                  // Individual's grip narrative (per `docs/canon/
+                  // guide-individual-model.md` principle 3). The
+                  // labeled engine-fallback `<dl>` that the Guide used
+                  // to receive *instead* of this prose now emits
+                  // additively below the warm paragraph (clinician-
+                  // only).
                   <p
                     className="font-serif italic"
                     style={{
@@ -970,6 +935,56 @@ export default function InnerConstitutionPage({
                     )}
                   </p>
                 )}
+                {/* CC-119 — labeled engine-fallback `<dl>` (Surface
+                    Grip / Grip Pattern / Underlying Question /
+                    Distorted Strategy / Healthy Gift) is clinician-
+                    only scaffolding, emitted ADDITIVELY below the
+                    warm prose above. Previously it replaced the warm
+                    prose in clinician mode (cold-only path), which
+                    inverted the additive contract. Only emits in the
+                    engine-fallback case (no LLM cache hit and not
+                    hedged). Mirrors the markdown's clinician
+                    `emitGripSection` labeled block. */}
+                {mode === "clinician" &&
+                !constitution.gripParagraphLlm &&
+                constitution.gripTaxonomy.proseMode !== "hedged" ? (
+                  <dl
+                    className="font-serif"
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "max-content 1fr",
+                      columnGap: 14,
+                      rowGap: 8,
+                      margin: "12px 0 0",
+                      fontSize: 15.5,
+                      color: "var(--ink)",
+                      lineHeight: 1.55,
+                    }}
+                  >
+                    <dt style={{ fontWeight: 700 }}>Surface Grip</dt>
+                    <dd style={{ margin: 0 }}>
+                      {constitution.gripTaxonomy.surfaceGrip}.
+                    </dd>
+                    <dt style={{ fontWeight: 700 }}>Grip Pattern</dt>
+                    <dd style={{ margin: 0 }}>
+                      {constitution.gripPattern?.renderedLabel ?? "Grip Pattern"}
+                    </dd>
+                    <dt style={{ fontWeight: 700 }}>Underlying Question</dt>
+                    <dd style={{ margin: 0, fontStyle: "italic" }}>
+                      {constitution.gripPattern?.underlyingQuestion ??
+                        "What is this pressure asking of me that I have not yet named?"}
+                    </dd>
+                    <dt style={{ fontWeight: 700 }}>Distorted Strategy</dt>
+                    <dd style={{ margin: 0 }}>
+                      {constitution.gripTaxonomy.distortedStrategy?.text ??
+                        "Under pressure, the question can start to drive instead of inform."}
+                    </dd>
+                    <dt style={{ fontWeight: 700 }}>Healthy Gift</dt>
+                    <dd style={{ margin: 0 }}>
+                      {constitution.gripTaxonomy.healthyGift}
+                    </dd>
+                  </dl>
+                ) : null}
               </div>
               {/* CC-117 — raw grip diagnostic field panel (Grip Pattern /
                   Underlying Question / Contributing grips / Sub-register /

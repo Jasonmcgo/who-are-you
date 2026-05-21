@@ -84,6 +84,15 @@ function toDemographicSet(
   return { answers };
 }
 
+// CC-118 — Display-label map from internal `renderMode` values to the
+// product terms set by `docs/canon/guide-individual-model.md`. Internal
+// string values are intentionally retained (principle 6); only the
+// rendered button text uses the display labels.
+const MODE_DISPLAY_LABEL: Record<"clinician" | "user", string> = {
+  clinician: "Guide",
+  user: "Individual",
+};
+
 // CC-065 Item 1 — Admin-only export panel. The user-facing Share block in
 // `InnerConstitutionPage` stays suppressed in this view via `hideShareBlock`
 // per CC-021a's UX distinction; this panel adds an unconditional Copy /
@@ -181,9 +190,15 @@ function AdminExportPanel({
       >
         Repeated export available; engine re-renders against current code on each load.
       </p>
-      {/* CC-113 + CC-117 — Clinician | User toggle. Controls which mode
-          the Copy / Download markdown buttons emit AND which mode the
-          styled <InnerConstitutionPage> preview below renders. */}
+      {/* CC-113 + CC-117 + CC-118 — Guide | Individual toggle. Controls
+          which mode the Copy / Download markdown buttons emit AND which
+          mode the styled <InnerConstitutionPage> preview below renders.
+          Display labels follow `docs/canon/guide-individual-model.md`:
+          "Guide" → internal renderMode "clinician" (additive superset
+          with diagnostic scaffolding); "Individual" → internal
+          renderMode "user" (the canonical reader-facing report). The
+          internal `renderMode` string values are intentionally retained
+          per principle 6 to avoid churning audits + baselines. */}
       <div
         role="group"
         aria-label="Preview mode"
@@ -192,6 +207,7 @@ function AdminExportPanel({
       >
         {(["clinician", "user"] as const).map((mode) => {
           const selected = previewMode === mode;
+          const label = MODE_DISPLAY_LABEL[mode];
           return (
             <button
               key={mode}
@@ -210,7 +226,7 @@ function AdminExportPanel({
                 marginRight: -1,
               }}
             >
-              {mode}
+              {label}
             </button>
           );
         })}
@@ -315,10 +331,13 @@ export default function SessionDetailPage({
   // CC-117 — preview mode is lifted from AdminExportPanel to here so the
   // single toggle drives BOTH the mode-aware markdown export buttons in
   // AdminExportPanel AND the styled <InnerConstitutionPage> preview
-  // below. Default "clinician" keeps the admin's primary reference view
-  // (full diagnostic detail); flipping to "user" re-renders the same
-  // styled report with the user-mode suppressions applied (grip raw-
-  // field panel and Movement grip-component bullets gated off).
+  // below. Default "clinician" (display label "Guide" per CC-118 +
+  // `docs/canon/guide-individual-model.md`) keeps the admin's primary
+  // reference view — the additive superset with diagnostic scaffolding
+  // on top of the Individual. Flipping to "user" (display label
+  // "Individual") re-renders the same styled report with the user-mode
+  // suppressions applied (grip raw-field panel and Movement grip-
+  // component bullets gated off).
   const [previewMode, setPreviewMode] = useState<"clinician" | "user">(
     "clinician"
   );
@@ -557,14 +576,18 @@ export default function SessionDetailPage({
             hideShareBlock
             demographics={toDemographicSet(data.demographics)}
             answers={data.answers}
-            // CC-REACT-USER-MODE-PARITY — admin/clinician surface
-            // retains MBTI disclosure line + "<MBTI>, provisional"
-            // Surface Label cell for audit reference. The user-facing
-            // /report/[sessionId] + /assessment paths omit this prop
-            // and default to user mode (suppression on).
-            // CC-117 — admin previewMode toggle now drives this prop so
-            // the styled preview flips Clinician↔User in place. Default
-            // "clinician" preserves the admin's primary reference view.
+            // CC-REACT-USER-MODE-PARITY — admin Guide surface (internal
+            // renderMode "clinician") retains MBTI disclosure line +
+            // "<MBTI>, provisional" Surface Label cell + the rest of the
+            // diagnostic scaffolding for helper/QA reference. The user-
+            // facing /report/[sessionId] + /assessment paths omit this
+            // prop and default to the Individual surface (internal
+            // renderMode "user", suppression on).
+            // CC-117 — admin previewMode toggle drives this prop so the
+            // styled preview flips Guide↔Individual in place. Default
+            // "clinician" (Guide) per CC-118 + `docs/canon/guide-
+            // individual-model.md` principle 3 preserves the admin's
+            // primary reference view as the additive superset.
             renderMode={previewMode}
           />
         </div>

@@ -1,7 +1,13 @@
-// CC-TWO-TIER-RENDER-SURFACE-CLEANUP — pre-CC clinician-mode baseline.
-// Captures the full rendered markdown hash for every cohort fixture so
-// the audit can verify that clinician-mode output stays byte-identical
-// after the renderMode switch + user-mode mask are added.
+// CC-TWO-TIER-RENDER-SURFACE-CLEANUP + CC-119 — Guide-mode regression
+// baseline. Pre-CC-119 this snapshot pinned the *pre-CC clinician* output
+// (raw engine prose) for byte-identity audit. CC-119 made the Guide
+// additive: it now contains the Individual's warm splice + scaffolding.
+// This file re-snapshots that *warm* Guide output for every cohort
+// fixture; the `guide-mode-snapshot-stable` assertion in
+// `twoTierRenderSurfaceCleanup.audit.ts` regression-checks against
+// these hashes. Re-run AFTER any intentional Guide content change
+// (warm splice change, scaffolding emit change, mask change that
+// affects Guide-only lines). Run order matters — snapshot LAST.
 
 import { createHash } from "node:crypto";
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";

@@ -236,34 +236,18 @@ function emitGripSection(
     out.push(
       `The pressure register reads quietly here. The surface clue is ${grip.surfaceGrip.toLowerCase()}; the underlying recognition may be "${underlyingQuestion}" — but the signal is thin enough that the question is worth noticing rather than governing. Under pressure this can pull toward ${cost}; for now, sit with whether the question has been doing more work than you realized.`
     );
-  } else if (renderMode === "clinician") {
-    // Engine fallback for rendered mode — emit the four-line three-
-    // concept block from the engine's canonical templates.
-    // CC-111 — clinician only. User mode gets a composed prose
-    // paragraph below (CC-115); the labeled block stays here for
-    // audit/debug reversibility.
-    const distorted =
-      grip.distortedStrategy?.text ??
-      `Under pressure, this question can pull you toward ${PRIMAL_FALLBACK_COST[grip.primary] ?? "the patterns that follow the question"}.`;
-    const healthy = formatHealthyGiftFallback(grip.primary, grip.healthyGift);
-    out.push(`Surface Grip: ${grip.surfaceGrip}.`);
-    out.push("");
-    out.push(`Grip Pattern: ${patternLabel}.`);
-    out.push("");
-    out.push(`Underlying Question: ${underlyingQuestion}`);
-    out.push("");
-    out.push(`Distorted Strategy: ${distorted}`);
-    out.push("");
-    out.push(`Healthy Gift: ${healthy}`);
   } else {
-    // CC-115 — user-mode rendered-fallback prose. CC-111 gated the
-    // labeled block above to clinician; user mode previously fell
-    // through to nothing, leaving the `## Your Grip` heading empty on
-    // any session that didn't have a cached `gripParagraphLlm`. This
-    // branch composes a short prose paragraph from the same engine
-    // fields the labeled block uses — no labels, varied cadence, per
-    // CC-112 canon (interpretation over recitation). The warm
-    // blockquote and hedged-prose branches above are unchanged.
+    // CC-115 — engine-fallback rendered-prose paragraph. Composes a
+    // short, warm prose paragraph from the same engine fields the
+    // labeled four-line block uses — no labels, varied cadence, per
+    // CC-112 canon (interpretation over recitation).
+    //
+    // CC-119 — both modes emit this prose so the Guide inherits the
+    // Individual's grip narrative (additive superset per
+    // `docs/canon/guide-individual-model.md` principle 3). The labeled
+    // four-line block is emitted *additionally* below in clinician
+    // mode; pre-CC-119 it *replaced* the warm prose, which made the
+    // Guide cold here.
     //
     // `formatHealthyGiftFallback` returns a full second-person sentence
     // ("You X…"), so the healthy-gift beat is its own sentence rather
@@ -275,6 +259,21 @@ function emitGripSection(
     out.push(
       `Under pressure the surface clue is ${grip.surfaceGrip.toLowerCase()}; underneath it runs a quieter question — *${underlyingQuestion}* ${distorted} At its steadier, the same instrument turns the other way. ${healthy}`
     );
+    if (renderMode === "clinician") {
+      // CC-119 — clinician scaffolding: the labeled four-line three-
+      // concept block from the engine's canonical templates, emitted
+      // additively below the warm prose for audit/debug reversibility.
+      out.push("");
+      out.push(`Surface Grip: ${grip.surfaceGrip}.`);
+      out.push("");
+      out.push(`Grip Pattern: ${patternLabel}.`);
+      out.push("");
+      out.push(`Underlying Question: ${underlyingQuestion}`);
+      out.push("");
+      out.push(`Distorted Strategy: ${distorted}`);
+      out.push("");
+      out.push(`Healthy Gift: ${healthy}`);
+    }
   }
 
   // CC-111 — raw diagnostic field block is clinician-only. User mode
@@ -392,11 +391,24 @@ export type RenderArgs = {
   // Optional override for the footer timestamp; defaults to "now". Tests
   // pass a fixed Date to keep snapshots stable.
   generatedAt?: Date;
-  // CC-TWO-TIER-RENDER-SURFACE-CLEANUP — render-tier switch. "user"
-  // (default) applies the user-facing mask: borrowed-system labels +
-  // engine-internal phrases relocated. "clinician" preserves byte-
-  // identical legacy output (for audit comparison + debug access).
+  // CC-TWO-TIER-RENDER-SURFACE-CLEANUP + CC-119 — render-tier switch.
+  // "user" (Individual) applies the user-facing mask + receives the
+  // warm splice. "clinician" (Guide) receives the same warm splice
+  // additively on top of scaffolding (no mask) — see
+  // `docs/canon/guide-individual-model.md`. Pre-CC-119, clinician
+  // returned cold engine prose; that branch is gone.
   renderMode?: "user" | "clinician";
+  // CC-119 — internal escape hatch for `renderMirrorAsMarkdownLive`'s
+  // pre-render step. When `true`, `renderMirrorAsMarkdown` skips both
+  // the warm prose splice (four scoped cards + V3 + Keystone scaffolding
+  // emit) and the user-mode mask, returning raw engine prose only. The
+  // live wrapper needs this to read the engine section bodies for cache-
+  // key construction *before* the runtime cache has been populated;
+  // without the hatch, Step 1's clinician pre-render would already have
+  // any committed-cache entries spliced in, yielding wrong cache keys
+  // for sections that combine pre-spliced engine prose with another
+  // section's cached body. Production callers should never set this.
+  engineOnly?: boolean;
 };
 
 // ─────────────────────────────────────────────────────────────────────
@@ -622,7 +634,11 @@ function conjugateYouVerbs(line: string): string {
   });
 }
 
-function applyUserModeMask(md: string, userName?: string | null): string {
+// CC-119 — exported so the two-tier audit can verify the Guide-superset-
+// of-Individual invariant: applying this mask to the Guide render should
+// produce a string whose lines are a superset of the Individual render
+// (the difference being only the scaffolding the mask doesn't strip).
+export function applyUserModeMask(md: string, userName?: string | null): string {
   const lines = md.split("\n");
   const out: string[] = [];
   // CC-LAUNCH-VOICE-POLISH B1 — third-person name → second-person
@@ -765,6 +781,13 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
   // donut, wrap architect failure-mode in <details>) can branch on it
   // alongside the late splice path.
   const renderMode = args.renderMode ?? "user";
+  // CC-119 — `engineOnly` is an internal escape hatch for the live
+  // wrapper's cache-key pre-render. When set, scaffolding-mode emit
+  // gates that check `renderMode === "clinician"` also apply, but the
+  // warm splice + mask are skipped at the tail. The flag effectively
+  // re-creates the pre-CC-119 "clinician = raw engine" semantic for
+  // cache-key purposes only.
+  const engineOnly = args.engineOnly === true;
   const out: string[] = [];
   // CC-PROSE-1B Layer 5 — three callouts at three depths. Computed once
   // so 5A (after Top Gifts/Edges table), 5B (inside Synthesis section),
@@ -1016,16 +1039,18 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
 
   // 9. Keystone Reflection
   //
-  // CC-KEYSTONE-RENDER — two-tier render. User mode replaces the
-  // metadata bullets ("Likely value" / "Wording temperature" / "Openness
-  // to revision") with the LLM-rendered interpretive paragraph that
-  // opens on the user's verbatim belief quote. Clinician mode keeps the
-  // legacy metadata bullets + engine prose byte-identical to pre-CC.
-  // On LLM cache miss in user mode, falls back to the engine path so
-  // the section never goes empty.
+  // CC-KEYSTONE-RENDER + CC-119 — additive render. Both modes emit the
+  // warm Tier A/B/C keystone prose (LLM committed cache → runtime cache
+  // → deterministic plain-prose fallback) so the Guide inherits the
+  // Individual's keystone narrative. Clinician mode ADDITIONALLY emits
+  // scaffolding below the warm prose: an optional verbatim belief
+  // blockquote (gated by `includeBeliefAnchor`), the field-list
+  // metadata bullets ("Likely value" / "Wording temperature" /
+  // "Openness to revision"), and the engine `valueOpener` /
+  // temperature / posture / closing prose. The scaffolding is helper-
+  // facing context for QA + interpretation, not a different read.
   const belief = constitution.belief_under_tension;
   if (belief && belief.belief_text) {
-    const keystoneRenderMode = args.renderMode ?? "user";
     const topCompassValueLabels = topCompassRefs
       .map((r) => COMPASS_LABEL[r.signal_id] ?? r.signal_id)
       .filter((s) => s.length > 0);
@@ -1044,40 +1069,35 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
       convictionTemperature: belief.conviction_temperature,
       epistemicPosture: belief.epistemic_posture,
     };
-    const cachedKeystone =
-      keystoneRenderMode === "user"
-        ? readCachedKeystoneRewrite(keystoneInputs)
-        : null;
+    // CC-119 — read warm cache for BOTH modes (pre-CC-119 this was
+    // gated to user mode only, which made the Guide cold).
+    const cachedKeystone = readCachedKeystoneRewrite(keystoneInputs);
 
     out.push("");
     out.push("## Keystone Reflection");
     out.push("");
     out.push("*the belief you named, where it sits in your shape.*");
 
-    if (keystoneRenderMode === "user") {
-      // CC-KEYSTONE-USER-MODE-UNCONDITIONAL — user-mode rendering is
-      // unconditionally free of engine field-list + engine valueOpener
-      // prose. Three-tier resolution:
-      //   Tier A: LLM committed-cache hit (cohort fixture)
-      //   Tier B: LLM runtime-cache hit (on-demand resolution from
-      //           CC-LIVE-SESSION-LLM-WIRING populated the runtime cache)
-      //   Tier C: deterministic plain-prose fallback when both caches
-      //           miss. Composes verbatim quote + value cluster + cost
-      //           surface naming with zero engine artifacts.
-      out.push("");
-      if (cachedKeystone) {
-        // Tier A or Tier B — readCachedKeystoneRewrite consults committed
-        // cache first, then the on-demand runtime cache.
-        out.push(cachedKeystone);
-      } else {
-        // Tier C — deterministic fallback. Never emits the field-list
-        // bullets, "Unsure" labels, or engine valueOpener paragraph.
-        out.push(composeKeystoneFallback(keystoneInputs));
-      }
+    // CC-119 — warm Tier A/B/C prose emits for BOTH modes. The
+    // Individual sees only this; the Guide sees this plus scaffolding
+    // below.
+    out.push("");
+    if (cachedKeystone) {
+      // Tier A or Tier B — readCachedKeystoneRewrite consults committed
+      // cache first, then the on-demand runtime cache.
+      out.push(cachedKeystone);
     } else {
-      // Clinician mode — byte-identical to pre-CC baseline: optional
-      // verbatim quote + field-list metadata bullets + engine
-      // valueOpener / temperature / posture / closing prose.
+      // Tier C — deterministic fallback. Never emits the field-list
+      // bullets, "Unsure" labels, or engine valueOpener paragraph.
+      out.push(composeKeystoneFallback(keystoneInputs));
+    }
+
+    // CC-119 — clinician-only scaffolding: optional verbatim belief
+    // blockquote, field-list metadata bullets, engine valueOpener.
+    // This is the legacy clinician keystone content emitted *in
+    // addition to* the warm prose so the Guide is a strict superset
+    // of the Individual.
+    if (renderMode === "clinician") {
       if (includeBeliefAnchor) {
         out.push("");
         // Multi-line belief texts get each line prefixed so the blockquote
@@ -1323,22 +1343,28 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
   if (constitution.ocean) {
     const mix = constitution.ocean.dispositionSignalMix;
     const prose = composeOceanProse(mix, constitution.goalSoulGive);
-    // CC-DISPOSITION-COLLAPSE-DEFAULT — user-mode collapses the full
-    // panel behind a <details> disclosure with a plain-language summary
-    // line visible above. Clinician mode renders as today (byte-identical
-    // to pre-CC baseline). The disposition engine computation is
-    // unchanged; this is presentation-only.
-    const dispositionRenderMode = args.renderMode ?? "user";
+    // CC-DISPOSITION-COLLAPSE-DEFAULT — collapses the full panel behind
+    // a <details> disclosure with a plain-language summary line above.
+    // The disposition engine computation is unchanged; this is
+    // presentation-only.
+    //
+    // CC-119 — emit the summary line + <details> wrapper in BOTH modes
+    // so the Guide is a strict superset of the Individual at the line
+    // level (additive contract per `docs/canon/guide-individual-model.md`).
+    // Pre-CC-119, the wrapper + summary line were user-mode-only and the
+    // Guide showed the full panel uncollapsed; that broke the line-set
+    // superset invariant. The Guide reader still gets the full panel —
+    // it's now inside a collapsible disclosure that opens with one
+    // click. Helper-facing scaffolding inside the disclosure is
+    // unchanged.
     out.push("");
     out.push("## Disposition Signal Mix");
     out.push("");
-    if (dispositionRenderMode === "user") {
-      out.push(`*${composeDispositionSummaryLine(mix)}*`);
-      out.push("");
-      out.push("<details>");
-      out.push("<summary>View the full disposition signal panel</summary>");
-      out.push("");
-    }
+    out.push(`*${composeDispositionSummaryLine(mix)}*`);
+    out.push("");
+    out.push("<details>");
+    out.push("<summary>View the full disposition signal panel</summary>");
+    out.push("");
     out.push(`*${prose.disclaimer}*`);
     out.push("");
     for (const para of prose.paragraphs) {
@@ -1346,10 +1372,8 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
       out.push("");
     }
     out.push(renderOceanDashboardSVG(mix));
-    if (dispositionRenderMode === "user") {
-      out.push("");
-      out.push("</details>");
-    }
+    out.push("");
+    out.push("</details>");
   }
 
   // 11. Work Map. Mirrors the page-level section between Disposition Map and Map.
@@ -1894,12 +1918,24 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
 
   let raw = out.join("\n") + "\n";
 
-  // CC-TWO-TIER-RENDER-SURFACE-CLEANUP — clinician mode emits the raw
-  // engine output verbatim (byte-identical to legacy). User mode runs
-  // the LLM rewrite substitution (when cache hits) + the user-mode
-  // surface mask. `renderMode` was hoisted to the top of the function
-  // by CC-LAUNCH-VOICE-POLISH so emit-time fixes can branch on it.
-  if (renderMode === "clinician") return raw;
+  // CC-119 — Guide/Individual additive contract (see
+  // `docs/canon/guide-individual-model.md`). Both modes run the warm
+  // splice (four scoped cards + V3 + Keystone) so the Guide inherits the
+  // Individual's warm prose; the Guide differs only by *additional*
+  // scaffolding lines emitted into `out` above (grip raw-field panel
+  // [CC-111], Movement grip-component bullets [CC-114], the unmasked
+  // MBTI / Surface Label / verdict-phrase lines, etc.).
+  //
+  // Pre-CC-119, the Guide (clinician) returned `raw` here, skipping the
+  // warm splice — the result was cold engine prose with scaffolding,
+  // which inverted the additive intent. The early-return is now gone;
+  // the final `applyUserModeMask` call below is the only mode-gated
+  // step (Individual only).
+  //
+  // CC-119 — `engineOnly` short-circuits to raw engine prose for the
+  // live wrapper's cache-key pre-render. Production callers leave it
+  // unset.
+  if (engineOnly) return raw;
 
   // CC-LLM-PROSE-PASS-V1 — substitute LLM-rewritten section bodies for
   // the four scoped cards (Lens / Compass / Hands / Path) when a cache
@@ -1988,7 +2024,18 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
   // CC-LAUNCH-VOICE-POLISH B1 — pass the demographics name into the
   // mask so third-person interpolations in engine pattern composers
   // get swapped to second-person on user surface.
-  return applyUserModeMask(raw, getUserName(demographics));
+  //
+  // CC-119 — apply the user-mode mask (suppression + name→you + jargon
+  // strips + Disposition header rename + donut SVG strip) ONLY when
+  // rendering the Individual. The Guide retains all scaffolding (MBTI
+  // disclosure, raw Surface Label cell, Disposition Signal Mix header,
+  // Drive distribution donut, engine-internal labels, third-person
+  // name interpolations) on top of the warm spliced prose, per
+  // `docs/canon/guide-individual-model.md` principle 3.
+  if (renderMode === "user") {
+    return applyUserModeMask(raw, getUserName(demographics));
+  }
+  return raw;
 }
 
 /**

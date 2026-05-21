@@ -110,9 +110,23 @@ export async function renderMirrorAsMarkdownLive(
   args: RenderArgs,
   options: LiveRenderOptions = {}
 ): Promise<string> {
-  // Step 1 — pre-render clinician mode to read the engine bodies. The
-  // bodies become the engineSectionBody inputs to the LLM cache key.
-  const clinMd = renderMirrorAsMarkdown({ ...args, renderMode: "clinician" });
+  // Step 1 — pre-render engine-only output to read the engine bodies.
+  // The bodies become the engineSectionBody inputs to the LLM cache key.
+  //
+  // CC-119 — `engineOnly: true` short-circuits the warm splice + mask
+  // so the pre-render returns true engine prose. Pre-CC-119 this used
+  // `renderMode: "clinician"` because clinician mode skipped the splice
+  // by early-return; that early-return is gone, so the cache-key pre-
+  // render must use the explicit escape hatch instead. The `renderMode`
+  // value passed alongside doesn't affect output once `engineOnly` is
+  // set, but we keep "clinician" for any scaffolding-emit gates that
+  // run before the early return (those scaffolding lines are not
+  // extracted as cache-key inputs, so their presence is harmless).
+  const clinMd = renderMirrorAsMarkdown({
+    ...args,
+    renderMode: "clinician",
+    engineOnly: true,
+  });
   const archetype =
     args.constitution.profileArchetype?.primary ?? "unmappedType";
 

@@ -134,12 +134,23 @@ export async function resolveScopedRewritesLive(
   args: ResolveScopedRewritesArgs,
   options: ResolveScopedRewritesOptions = {}
 ): Promise<ScopedRewritesResult> {
+  // CC-119 — `engineOnly: true` short-circuits the warm splice + mask
+  // so the pre-render returns raw engine prose for cache-key
+  // construction. Pre-CC-119 this used `renderMode: "clinician"` alone,
+  // which skipped the splice by early-return; that early-return is gone
+  // post-CC-119 (clinician/Guide is now additive), so without the
+  // escape hatch this pre-render would emit *already-spliced* bodies
+  // and the resulting cache keys would never match committed cohort
+  // entries — cohort fixtures would falsely cache-miss and the live
+  // composer would fire every time. Mirrors the same change in
+  // `renderMirrorAsMarkdownLive`.
   const clinMd = renderMirrorAsMarkdown({
     constitution: args.constitution,
     answers: args.answers,
     demographics: args.demographics,
     includeBeliefAnchor: false,
     renderMode: "clinician",
+    engineOnly: true,
   });
   const archetype =
     args.constitution.profileArchetype?.primary ?? "unmappedType";
