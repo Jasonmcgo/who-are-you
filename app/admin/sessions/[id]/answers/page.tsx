@@ -388,7 +388,8 @@ function ReadOnlyAnswer({
         {answer.order.map((id) => {
           const items =
             question.type === "ranking" ? question.items : undefined;
-          const label = items?.find((i) => i.id === id)?.label ?? id;
+          const item = items?.find((i) => i.id === id);
+          const label = item?.quote ?? item?.label ?? id;
           return <li key={id}>{label}</li>;
         })}
       </ol>

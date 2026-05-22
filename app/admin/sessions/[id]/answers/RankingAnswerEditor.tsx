@@ -107,7 +107,7 @@ export default function RankingAnswerEditor({
               >
                 {idx + 1}.
               </span>
-              <span style={{ flex: 1 }}>{item?.label ?? id}</span>
+              <span style={{ flex: 1 }}>{item?.quote ?? item?.label ?? id}</span>
               <button
                 type="button"
                 onClick={() => move(idx, -1)}
