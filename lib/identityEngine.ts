@@ -7421,9 +7421,13 @@ export const CROSS_CARD_PATTERNS: CrossCardPattern[] = [
     detection: (signals, _tc, _tg, lensStack) =>
       (lensStack.dominant === "ni" || lensStack.dominant === "ne") &&
       hasFromQuestion(signals, "reactive_operator", "Q-A1"),
-    prose: (_s, _tc, _tg, _ls, demographics) => {
+    prose: (_s, _tc, _tg, ls, demographics) => {
       const subj = getUserName(demographics) ?? "You";
-      return `The pattern-reader gift can produce paralysis when the patterns multiply faster than action. ${subj} may need to choose ground that's good enough rather than waiting for the optimal pattern to land.`;
+      const isNe = ls.dominant === "ne";
+      const voice = isNe ? "possibility-finder" : "pattern-reader";
+      const multiplying = isNe ? "options multiply" : "patterns multiply";
+      const optimal = isNe ? "the optimal option to land" : "the optimal pattern to land";
+      return `The ${voice} gift can produce paralysis when the ${multiplying} faster than action. ${subj} may need to choose ground that's good enough rather than waiting for ${optimal}.`;
     },
   },
 
@@ -7765,7 +7769,10 @@ const GIFT_DANGER_LINES: Record<
   { gift: string; danger: string }
 > = {
   ni: { gift: "the long read", danger: "believing the long read too early" },
-  ne: { gift: "room-reading", danger: "room-reading instead of saying" },
+  ne: {
+    gift: "seeing what could become",
+    danger: "seeing what could become instead of finishing it",
+  },
   si: {
     gift: "durable memory",
     danger: "durable memory of what no longer applies",
