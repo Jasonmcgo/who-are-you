@@ -268,8 +268,8 @@ export const questions: Question[] = [
     type: "ranking",
     text: "When you're working on a hard problem",
     items: [
-      { id: "ni", label: "Voice A", voice: "Voice A", quote: `"Once I see how the pieces are going to land, the rest is mostly execution. I'm looking for the pattern that would explain everything else."`, example: "Halfway through reading a long thread, I already have a sense of where the argument is heading and what its real point will turn out to be.", signal: "ni" },
-      { id: "ne", label: "Voice B", voice: "Voice B", quote: `"There are at least four interesting angles here. I want to spend time on each before deciding which one fits."`, example: "I leave a brainstorm with three new directions I want to chase before lunch is over.", signal: "ne" },
+      { id: "ni", label: "Voice A", voice: "Voice A", quote: `"I keep looking for the hidden shape underneath the details. Once I see the pattern, the scattered pieces start to arrange themselves."`, example: "I sit with it until the underlying shape clicks; after that the specifics mostly sort themselves out.", signal: "ni" },
+      { id: "ne", label: "Voice B", voice: "Voice B", quote: `"I start seeing several ways this could open up — one idea leads to another, and the useful path usually appears after I've followed a few live threads."`, example: "Partway in, I've got three or four threads I want to pull, and chasing them is usually how the workable path shows up.", signal: "ne" },
       { id: "si", label: "Voice C", voice: "Voice C", quote: `"What's worked in similar situations before? There's usually precedent worth checking before reinventing."`, example: "Before I start, I look up what we did the last time something like this came up and use that as the baseline.", signal: "si" },
       { id: "se", label: "Voice D", voice: "Voice D", quote: `"Let me start moving and see what surfaces. I'll know what I'm dealing with once I'm actually working on it."`, example: "I'd rather pick it up and start working than spend another hour planning what working on it will look like.", signal: "se" },
     ],
@@ -280,10 +280,10 @@ export const questions: Question[] = [
     type: "ranking",
     text: "When you walk into a new environment",
     items: [
-      { id: "ne", label: "Voice A", voice: "Voice A", quote: `"This is interesting — there are so many new possibilities here. I want to explore widely before forming any conclusions."`, example: "I want to wander into every room, ask everyone what they're working on, and circle back to my impressions later.", signal: "ne" },
+      { id: "ne", label: "Voice A", voice: "Voice A", quote: `"I start sensing what this place could become and where it might lead — I want to follow the openings before I settle into any read."`, example: "I find myself imagining what could happen here and which directions are worth following, well before I've pinned anything down.", signal: "ne" },
       { id: "si", label: "Voice B", voice: "Voice B", quote: `"I'm comparing this to similar environments I've been in. The differences are telling me what I need to pay attention to."`, example: "I keep noting the small ways this place is different from the last one I worked in — the differences tell me what to pay attention to.", signal: "si" },
       { id: "se", label: "Voice C", voice: "Voice C", quote: `"I'm taking in what's physically present — the layout, the lighting, the sounds, the way the space is arranged. I'll respond to what's actually in the room."`, example: "I notice the physical setup — where things are, what's in motion, what the space looks and sounds like — and that's where I orient my response.", signal: "se" },
-      { id: "ni", label: "Voice D", voice: "Voice D", quote: `"I'm already picking up on what this place is really about. A few cues tell me more than the formal orientation would."`, example: "Two minutes into my first day, I notice the way people are sitting and what isn't being said, and I get a quick read on what this place is actually like.", signal: "ni" },
+      { id: "ni", label: "Voice D", voice: "Voice D", quote: `"I sense where this place is actually headed before much has been said — the direction starts to feel clear even without all the evidence."`, example: "A short while in, I have a quiet read on where this is really going, beneath what people are telling me.", signal: "ni" },
     ],
   },
   {
@@ -294,8 +294,8 @@ export const questions: Question[] = [
     items: [
       { id: "si", label: "Voice A", voice: "Voice A", quote: `"I want to follow the sequence that's been proven to work — the path I or others have walked before. Repetition of what works builds the skill."`, example: "I work through it step by step the way it's been done before; the repetition of a tested sequence is how the skill becomes mine.", signal: "si" },
       { id: "se", label: "Voice B", voice: "Voice B", quote: `"I learn by doing it. Pick it up, try it, adjust based on what's actually happening in my hands."`, example: "I pick the thing up and try it, then adjust based on what's actually happening as I work.", signal: "se" },
-      { id: "ni", label: "Voice C", voice: "Voice C", quote: `"I want to understand what the skill is really *for*. Once I get the underlying principle, the specifics fall into place."`, example: "I want to know what the deeper point of this skill is before I'll commit to memorizing the steps.", signal: "ni" },
-      { id: "ne", label: "Voice D", voice: "Voice D", quote: `"I'd rather try several approaches than commit to one method. Different methods reveal different things about the skill."`, example: "I'll try three different tutorials in an afternoon — each one shows me a different facet of how this works.", signal: "ne" },
+      { id: "ni", label: "Voice C", voice: "Voice C", quote: `"I need the underlying meaning or organizing principle first. Once I understand what the thing is really about, the details fall into place."`, example: "Until I grasp what it's fundamentally for, the steps won't stick; once I do, they settle into place on their own.", signal: "ni" },
+      { id: "ne", label: "Voice D", voice: "Voice D", quote: `"I learn by finding different entrances into the thing — a conversation, an example, a story, or a tangent can suddenly make the whole subject come alive."`, example: "A chat, a story, a side-tangent — somewhere across those different ways in, it suddenly clicks into a whole.", signal: "ne" },
     ],
   },
   {
@@ -305,8 +305,8 @@ export const questions: Question[] = [
     text: "When you're trying to read a complex situation",
     items: [
       { id: "se", label: "Voice A", voice: "Voice A", quote: `"I focus on the concrete, observable signals — what people are physically doing, facial expression, posture, what's in motion in the space. The body language tells me what the explanations don't."`, example: "I read what's physically happening — facial expression, posture, who's moving toward what — and let the observable signals tell me what the explanations miss.", signal: "se" },
-      { id: "ni", label: "Voice B", voice: "Voice B", quote: `"I'm looking for the one underlying thing that would explain all the other observations at once."`, example: "I'm looking for the single thing that, if true, would make all the small confusing details suddenly fit.", signal: "ni" },
-      { id: "ne", label: "Voice C", voice: "Voice C", quote: `"There are probably several forces at work here. I want to map them and see how they interact before picking a read."`, example: "I list the four or five things that could be in play, then watch how they bump into each other before I pick a read.", signal: "ne" },
+      { id: "ni", label: "Voice B", voice: "Voice B", quote: `"I sense the deeper direction beneath the surface facts; where this is actually headed often becomes clear before I can fully explain why."`, example: "The underlying direction starts to feel clear to me before the evidence has fully caught up.", signal: "ni" },
+      { id: "ne", label: "Voice C", voice: "Voice C", quote: `"Several different things could be going on here — I follow where each one might lead before I settle on a read."`, example: "I hold a few live possibilities open and watch where each could go before I commit to one.", signal: "ne" },
       { id: "si", label: "Voice D", voice: "Voice D", quote: `"I've seen this kind of situation before. The pattern-match to past examples tells me a lot about what's likely happening."`, example: "I notice this looks a lot like something I went through three years ago, and that comparison tells me most of what I need.", signal: "si" },
     ],
   },
