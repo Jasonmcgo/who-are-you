@@ -1,9 +1,9 @@
 {
   "label": "Michele — real-person calibration anchor",
-  "_source": "Extracted from prod session ccb4d74e-a9b2-4ec9-a21a-6fe679fb1fed on 2026-05-17. Real-person answers from the named cohort user. Per feedback_cohort_fixtures_two_functions.md — this is a REAL-PERSON calibration anchor, not a synthetic shape-pattern diagnostic.",
+  "_source": "Extracted from prod session ccb4d74e-a9b2-4ec9-a21a-6fe679fb1fed on 2026-05-22. Real-person answers from the named cohort user. Per feedback_cohort_fixtures_two_functions.md — this is a REAL-PERSON calibration anchor, not a synthetic shape-pattern diagnostic.",
   "canonical_name": "Michele",
   "prod_session_id": "ccb4d74e-a9b2-4ec9-a21a-6fe679fb1fed",
-  "extracted_at": "2026-05-17T22:36:05.874Z",
+  "extracted_at": "2026-05-22T23:05:35.044Z",
   "answers": [
     {
       "type": "forced",
@@ -235,10 +235,10 @@
     {
       "type": "ranking",
       "order": [
+        "ne",
         "se",
         "si",
-        "ni",
-        "ne"
+        "ni"
       ],
       "card_id": "temperament",
       "question_id": "Q-T1",
@@ -247,9 +247,9 @@
     {
       "type": "ranking",
       "order": [
-        "ni",
         "ne",
         "se",
+        "ni",
         "si"
       ],
       "card_id": "temperament",
@@ -259,10 +259,10 @@
     {
       "type": "ranking",
       "order": [
-        "ni",
+        "ne",
         "se",
-        "si",
-        "ne"
+        "ni",
+        "si"
       ],
       "card_id": "temperament",
       "question_id": "Q-T3",
@@ -271,9 +271,9 @@
     {
       "type": "ranking",
       "order": [
-        "se",
-        "ni",
         "ne",
+        "ni",
+        "se",
         "si"
       ],
       "card_id": "temperament",
@@ -283,10 +283,10 @@
     {
       "type": "ranking",
       "order": [
+        "fi",
         "te",
         "fe",
-        "ti",
-        "fi"
+        "ti"
       ],
       "card_id": "temperament",
       "question_id": "Q-T5",
@@ -295,10 +295,10 @@
     {
       "type": "ranking",
       "order": [
-        "fe",
         "fi",
-        "ti",
-        "te"
+        "te",
+        "fe",
+        "ti"
       ],
       "card_id": "temperament",
       "question_id": "Q-T6",
@@ -319,10 +319,10 @@
     {
       "type": "ranking",
       "order": [
+        "fi",
         "fe",
-        "ti",
         "te",
-        "fi"
+        "ti"
       ],
       "card_id": "temperament",
       "question_id": "Q-T8",
@@ -545,9 +545,9 @@
       "order": [
         "close_relationships",
         "health",
+        "reputation",
         "money",
-        "job",
-        "reputation"
+        "job"
       ],
       "card_id": "sacred",
       "question_id": "Q-Stakes1",

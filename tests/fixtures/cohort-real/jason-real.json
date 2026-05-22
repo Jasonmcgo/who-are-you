@@ -1,9 +1,9 @@
 {
   "label": "JasonDMcG — real-person calibration anchor",
-  "_source": "Extracted from prod session 3d3ddc5a-8b32-49c1-a90b-4e2d761a1913 on 2026-05-17. Real-person answers from the named cohort user. Per feedback_cohort_fixtures_two_functions.md — this is a REAL-PERSON calibration anchor, not a synthetic shape-pattern diagnostic.",
+  "_source": "Extracted from prod session 3d3ddc5a-8b32-49c1-a90b-4e2d761a1913 on 2026-05-22. Real-person answers from the named cohort user. Per feedback_cohort_fixtures_two_functions.md — this is a REAL-PERSON calibration anchor, not a synthetic shape-pattern diagnostic.",
   "canonical_name": "JasonDMcG",
   "prod_session_id": "3d3ddc5a-8b32-49c1-a90b-4e2d761a1913",
-  "extracted_at": "2026-05-17T22:36:05.788Z",
+  "extracted_at": "2026-05-22T23:05:34.965Z",
   "answers": [
     {
       "type": "forced",

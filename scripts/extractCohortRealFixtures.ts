@@ -38,6 +38,19 @@ const COHORT_MAPPING: Array<{ uuid: string; filename: string; canonicalName: str
   { uuid: "8a238ac3-8579-4ff2-b429-df0299c5d7bd", filename: "kevin-real.json", canonicalName: "Kevin" },
   { uuid: "ec5994e5-4176-4fea-95d7-576c91059440", filename: "harry-real.json", canonicalName: "Harry" },
   { uuid: "bbd5300a-7b57-4408-a787-67cea202e772", filename: "ashley-real.json", canonicalName: "Ashley" },
+  // Added 2026-05-18 — three latest cohort sessions (Vistage drop wave).
+  // Brad's wife Raquel did not enter a name field; using email handle "quelcdp"
+  // as the canonical name so the fixture is identifiable in cohort analysis.
+  { uuid: "a71ed2e0-a8a1-4c68-8eb0-3cc323346f4b", filename: "brad-real.json", canonicalName: "Brad" },
+  { uuid: "25ddf876-46b3-4218-ac1c-e47bd372a2d9", filename: "matti-real.json", canonicalName: "Matti" },
+  { uuid: "a9d63f8a-7211-4589-9a1b-683c20900171", filename: "quelcdp-real.json", canonicalName: "quelcdp" },
+  // Added 2026-05-22 — four newest cohort sessions (Jake, Connor, Keith, Brian),
+  // for the full-cohort Q&A + Guide MD export (Clarence). UUIDs from their admin
+  // session links.
+  { uuid: "d595b405-8881-465b-aa7b-81439aae94a7", filename: "jake-real.json",   canonicalName: "Jake"   },
+  { uuid: "c892e7ef-1170-45d8-a788-4c4e02e17b88", filename: "connor-real.json", canonicalName: "Connor" },
+  { uuid: "ee1cc068-2736-45f6-a7ad-20fddc8d4c3f", filename: "keith-real.json",  canonicalName: "Keith"  },
+  { uuid: "b232bb03-a99d-4c3b-b696-9c0ca5c9e6ed", filename: "brian-real.json",  canonicalName: "Brian"  },
 ];
 
 async function main() {

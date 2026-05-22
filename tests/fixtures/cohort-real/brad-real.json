@@ -1,21 +1,21 @@
 {
-  "label": "Cindy — real-person calibration anchor",
-  "_source": "Extracted from prod session 652a60c9-4d4c-42be-b8c4-9eff2a1de7db on 2026-05-22. Real-person answers from the named cohort user. Per feedback_cohort_fixtures_two_functions.md — this is a REAL-PERSON calibration anchor, not a synthetic shape-pattern diagnostic.",
-  "canonical_name": "Cindy",
-  "prod_session_id": "652a60c9-4d4c-42be-b8c4-9eff2a1de7db",
-  "extracted_at": "2026-05-22T23:05:35.213Z",
+  "label": "Brad — real-person calibration anchor",
+  "_source": "Extracted from prod session a71ed2e0-a8a1-4c68-8eb0-3cc323346f4b on 2026-05-22. Real-person answers from the named cohort user. Per feedback_cohort_fixtures_two_functions.md — this is a REAL-PERSON calibration anchor, not a synthetic shape-pattern diagnostic.",
+  "canonical_name": "Brad",
+  "prod_session_id": "a71ed2e0-a8a1-4c68-8eb0-3cc323346f4b",
+  "extracted_at": "2026-05-22T23:05:35.568Z",
   "answers": [
     {
       "type": "forced",
       "card_id": "conviction",
-      "response": "Liked but slightly dishonest",
+      "response": "Misunderstood but correct",
       "question_id": "Q-C1",
       "question_text": "Would you rather be misunderstood but correct, or liked but slightly dishonest?"
     },
     {
       "type": "forced",
       "card_id": "conviction",
-      "response": "Stability and order",
+      "response": "Freedom to act",
       "question_id": "Q-C3",
       "question_text": "Which feels more important to preserve?"
     },
@@ -24,9 +24,9 @@
       "order": [
         "individual",
         "system",
-        "authority",
         "nature",
-        "supernatural"
+        "supernatural",
+        "authority"
       ],
       "card_id": "conviction",
       "question_id": "Q-C4",
@@ -35,14 +35,14 @@
     {
       "type": "forced",
       "card_id": "pressure",
-      "response": "Soften it",
+      "response": "Stay silent",
       "question_id": "Q-P1",
       "question_text": "If expressing a belief would cost you close relationships, you would:"
     },
     {
       "type": "forced",
       "card_id": "pressure",
-      "response": "Don't volunteer it",
+      "response": "Keep it quiet at work",
       "question_id": "Q-P2",
       "question_text": "If a belief put your job at risk, you would:"
     },
@@ -56,21 +56,21 @@
     {
       "type": "forced",
       "card_id": "formation",
-      "response": "Mixed",
+      "response": "Stable and predictable",
       "question_id": "Q-F2",
       "question_text": "Your childhood environment felt:"
     },
     {
       "type": "forced",
       "card_id": "context",
-      "response": "Stable and manageable",
+      "response": "Busy but controlled",
       "question_id": "Q-X1",
       "question_text": "Your current life feels:"
     },
     {
       "type": "forced",
       "card_id": "context",
-      "response": "Some",
+      "response": "A lot",
       "question_id": "Q-X2",
       "question_text": "Right now, people depend on you:"
     },
@@ -78,10 +78,10 @@
       "type": "ranking",
       "order": [
         "religious",
+        "government_services",
         "nonprofits",
-        "government_elected",
         "education",
-        "government_services"
+        "government_elected"
       ],
       "card_id": "context",
       "question_id": "Q-X3-public",
@@ -92,9 +92,9 @@
       "order": [
         "small_business",
         "journalism",
+        "news_organizations",
         "social_media",
-        "large_companies",
-        "news_organizations"
+        "large_companies"
       ],
       "card_id": "context",
       "question_id": "Q-X3-information-and-commercial",
@@ -104,8 +104,8 @@
       "type": "ranking_derived",
       "order": [
         "Q-X3-public:religious",
-        "Q-X3-public:nonprofits",
         "Q-X3-information-and-commercial:small_business",
+        "Q-X3-public:government_services",
         "Q-X3-information-and-commercial:journalism"
       ],
       "card_id": "context",
@@ -118,8 +118,8 @@
           "source_question_id": "Q-X3-public"
         },
         {
-          "id": "Q-X3-public:nonprofits",
-          "signal": "nonprofits_trust_priority",
+          "id": "Q-X3-public:government_services",
+          "signal": "government_services_trust_priority",
           "source_question_id": "Q-X3-public"
         },
         {
@@ -193,26 +193,26 @@
     {
       "type": "forced",
       "card_id": "agency",
-      "response": "Maintaining responsibilities",
+      "response": "Building or creating",
       "question_id": "Q-A1",
       "question_text": "How do you spend most of your time?"
     },
     {
       "type": "forced",
       "card_id": "agency",
-      "response": "Deepening relationships and care",
+      "response": "Exploring, learning, or wandering",
       "question_id": "Q-A2",
       "question_text": "If your obligations were lighter, where would your energy naturally go?"
     },
     {
       "type": "ranking",
       "order": [
-        "loyalty",
-        "peace",
-        "stability",
         "truth",
+        "peace",
         "honor",
-        "freedom"
+        "freedom",
+        "loyalty",
+        "stability"
       ],
       "card_id": "sacred",
       "question_id": "Q-S1",
@@ -222,11 +222,11 @@
       "type": "ranking",
       "order": [
         "family",
+        "knowledge",
+        "justice",
         "faith",
         "compassion",
-        "mercy",
-        "justice",
-        "knowledge"
+        "mercy"
       ],
       "card_id": "sacred",
       "question_id": "Q-S2",
@@ -236,9 +236,9 @@
       "type": "ranking",
       "order": [
         "ni",
+        "ne",
         "si",
-        "se",
-        "ne"
+        "se"
       ],
       "card_id": "temperament",
       "question_id": "Q-T1",
@@ -247,10 +247,10 @@
     {
       "type": "ranking",
       "order": [
-        "se",
-        "ni",
         "ne",
-        "si"
+        "se",
+        "si",
+        "ni"
       ],
       "card_id": "temperament",
       "question_id": "Q-T2",
@@ -259,10 +259,10 @@
     {
       "type": "ranking",
       "order": [
-        "se",
+        "si",
         "ni",
-        "ne",
-        "si"
+        "se",
+        "ne"
       ],
       "card_id": "temperament",
       "question_id": "Q-T3",
@@ -272,9 +272,9 @@
       "type": "ranking",
       "order": [
         "se",
-        "ni",
+        "si",
         "ne",
-        "si"
+        "ni"
       ],
       "card_id": "temperament",
       "question_id": "Q-T4",
@@ -283,9 +283,9 @@
     {
       "type": "ranking",
       "order": [
-        "fi",
-        "te",
         "ti",
+        "te",
+        "fi",
         "fe"
       ],
       "card_id": "temperament",
@@ -295,10 +295,10 @@
     {
       "type": "ranking",
       "order": [
-        "fe",
-        "fi",
         "te",
-        "ti"
+        "ti",
+        "fi",
+        "fe"
       ],
       "card_id": "temperament",
       "question_id": "Q-T6",
@@ -307,10 +307,10 @@
     {
       "type": "ranking",
       "order": [
-        "fe",
-        "fi",
+        "te",
         "ti",
-        "te"
+        "fi",
+        "fe"
       ],
       "card_id": "temperament",
       "question_id": "Q-T7",
@@ -319,10 +319,10 @@
     {
       "type": "ranking",
       "order": [
-        "fe",
-        "fi",
         "te",
-        "ti"
+        "ti",
+        "fe",
+        "fi"
       ],
       "card_id": "temperament",
       "question_id": "Q-T8",
@@ -331,11 +331,11 @@
     {
       "type": "ranking",
       "order": [
-        "intellectual",
         "aesthetic",
         "perspective",
-        "emotional",
+        "intellectual",
         "experiential",
+        "emotional",
         "low_novelty_preference"
       ],
       "card_id": "temperament",
@@ -347,10 +347,10 @@
       "order": [
         "low_reactivity_focus",
         "hidden_reactivity",
-        "anxious_reactivity",
-        "anger_reactivity",
         "detached_reactivity",
         "overwhelmed_functioning",
+        "anxious_reactivity",
+        "anger_reactivity",
         "avoidant_reactivity"
       ],
       "card_id": "temperament",
@@ -360,8 +360,8 @@
     {
       "type": "ranking",
       "order": [
-        "family",
         "yourself",
+        "family",
         "friends"
       ],
       "card_id": "sacred",
@@ -382,23 +382,23 @@
     {
       "type": "ranking_derived",
       "order": [
-        "Q-S3-close:family",
-        "Q-S3-wider:nonprofits_religious",
         "Q-S3-close:yourself",
-        "Q-S3-wider:social"
+        "Q-S3-close:family",
+        "Q-S3-wider:social",
+        "Q-S3-wider:nonprofits_religious"
       ],
       "card_id": "sacred",
       "question_id": "Q-S3-cross",
       "question_text": "When close-circle and wider-circle compete for the same dollar, where does it actually go?",
       "derived_item_sources": [
         {
-          "id": "Q-S3-close:family",
-          "signal": "family_spending_priority",
+          "id": "Q-S3-close:yourself",
+          "signal": "self_spending_priority",
           "source_question_id": "Q-S3-close"
         },
         {
-          "id": "Q-S3-close:yourself",
-          "signal": "self_spending_priority",
+          "id": "Q-S3-close:family",
+          "signal": "family_spending_priority",
           "source_question_id": "Q-S3-close"
         },
         {
@@ -416,8 +416,8 @@
     {
       "type": "ranking",
       "order": [
-        "restoring",
         "building",
+        "restoring",
         "solving"
       ],
       "card_id": "sacred",
@@ -427,9 +427,9 @@
     {
       "type": "ranking",
       "order": [
-        "caring",
         "enjoying",
-        "learning"
+        "learning",
+        "caring"
       ],
       "card_id": "sacred",
       "question_id": "Q-E1-inward",
@@ -438,33 +438,33 @@
     {
       "type": "ranking_derived",
       "order": [
+        "Q-E1-outward:building",
         "Q-E1-inward:enjoying",
-        "Q-E1-outward:restoring",
-        "Q-E1-inward:caring",
-        "Q-E1-outward:building"
+        "Q-E1-inward:learning",
+        "Q-E1-outward:restoring"
       ],
       "card_id": "sacred",
       "question_id": "Q-E1-cross",
       "question_text": "When outward energy and inward energy compete for the same hour, which actually wins?",
       "derived_item_sources": [
         {
-          "id": "Q-E1-outward:restoring",
-          "signal": "restoring_energy_priority",
-          "source_question_id": "Q-E1-outward"
-        },
-        {
           "id": "Q-E1-outward:building",
           "signal": "building_energy_priority",
           "source_question_id": "Q-E1-outward"
         },
         {
-          "id": "Q-E1-inward:caring",
-          "signal": "caring_energy_priority",
-          "source_question_id": "Q-E1-inward"
+          "id": "Q-E1-outward:restoring",
+          "signal": "restoring_energy_priority",
+          "source_question_id": "Q-E1-outward"
         },
         {
           "id": "Q-E1-inward:enjoying",
           "signal": "enjoying_energy_priority",
+          "source_question_id": "Q-E1-inward"
+        },
+        {
+          "id": "Q-E1-inward:learning",
+          "signal": "learning_energy_priority",
           "source_question_id": "Q-E1-inward"
         }
       ]
@@ -472,13 +472,13 @@
     {
       "type": "ranking",
       "order": [
-        "soul_people",
         "soul_calling",
+        "soul_people",
+        "goal_completion",
         "durable_creation",
-        "gripping_proof",
         "security_freedom",
-        "creative_truth",
-        "goal_completion"
+        "gripping_proof",
+        "creative_truth"
       ],
       "card_id": "sacred",
       "question_id": "Q-GS1",
@@ -487,12 +487,12 @@
     {
       "type": "ranking",
       "order": [
-        "soul_beloved_named",
         "sacred_belief_connection",
         "goal_logic_explanation",
-        "vulnerability_deflection",
+        "soul_beloved_named",
         "performance_identity",
-        "vulnerability_open_uncertainty"
+        "vulnerability_open_uncertainty",
+        "vulnerability_deflection"
       ],
       "card_id": "conviction",
       "question_id": "Q-V1",
@@ -501,14 +501,14 @@
     {
       "type": "ranking",
       "order": [
-        "grips_neededness",
+        "grips_control",
+        "grips_security",
         "grips_reputation",
         "grips_approval",
-        "grips_security",
-        "grips_comfort",
-        "grips_old_plan",
+        "grips_neededness",
         "grips_certainty",
-        "grips_control"
+        "grips_comfort",
+        "grips_old_plan"
       ],
       "card_id": "pressure",
       "question_id": "Q-GRIP1",
@@ -519,11 +519,11 @@
       "order": [
         "presence",
         "shared_experience",
-        "quiet_sacrifice",
         "problem_solving",
         "verbal_expression",
+        "protection",
         "co_construction",
-        "protection"
+        "quiet_sacrifice"
       ],
       "card_id": "sacred",
       "question_id": "Q-L1",
@@ -532,10 +532,10 @@
     {
       "type": "ranking",
       "order": [
-        "close_relationships",
-        "money",
-        "reputation",
         "health",
+        "close_relationships",
+        "reputation",
+        "money",
         "job"
       ],
       "card_id": "sacred",
@@ -546,8 +546,8 @@
       "type": "ranking",
       "order": [
         "coverage",
-        "compliance",
-        "cost"
+        "cost",
+        "compliance"
       ],
       "card_id": "role",
       "question_id": "Q-3C1",
@@ -556,12 +556,12 @@
     {
       "type": "ranking",
       "order": [
+        "cost_priority",
         "coverage_priority",
-        "reputation_priority",
-        "compliance_priority",
-        "goal_priority",
         "recovery_priority",
-        "cost_priority"
+        "goal_priority",
+        "reputation_priority",
+        "compliance_priority"
       ],
       "card_id": "role",
       "question_id": "Q-3C2",
@@ -570,10 +570,10 @@
     {
       "type": "ranking",
       "order": [
-        "legacy",
         "success",
-        "fame",
-        "wealth"
+        "legacy",
+        "wealth",
+        "fame"
       ],
       "card_id": "role",
       "question_id": "Q-Ambition1",
@@ -582,7 +582,7 @@
     {
       "type": "freeform",
       "card_id": "conviction",
-      "response": "Faith in God, Gospel and Marriage",
+      "response": "Equal rights for humanity",
       "question_id": "Q-I1",
       "question_text": "What is a belief you'd bear real cost to keep?"
     },
@@ -591,28 +591,18 @@
       "card_id": "pressure",
       "selections": [
         {
-          "id": "Q-Stakes1:job",
-          "signal": "job_stakes_priority",
-          "source_question_id": "Q-Stakes1"
-        },
-        {
-          "id": "Q-Stakes1:health",
-          "signal": "health_stakes_priority",
-          "source_question_id": "Q-Stakes1"
-        },
-        {
-          "id": "Q-Stakes1:reputation",
-          "signal": "reputation_stakes_priority",
-          "source_question_id": "Q-Stakes1"
-        },
-        {
           "id": "Q-Stakes1:money",
           "signal": "money_stakes_priority",
           "source_question_id": "Q-Stakes1"
         },
         {
-          "id": "Q-Stakes1:close_relationships",
-          "signal": "close_relationships_stakes_priority",
+          "id": "Q-Stakes1:job",
+          "signal": "job_stakes_priority",
+          "source_question_id": "Q-Stakes1"
+        },
+        {
+          "id": "Q-Stakes1:reputation",
+          "signal": "reputation_stakes_priority",
           "source_question_id": "Q-Stakes1"
         }
       ],
@@ -622,24 +612,24 @@
     }
   ],
   "demographics": {
-    "name_value": "Cindy",
+    "name_value": "Brad",
     "name_state": "specified",
-    "gender_value": "woman",
+    "gender_value": "man",
     "gender_state": "specified",
-    "age_decade": "1950s",
+    "age_decade": "1970s",
     "age_state": "specified",
     "location_country": null,
     "location_region": null,
-    "location_state": "not_answered",
+    "location_state": "prefer_not_to_say",
     "marital_status_value": "married",
     "marital_status_state": "specified",
-    "education_value": "some_college",
+    "education_value": "masters",
     "education_state": "specified",
-    "political_value": "right",
-    "political_state": "specified",
+    "political_value": null,
+    "political_state": "prefer_not_to_say",
     "religious_value": "christianity",
     "religious_state": "specified",
-    "profession_value": "entrepreneur",
+    "profession_value": "creative",
     "profession_state": "specified"
   }
 }
