@@ -588,6 +588,10 @@ export default function MirrorSection({
                   {summaryParts.intro}
                 </p>
               )}
+            {/* CC-120 — Synthesis tercet stays in both modes on the
+                React surface to keep parity with the markdown render
+                (which keeps it for cache-key stability; the warm V3
+                splice already drops it from the substituted body). */}
             {summaryParts.tercet ? (
               <p
                 className="font-serif text-[15.5px] md:text-[16px]"

@@ -89,6 +89,16 @@ WARM PRECISION. Closer to a thoughtful friend's read than a clinician's note. No
 
 9. **CC-112 — Interpretation over recitation.** The Keystone translates the user's selections into meaning; it never recites the mechanics of their input. FORBIDDEN: counts of what they selected ("you marked 4 of the 5 stakes", "the N values you ranked highest" as a tally), tallying selections as evidence of themselves, "your selections place / your shape places / Of the N you ranked" framings that narrate the act of choosing rather than what's been chosen, and the third-person name leakage of any "Name marked / Name would bear" form (the reflective voice is second-person). REQUIRED: state what the *pattern* reveals — a wide cost surface across relationships, reputation, money, and livelihood is load-bearing (meaning); not "you marked 4 of 5" (mechanics). The breadth IS the read, not the count. Specific costs/values may appear woven into prose when they carry meaning the reader cannot already infer from having answered; they may NOT appear as a counted tally. Vary cadence — no two adjacent sentences may share the same opener (no "Your selections… / Your shape… / Of the…" stacking). Extends Rule 3.
 
+10. **CC-121 — Length discipline (reaffirms Rule 7).** Reader feedback is that the report is too long. Hold the Keystone to ~90-140 words after the opening blockquote; hard ceiling 170 words. Prefer fewer, sharper sentences over comprehensive ones. Never exceed the ceiling.
+
+11. **CC-121 — No signature-term over-use.** Do not repeat any single signature label more than **twice** in the section. This applies to function-voice translations ("pattern-reader", "structurer", "room-reader", etc.), to archetype names ("the architect", "the caregiver", "the steward"), and to surface labels (driver names, named registers). After two mentions, switch to natural prose, pronouns, or a related verb-form.
+
+12. **CC-121 — Protected-value cluster at most once.** A protected-value cluster (Family / Loyalty / Honor / Knowledge / Peace / Stability / Compassion / Faith / Freedom / Truth, named singly or in a list) appears at most once in the Keystone. After it lands once, translate it into the verb the reader lives — what they protect, what they organize their week around — not a re-listing of the same values as a refrain. Extends Rule 3.
+
+13. **CC-121 — Vary cadence (reaffirms Rule 9).** No two consecutive sentences share the same opener. Avoid formulaic stacking ("Your selections… / Your shape… / Of the…"); sentence shapes read as authored prose, not as a template ratchet.
+
+14. **CC-121 — Rules 10-13 extend the existing concision + interpretation rules (7, 9). Concise + declarative + low-hedge + non-repetitive is the target voice, all at once.**
+
 # Output structure
 
 Output ONLY the section body (no header). Format exactly:

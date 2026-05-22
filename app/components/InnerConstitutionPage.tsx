@@ -1252,6 +1252,7 @@ export default function InnerConstitutionPage({
           constitution={constitution}
           demographics={demographics}
           liveScopedRewrites={liveScopedRewrites}
+          renderMode={mode}
         />
 
         {/* CC-SYNTHESIS-1-FINISH Section A — Growth Path section removed
@@ -1259,23 +1260,31 @@ export default function InnerConstitutionPage({
             F's Path master synthesis paragraph absorbs Growth Path's
             job. The engine still produces `cross_card.growthPath` for
             backward compatibility; only the React emit is removed. */}
-        <section
-          className="flex flex-col"
-          style={{ gap: 14, paddingTop: 12, paddingBottom: 12 }}
-        >
-          <SectionLabel>Conflict Translation</SectionLabel>
-          <SectionParagraph text={cross.conflictTranslation} />
-        </section>
+        {/* CC-120 — Conflict Translation + Mirror-Type Seed gated to
+            Guide-only. Interpretive/comparative asides secondary to the
+            core read; retained verbatim in the Guide per the additive
+            contract. */}
+        {mode === "clinician" ? (
+          <>
+            <section
+              className="flex flex-col"
+              style={{ gap: 14, paddingTop: 12, paddingBottom: 12 }}
+            >
+              <SectionLabel>Conflict Translation</SectionLabel>
+              <SectionParagraph text={cross.conflictTranslation} />
+            </section>
 
-        <SectionRule />
+            <SectionRule />
 
-        <section
-          className="flex flex-col"
-          style={{ gap: 14, paddingTop: 12, paddingBottom: 12 }}
-        >
-          <SectionLabel>Mirror-Type Seed</SectionLabel>
-          <SectionParagraph text={cross.mirrorTypesSeed} />
-        </section>
+            <section
+              className="flex flex-col"
+              style={{ gap: 14, paddingTop: 12, paddingBottom: 12 }}
+            >
+              <SectionLabel>Mirror-Type Seed</SectionLabel>
+              <SectionParagraph text={cross.mirrorTypesSeed} />
+            </section>
+          </>
+        ) : null}
 
         {confirmedTensions.length > 0 ? (
           <>
@@ -1547,11 +1556,18 @@ export default function InnerConstitutionPage({
         </div>
         )}
 
-        <SectionRule />
-        <UseCasesSection
-          archetype={constitution.profileArchetype?.primary}
-          driver={constitution.lens_stack?.dominant}
-        />
+        {/* CC-120 — Use-cases section ("What this is good for" + 10
+            "earns its keep" items) gated to Guide-only. Long appendix;
+            retained verbatim in the Guide. */}
+        {mode === "clinician" ? (
+          <>
+            <SectionRule />
+            <UseCasesSection
+              archetype={constitution.profileArchetype?.primary}
+              driver={constitution.lens_stack?.dominant}
+            />
+          </>
+        ) : null}
 
         {/* CC-PROSE-1B Layer 5C — Final Line callout. Closing-of-the-
             closing, mechanically recombined from shapeDescriptor +

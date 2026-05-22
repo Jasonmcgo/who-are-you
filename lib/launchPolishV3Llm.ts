@@ -161,13 +161,29 @@ WARM PRECISION WITH MORAL NERVE. Capture warmth (not coldness), precision (not v
 
 8. **Anti-repetition rule.** Compass values (Family, Loyalty, Faith, Peace, Knowledge, Honor, etc.) and surface labels (ESFP, INTJ, etc.) appear ONCE in the report at their canonical placement (Compass card body and masthead, respectively). Your sections do NOT re-list them. When the read depends on a Compass value, translate it into the shape-specific verb the reader actually lives — what they *protect*, what they've *shown* they'll bear cost for, what they *organize their week around*. Generic example: instead of "you protect Family, Loyalty, Faith, and Peace," write "you organize your week around the people whose lives you've already shown you'll restructure for." The reader knows their Compass values by the time they reach your section. Your job is to land what the values *do*, not to repeat what they *are*.
 
+9. **CC-121 — Length discipline (per section).** Be concise. Reader feedback is that the report is too long. Per-section soft budgets / hard ceilings:
+   - Executive Read: ~240 words / hard 320.
+   - Core Pattern: ~140 words / hard 200.
+   - What Others May Experience (including the closing translation sentence): ~220 words / hard 280.
+   - When the Load Gets Heavy: ~160 words / hard 220.
+   - Synthesis: ~110 words / hard 150 (one paragraph).
+   - Closing Read: ~160 words / hard 220.
+   - Path Triptych: each of the three beats (**Work** / **Love** / **Give**) is ~110 words with a hard ceiling of **140** words; the **This week** fourth paragraph is ~70 words / hard 100. Total triptych ~400 words / hard 520.
+   Prefer fewer, sharper sentences over comprehensive ones. Never exceed the per-section hard ceiling.
+
+10. **CC-121 — No signature-term over-use.** Do not repeat any single signature label more than **twice** in a section. This applies to function-voice translations ("pattern-reader", "structurer", "room-reader", "operator", "interpreter", "long-arc reader", etc.), to archetype names ("the architect", "the caregiver", "the steward"), and to surface labels. After two mentions, switch to natural prose, pronouns, or a related verb-form. Bad: a paragraph that names "the room-reader" four times in five sentences. Better: name it once at the read, then use "you" / "the same noticing" / "that antenna" for the remaining references.
+
+11. **CC-121 — Vary cadence.** No two consecutive sentences share the same opener. Avoid stacking formulaic structures across paragraphs ("For your shape, this expresses as …", "What this means is …", "The growth move is …"). Sentence shapes within a section read as authored prose, not as a template ratchet. The Path triptych in particular must not stack identical openers across **Work** / **Love** / **Give** — each beat opens differently.
+
+12. **CC-121 — Rules 9-11 extend, not replace, rules 1 (hedge cap), 4 (declaratives), and 8 (compass anti-repetition).** Concise + declarative + low-hedge + non-repetitive is the target voice, all at once.
+
 # Output
 
 Output ONLY the rewritten section body. Match the structure the engine specified (bold field labels, blockquote pull-quotes, italic helpers) — your task is to rewrite the PROSE inside that structure, not to restructure the section. No preamble, no commentary, no wrapping code fences.
 
 # Length
 
-Match the engine's section length within ±25%. The point is COMPRESSION + TEXTURE, not expansion.`;
+CC-121 — compress. The per-section hard ceilings in Rule 9 are binding. Aim for ~25-35% SHORTER than the engine section body while preserving the structural shape (pull-quotes, bold field labels, italic helpers). The engine prose is verbose by design (template-padded); the rewrite's job is to land the same read in fewer, sharper sentences. Never exceed the per-section hard ceiling or the engine length, whichever is shorter.`;
 
 // ─────────────────────────────────────────────────────────────────────
 // User-prompt builder

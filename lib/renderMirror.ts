@@ -825,7 +825,22 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
   // labels addressed different surfaces but read identically before this
   // rename, blurring whether a paragraph was an aphorism or a detected
   // cross-card pattern.
+  // CC-120 — the cards in this set are in the warm-prose splice
+  // (`renderMirror`'s tail four-card cache lookup). Their engine bodies
+  // ARE the cache-key input; removing the Pattern in motion line in user
+  // mode would mismatch the committed cache key and force a cold engine-
+  // prose fallback. The splice replaces the body anyway, so the Pattern
+  // in motion content does not surface to the Individual — we emit it
+  // for cache-key purposes and let the splice wipe it. Hands is also in
+  // the splice list but the cross-card Pattern detector doesn't map any
+  // patterns to "hands" (its applicable_card values are ShapeCardId,
+  // which doesn't include "hands"), so omitting hands here is correct.
+  const SPLICE_CARDS = new Set<ShapeCardId>(["lens", "compass", "path"]);
   function emitPatternBlock(cardId: ShapeCardId): void {
+    // CC-120 — Pattern in motion is a cross-card secondary annotation
+    // (diagnostic/interpretive); gate to Guide-only for cards NOT in the
+    // splice list. Splice-list cards always emit (cache-key stability).
+    if (renderMode !== "clinician" && !SPLICE_CARDS.has(cardId)) return;
     const proses = patternsByCard.get(cardId);
     if (!proses || proses.length === 0) return;
     for (const prose of proses) {
@@ -1140,6 +1155,14 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
     out.push("*one cross-card read, with the parallel-line close.*");
     out.push("");
     out.push(summaryParts.intro);
+    // CC-120 — the tercet stays emitted in both modes. `synthesis` is
+    // in the V3 markdown splice (V3_MARKDOWN_SPLICE_SECTION_IDS), whose
+    // cache key includes the engine section body — dropping the tercet
+    // in user mode would mismatch the committed cache and force a
+    // cold engine-prose fallback for Synthesis on every cohort
+    // fixture. The cached V3 synthesis rewrite already drops the
+    // tercet from the substituted body, so the Individual doesn't see
+    // it post-splice anyway.
     if (summaryParts.tercet) {
       out.push("");
       out.push(summaryParts.tercet);
@@ -1558,13 +1581,23 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
     // Correction Channel reframe (Section B). Weather gets the State-
     // vs-Shape qualifier (Section C). Conviction is rendered separately
     // below the SWOT loop. Path is restructured in its own block.
+    //
+    // CC-120 — these per-card secondary annotations (Movement Note /
+    // Correction channel / State vs. shape) are gated to Guide-only for
+    // the non-splice cards (gravity / trust / weather / fire). Lens +
+    // Compass are in the four-card warm-prose splice — emitting their
+    // synthesis line is required for cache-key stability (the splice
+    // replaces the card body, including this line, with the LLM
+    // rewrite so it doesn't surface in the Individual anyway).
     let cardSynthLine: string | null = null;
     if (id === "lens") cardSynthLine = composeLensMovementNote(constitution);
     else if (id === "compass") cardSynthLine = composeCompassMovementNote(constitution);
-    else if (id === "gravity") cardSynthLine = composeGravityMovementNote(constitution);
-    else if (id === "fire") cardSynthLine = composeFireMovementNote(constitution);
-    else if (id === "trust") cardSynthLine = composeTrustCorrectionChannel(constitution);
-    else if (id === "weather") cardSynthLine = composeWeatherStateVsShape(constitution);
+    else if (renderMode === "clinician") {
+      if (id === "gravity") cardSynthLine = composeGravityMovementNote(constitution);
+      else if (id === "fire") cardSynthLine = composeFireMovementNote(constitution);
+      else if (id === "trust") cardSynthLine = composeTrustCorrectionChannel(constitution);
+      else if (id === "weather") cardSynthLine = composeWeatherStateVsShape(constitution);
+    }
     if (cardSynthLine && cardSynthLine.length > 0) {
       out.push("");
       out.push(cardSynthLine);
@@ -1613,6 +1646,11 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
       );
       out.push("");
       out.push(`**Practice** — ${h.practice}`);
+      // CC-120 — Hands movement note stays emitted in both modes. Hands
+      // is in the four-card splice (cards: lens / compass / hands /
+      // path); its engine body is the cache-key input. Gating this line
+      // off in user mode would mismatch the committed cache key. The
+      // splice replaces the body with the LLM rewrite anyway.
       out.push("");
       out.push(`*${h.movementNote}*`);
       out.push("");
@@ -1645,10 +1683,14 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
   // CC-SYNTHESIS-1-FINISH Section E — Conviction render order:
   //   Posture → Pattern in motion → Movement Note → Pattern Note
   emitPatternBlock("conviction");
-  const convMovementNote = composeConvictionMovementNote(constitution);
-  if (convMovementNote.length > 0) {
-    out.push("");
-    out.push(convMovementNote);
+  // CC-120 — Conviction Movement Note is the same family of per-card
+  // synthesis annotations gated above; clinician-only.
+  if (renderMode === "clinician") {
+    const convMovementNote = composeConvictionMovementNote(constitution);
+    if (convMovementNote.length > 0) {
+      out.push("");
+      out.push(convMovementNote);
+    }
   }
   const convPatternNote =
     conv.patternNote ?? SHAPE_CARD_PATTERN_NOTE.conviction;
@@ -1657,21 +1699,24 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
 
   // 13.5. CC-104-NEXT-MOVES-SHAPE-AWARE — release-mechanism prose.
   // Renders between the SWOT-shape cards (which include the Grip
-  // Pattern read) and the Path section. Sits here so a user reading
-  // top-down meets "what's the grip" before "how do I release it"
-  // before "what's the trajectory." Section emits only when the
-  // engine attached `constitution.nextMoves` (skipped for unmapped
-  // grip / missing V/O).
+  // Pattern read) and the Path section.
+  //
+  // CC-120 — gated to Guide-only. This block duplicates "Your Next 3
+  // Moves" near the top of the report (engine-composed numbered list)
+  // with overlapping content (release-mechanism + paragraphs +
+  // oneSmallMove + reMeasureCue) and exposes question-IDs (Q-X2 /
+  // Q-A1 etc.) in the reMeasureCue prose. Per
+  // `docs/canon/guide-individual-model.md` principle 4, length and
+  // repetition are Individual defects; the Guide retains the full
+  // shape-aware release-mechanism prose verbatim.
   const nextMoves = constitution.nextMoves;
-  if (nextMoves) {
+  if (nextMoves && renderMode === "clinician") {
     out.push("");
     out.push("## Next Moves");
-    if (renderMode === "clinician") {
-      out.push("");
-      out.push(
-        `_Register: ${nextMoves.prose.registerLabel} — ${nextMoves.routing.reason}_`
-      );
-    }
+    out.push("");
+    out.push(
+      `_Register: ${nextMoves.prose.registerLabel} — ${nextMoves.routing.reason}_`
+    );
     for (const para of nextMoves.prose.paragraphs) {
       out.push("");
       out.push(para);
@@ -1818,19 +1863,25 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
   // compatibility; only the render-path emission is removed.
   const cross = constitution.cross_card;
 
-  out.push("");
-  out.push("## Conflict Translation");
-  out.push("");
-  out.push(cross.conflictTranslation);
+  // CC-120 — Conflict Translation + Mirror-Types Seed gated to Guide-
+  // only. Both are interpretive/comparative asides secondary to the
+  // core read; retained verbatim in the Guide per the additive
+  // contract.
+  if (renderMode === "clinician") {
+    out.push("");
+    out.push("## Conflict Translation");
+    out.push("");
+    out.push(cross.conflictTranslation);
 
-  out.push("");
-  // CC-LAUNCH-VOICE-POLISH B4 — singularization. Engine emits the legacy
-  // plural so the existing cohort baselines stay byte-identical in
-  // clinician mode; the user-mode mask rewrites the heading to the
-  // singular form below.
-  out.push("## Mirror-Types Seed");
-  out.push("");
-  out.push(cross.mirrorTypesSeed);
+    out.push("");
+    // CC-LAUNCH-VOICE-POLISH B4 — singularization. Engine emits the legacy
+    // plural so the existing cohort baselines stay byte-identical in
+    // clinician mode; the user-mode mask rewrites the heading to the
+    // singular form below.
+    out.push("## Mirror-Types Seed");
+    out.push("");
+    out.push(cross.mirrorTypesSeed);
+  }
 
   // 18. Open Tensions. The page-level surface uses local confirmation state
   // not available in the markdown renderer, so the export filters to the
@@ -1869,21 +1920,29 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
   // carried the architect-coded long-arc example regardless of
   // shape — that's the template bleed Cindy's 2026-05-16 prod render
   // surfaced.
-  const familyExplanationBody = resolveFamilyExplanation(
-    constitution.lens_stack?.dominant ?? null,
-    constitution.profileArchetype?.primary ?? null
-  );
-  out.push("");
-  out.push(`## ${USE_CASES_SECTION_TITLE}`);
-  out.push("");
-  out.push(`*${USE_CASES_SECTION_SUBHEAD}*`);
-  for (const useCase of USE_CASES) {
+  // CC-120 — Use-cases section gated to Guide-only. The 10 "earns its
+  // keep" items are a long appendix; the Guide retains them verbatim
+  // for helper/QA reference. Per the additive contract, this is a cut
+  // from the Individual, not a deletion. (If a reduced Individual
+  // variant is wanted later — e.g., the masthead line alone — that's a
+  // sibling edit, flagged.)
+  if (renderMode === "clinician") {
+    const familyExplanationBody = resolveFamilyExplanation(
+      constitution.lens_stack?.dominant ?? null,
+      constitution.profileArchetype?.primary ?? null
+    );
     out.push("");
-    const body =
-      useCase.title === "Family and coworker explanations."
-        ? familyExplanationBody
-        : useCase.body;
-    out.push(`**${useCase.title}** ${body}`);
+    out.push(`## ${USE_CASES_SECTION_TITLE}`);
+    out.push("");
+    out.push(`*${USE_CASES_SECTION_SUBHEAD}*`);
+    for (const useCase of USE_CASES) {
+      out.push("");
+      const body =
+        useCase.title === "Family and coworker explanations."
+          ? familyExplanationBody
+          : useCase.body;
+      out.push(`**${useCase.title}** ${body}`);
+    }
   }
 
   // 19a. CC-PROSE-1B Layer 5C — Final Line callout. Closing-of-the-closing,

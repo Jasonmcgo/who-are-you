@@ -104,6 +104,16 @@ WARM PRECISION WITH MORAL NERVE. Capture warmth (not coldness), precision (not v
 
 7. **Voice differentiation.** Each archetype sounds DIFFERENT. Not one template with swapped nouns. Jason should sound architectural; Cindy should sound relational; Daniel should sound precedent-bound. Sentence shapes vary across archetypes, not just adjectives.
 
+8. **CC-121 — Length discipline.** Be concise. The body of each labeled field (**Strength** / **Growth Edge** / **Practice** etc.) lands in ~50-90 words; the full card body lands in ~250-380 words. Hard ceiling: 420 words for the card body. The Path card (which carries Work/Love/Give) holds each beat to ~110 words, hard ceiling 140. Prefer fewer, sharper sentences over comprehensive ones. Reader feedback is that the report is too long; the rewrite must compress, not match-or-expand the engine prose.
+
+9. **CC-121 — No signature-term over-use.** Do not repeat any single signature label more than **twice** in the section. This applies to function-voice translations ("pattern-reader", "structurer", "room-reader", "operator", "interpreter", etc.), to archetype names, and to surface labels (driver names, named registers). After two mentions, switch to natural prose, pronouns, or a related verb-form. Bad: a paragraph that names "the room-reader" four times in five sentences. Better: name it once at the read, use "you" / "the same noticing" / "that same antenna" for the remaining references.
+
+10. **CC-121 — State protected-value cluster at most once.** A protected-value cluster (Family / Loyalty / Honor / Knowledge / Peace / Stability / Compassion / Faith / Freedom / Truth, named singly or in a list) appears at most once per section. After it lands once, translate it into the verb the reader lives — what they protect, what they organize their week around — not a re-listing of the same values as a refrain.
+
+11. **CC-121 — Vary cadence.** No two consecutive sentences share the same opener. Avoid stacking formulaic structures across paragraphs ("For your shape, this expresses as …", "What this means is …", "The growth move is …"). Sentence shapes within a section read as authored prose, not as a template ratchet.
+
+12. **CC-121 — Rules 8-11 extend, not replace, rules 1 (hedge cap) and 4 (declaratives).** Concise + declarative + low-hedge is the target voice, all at once.
+
 # Output
 
 Output ONLY the rewritten section body. Preserve the section header line ("### {Card} — {Bodypart}") and the bold field labels ("**Strength** — ...") that the engine emits — your task is to rewrite the prose INSIDE those labels, not to restructure the card. Keep the body fields the engine specified:
@@ -115,7 +125,7 @@ Do NOT add or remove field labels. Do NOT change numeric values. Do NOT add comm
 
 # Length
 
-Match the engine's section length within ±25%. The point is COMPRESSION + TEXTURE, not expansion.`;
+CC-121 — compress. Aim for ~25-35% SHORTER than the engine section body while preserving the structural shape (the labeled fields). The point is COMPRESSION + TEXTURE; the engine prose is verbose by design (template-padded) and the rewrite's job is to land the same read in fewer, sharper sentences. Never exceed the engine length.`;
 
 // ─────────────────────────────────────────────────────────────────────
 // User-prompt builder

@@ -61,6 +61,12 @@ type Props = {
     // consumed inside the Map (others land in Mirror / Closing Read).
     pathTriptych?: string | null;
   };
+  // CC-120 — render-mode gate for per-card secondary annotations.
+  // User mode (Individual) suppresses Pattern-in-motion + Movement
+  // Note / Correction channel / State vs. shape (the synthesisLine
+  // family); clinician mode (Guide) retains them in place per
+  // `docs/canon/guide-individual-model.md`.
+  renderMode?: "user" | "clinician";
 };
 
 const CARD_KEYS = [
@@ -84,7 +90,10 @@ export default function MapSection({
   mbtiSlot,
   demographics,
   liveScopedRewrites,
+  renderMode,
 }: Props) {
+  // CC-120 — default to user (Individual) when caller omits the prop.
+  const mode = renderMode ?? "user";
   const [expanded, setExpanded] = useState<Record<CardKey, boolean>>({
     lens: false,
     compass: false,
@@ -147,7 +156,13 @@ export default function MapSection({
   // CC-022b Items 4 + 2 — compute cross-card patterns + demographic hooks.
   // All render-time computations (per Rule 4 amendment); the InnerConstitution
   // stored on disk stays demographic-blind.
+  // CC-120 — Pattern in motion (cross-card patterns) is a Guide-only
+  // secondary annotation. In user mode the map is empty so every
+  // `<CrossCardPatternBlock proses={…} />` invocation short-circuits to
+  // null (its existing `proses.length === 0` guard).
   const patternsByCard = useMemo(() => {
+    const grouped = new Map<ShapeCardId, string[]>();
+    if (mode !== "clinician") return grouped;
     const topCompass = getTopCompassValues(constitution.signals);
     const topGravity = getTopGravityAttribution(constitution.signals);
     const detected = detectCrossCardPatterns(
@@ -158,14 +173,13 @@ export default function MapSection({
       constitution.meta_signals,
       demographics
     );
-    const grouped = new Map<ShapeCardId, string[]>();
     for (const { pattern, prose } of detected) {
       const list = grouped.get(pattern.applicable_card) ?? [];
       list.push(prose);
       grouped.set(pattern.applicable_card, list);
     }
     return grouped;
-  }, [constitution, demographics]);
+  }, [constitution, demographics, mode]);
 
   // CC-SYNTHESIS-1-FINISH — per-card synthesis lines computed once and
   // memoized so the 6 composer calls run in one pass (instead of once
@@ -176,20 +190,27 @@ export default function MapSection({
   // CC-SYNTHESIS-3 — `pathMaster` prefers the LLM-articulated cached
   // paragraph (`shape_outputs.path.masterSynthesisLlm`) when present;
   // falls back to the mechanical CC-SYNTHESIS-1F composer otherwise.
+  // CC-120 — the per-card secondary annotations (Movement Note /
+  // Correction channel / State vs. shape) are gated to Guide-only.
+  // In user mode (Individual) they resolve to null so each ShapeCard
+  // receives `synthesisLine={null}` and skips emitting the synthesis
+  // paragraph slot. Path's master synthesis paragraph is NOT a per-card
+  // annotation — it's the warm core of the Path card and stays in both
+  // modes (handled below via `pathMaster`).
   const synthLines = useMemo(
     () => ({
-      lens: composeLensMovementNote(constitution),
-      compass: composeCompassMovementNote(constitution),
-      conviction: composeConvictionMovementNote(constitution),
-      gravity: composeGravityMovementNote(constitution),
-      trust: composeTrustCorrectionChannel(constitution),
-      weather: composeWeatherStateVsShape(constitution),
-      fire: composeFireMovementNote(constitution),
+      lens: mode === "clinician" ? composeLensMovementNote(constitution) : null,
+      compass: mode === "clinician" ? composeCompassMovementNote(constitution) : null,
+      conviction: mode === "clinician" ? composeConvictionMovementNote(constitution) : null,
+      gravity: mode === "clinician" ? composeGravityMovementNote(constitution) : null,
+      trust: mode === "clinician" ? composeTrustCorrectionChannel(constitution) : null,
+      weather: mode === "clinician" ? composeWeatherStateVsShape(constitution) : null,
+      fire: mode === "clinician" ? composeFireMovementNote(constitution) : null,
       pathMaster:
         constitution.shape_outputs.path.masterSynthesisLlm ??
         composePathMasterSynthesis(constitution),
     }),
-    [constitution]
+    [constitution, mode]
   );
 
   // CC-022b Item 2 — demographic-augmented Path output. Append the
@@ -545,11 +566,17 @@ export default function MapSection({
                     <p style={{ margin: 0, lineHeight: 1.55 }}>
                       <strong>Practice</strong> — {constitution.handsCard.practice}
                     </p>
-                    <p
-                      style={{ fontStyle: "italic", margin: 0, lineHeight: 1.55 }}
-                    >
-                      {constitution.handsCard.movementNote}
-                    </p>
+                    {/* CC-120 — Hands Movement Note gated to Guide-only
+                        (same family as the Lens/Compass/etc. per-card
+                        synthesis annotations). Closing line stays in
+                        both modes. */}
+                    {mode === "clinician" ? (
+                      <p
+                        style={{ fontStyle: "italic", margin: 0, lineHeight: 1.55 }}
+                      >
+                        {constitution.handsCard.movementNote}
+                      </p>
+                    ) : null}
                     <p
                       style={{ fontStyle: "italic", margin: 0, lineHeight: 1.55 }}
                     >

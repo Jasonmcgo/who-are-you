@@ -11,9 +11,14 @@
 //       applying the user-mode mask to the Guide to neutralize name-
 //       swap / jargon-strip / header-rename differences that aren't
 //       structural). Mask-applied-to-Guide ⊇ Individual.
-//   9b. guide-mode-snapshot-stable — Guide hash matches a fresh
-//       baseline (`twoTierBaseline.snapshot.json`, re-snapshotted post
-//       CC-119) for every fixture. Regression-stability check.
+//   9b. guide-contains-expected-sections (CC-121) — replaces the
+//       byte-hash `guide-mode-snapshot-stable` assertion. The byte-hash
+//       check flapped at CC-116/119/120 (baseline written warm vs.
+//       audit run cold). Structural check: the Guide render contains
+//       every canonical top-level section + the clinician-only
+//       scaffolding markers. Prose-content stability is now governed
+//       by the per-section LLM rewrite prompts (CC-121) + the
+//       `regen-cache.sh` runbook, not by a byte-snapshot audit.
 //
 // Assertions:
 //   1. renderMode-switch-exists — renderMirrorAsMarkdown accepts renderMode
@@ -37,8 +42,9 @@
 //   8. appendix-dialog-strips-intj — UseCasesSection.tsx jasonType
 //      explanation no longer contains "I'm an INTJ"
 //   9a. guide-superset-of-individual — mask(Guide) ⊇ Individual (CC-119).
-//   9b. guide-mode-snapshot-stable — Guide hash matches new warm
-//       baseline for every cohort fixture (CC-119 re-snapshot).
+//   9b. guide-contains-expected-sections — Guide carries the canonical
+//       top-level sections + clinician-only scaffolding markers
+//       (CC-121, replaces the prior byte-hash check).
 //  10. user-mode-cohort-renders-clean — full 24-fixture cohort sweep
 //      passes the suppression gates (informational on outliers)
 
@@ -515,57 +521,103 @@ function runAudit(): AssertionResult[] {
     );
   }
 
-  // ── 9b. guide-mode-snapshot-stable (CC-119) ────────────────────────
-  //   Regression check: the Guide render's hash matches the warm
-  //   baseline written by `twoTierBaseline.snapshot.ts` after CC-119.
-  //   Re-run that snapshot writer when an intentional Guide content
-  //   change ships; treat snapshot drift as a flagged regression
-  //   otherwise.
-  if (!existsSync(BASELINE)) {
-    results.push({
-      ok: false,
-      assertion: "guide-mode-snapshot-stable",
-      detail: "baseline snapshot missing — run `npx tsx tests/audit/twoTierBaseline.snapshot.ts`",
-    });
-  } else {
-    const baseline = JSON.parse(readFileSync(BASELINE, "utf-8")) as Record<
-      string,
-      { length: number; hash: string }
-    >;
-    const driftFails: string[] = [];
+  // ── 9b. guide-contains-expected-sections (CC-121) ──────────────────
+  //   Structural regression check, replacing the CC-119 byte-hash
+  //   `guide-mode-snapshot-stable` assertion. The byte-hash check
+  //   pinned LLM-cached prose and flapped at CC-116/119/120 (baseline
+  //   written warm vs. audit run cold; engine drift between commits
+  //   shifting prose without changing length). The meaningful Guide
+  //   guarantees are:
+  //     (a) Guide ⊇ Individual at the line level → `guide-superset-of-
+  //         individual` (9a), and
+  //     (b) the Guide carries every canonical top-level section + the
+  //         clinician-only scaffolding markers → THIS assertion.
+  //   Prose-content stability inside a section is governed by the
+  //   per-section LLM rewrite prompts (CC-121); regen via the
+  //   `regen-cache.sh` runbook is the right place to re-pin warm prose,
+  //   not a byte-snapshot audit.
+  //
+  //   The `twoTierBaseline.snapshot.json` file is intentionally left in
+  //   place for forensic diff use during regen cycles; this assertion
+  //   no longer reads it. The snapshot writer at
+  //   `tests/audit/twoTierBaseline.snapshot.ts` remains callable and
+  //   useful for that forensic comparison.
+  {
+    // Sections present in the Guide render of ALL 24 cohort fixtures
+    // (verified empirically). Conditional sections — "## Your Grip"
+    // (when grip taxonomy yields a renderable bucket), "## Keystone
+    // Reflection" (when the user wrote a belief), "## A Synthesis"
+    // (when summary parts emit), "## Next Moves" (when the engine
+    // attached the release-mechanism prose) — are NOT required here
+    // because they don't always emit. The four explicitly-Guide-only
+    // sections (Disposition Signal Mix — header renamed by the user-
+    // mask, Conflict Translation + Mirror-Types Seed + "What this is
+    // good for" — gated to clinician by CC-120) are included in this
+    // set and act as the Guide-only scaffolding markers; their
+    // presence confirms the additive contract holds at the section
+    // level.
+    const REQUIRED_GUIDE_SECTIONS: string[] = [
+      "## Closing Read",
+      "## Conflict Translation", // Guide-only (CC-120)
+      "## Core Signal Map",
+      "## Disposition Signal Mix", // Guide-only (mask renames in user)
+      "## Executive Read",
+      "## Love Map",
+      "## Map — go deeper",
+      "## Mirror-Types Seed", // Guide-only (CC-120)
+      "## Movement",
+      "## Open Tensions",
+      "## Path — Gait",
+      "## What Others May Experience",
+      "## What this is good for.", // Guide-only (CC-120)
+      "## When the Load Gets Heavy",
+      "## Work Map",
+      "## Your Core Pattern",
+      "## Your Next 3 Moves",
+      "## Your Top Gifts and Growth Edges",
+    ];
+
+    const missingFails: string[] = [];
     for (const dir of ["ocean", "goal-soul-give"]) {
       for (const f of readdirSync(join(ROOT, dir))
         .filter((x) => x.endsWith(".json"))
         .sort()) {
-        const key = `${dir}/${f}`;
-        const expected = baseline[key];
-        if (!expected) continue;
         const md = renderClinician(dir, f);
-        const actual = { length: md.length, hash: hash(md) };
-        if (
-          actual.hash !== expected.hash ||
-          actual.length !== expected.length
-        ) {
-          driftFails.push(
-            `${key}: actual.hash=${actual.hash.slice(0, 12)} expected.hash=${expected.hash.slice(0, 12)}; len ${actual.length} vs ${expected.length}`
+        const missing: string[] = [];
+        for (const header of REQUIRED_GUIDE_SECTIONS) {
+          if (!md.includes(header)) missing.push(header);
+        }
+        if (missing.length > 0) {
+          missingFails.push(
+            `${dir}/${f}: missing ${missing.length} section(s); first: "${missing[0]}"`
           );
         }
       }
     }
     results.push(
-      driftFails.length === 0
+      missingFails.length === 0
         ? {
             ok: true,
-            assertion: "guide-mode-snapshot-stable",
-            detail: "Guide-mode output matches CC-119 warm baseline for every cohort fixture",
+            assertion: "guide-contains-expected-sections",
+            detail: `Guide render contains all ${REQUIRED_GUIDE_SECTIONS.length} canonical top-level sections (including the 4 Guide-only sections that act as additive-contract scaffolding markers) for every cohort fixture`,
           }
         : {
             ok: false,
-            assertion: "guide-mode-snapshot-stable",
-            detail: driftFails.slice(0, 5).join(" | "),
+            assertion: "guide-contains-expected-sections",
+            detail: missingFails.slice(0, 5).join(" | "),
           }
     );
   }
+  // CC-121 — the BASELINE constant + the createHash import + the
+  // existsSync / readFileSync uses for the baseline file are now
+  // unreachable here. They're left in place so the snapshot writer
+  // (twoTierBaseline.snapshot.ts) and forensic regen-time diffs can
+  // still consume them without an audit re-edit. Intentional dead
+  // code in this file. (Flag for cleanup if the snapshot.ts file is
+  // ever retired.)
+  void BASELINE;
+  void existsSync;
+  void hash;
 
   // ── 10. user-mode-cohort-renders-clean ─────────────────────────────
   // Diagnostic — count cohort fixtures whose user-mode body remains
