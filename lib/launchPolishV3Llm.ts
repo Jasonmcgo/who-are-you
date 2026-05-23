@@ -83,18 +83,97 @@ export function deriveQuieterAxis(
 // ─────────────────────────────────────────────────────────────────────
 // Archetype voice library (matches proseRewriteLlm.ts's ARCHETYPE_VOICE
 // register so V3 sections sound continuous with the existing 5).
+//
+// CC-131 Part C.2 — imagery is now a POOL per archetype (the engine
+// concrete-image hooks the LLM rewriter is encouraged to land on).
+// `archetypeVoice(archetype, sectionId)` returns the base voice +
+// a deterministic 2-image WINDOW into the pool — different sections
+// see different imagery so the LLM stops landing the same first hook
+// ("strategy memo nobody asked for" was hitting 6× in jasonType
+// fixtures) into every cross-section rewrite. Section index drives
+// the window start; pool wraps. Pure-given-input (no RNG, no per-
+// fixture state) so the cache key shape is unchanged.
 // ─────────────────────────────────────────────────────────────────────
 
-const ARCHETYPE_VOICE: Record<ProfileArchetype, string> = {
-  jasonType:
-    "Long-arc, architectural, knowledge-protective, mastery-controlled. Sentences land hard; structure is the texture. Concrete imagery: writing the strategy memo nobody asked for; building the model that explains the noise; refining a structure past usefulness; holding a conclusion until it can be revised in public.",
-  cindyType:
-    "Present-tense, relational, family-protective, belonging-through-usefulness. The room reads first. Concrete imagery: noticing what the room needs before anyone names it; the recurring meal, the standing call; the structural fix that removes a recurring strain on someone you love; staying close when the work would be easier from a distance.",
-  danielType:
-    "Precedent-bound, structural, faith-protective, security-through-structure. What endures gets named. Concrete imagery: the standard followed when no one is watching; the precedent honored across decades; the system that doesn't ask to be reinvented every morning; the quiet faithfulness that institutions only notice in its absence.",
-  unmappedType:
-    "Plain-language, shape-aware. Speak from the user's specific shape without leaning on a named archetype. Concrete imagery should be drawn from what their engine read names.",
+interface ArchetypeVoiceProfile {
+  /** Voice register description (tempo, sentence shape, value posture). */
+  base: string;
+  /** Imagery pool. The rewriter is shown a 2-image WINDOW per section
+   *  so any single hook lands at most ~⌈N/L⌉ times across the report
+   *  (L = pool length, N = sections that fire). Authoring rule: every
+   *  pool entry must be a noun-phrase scene the user could recognize
+   *  from their own week. Avoid synonym swaps — each entry should be
+   *  a different *moment*, not a different *word* for the same moment. */
+  imagery: string[];
+}
+
+const ARCHETYPE_VOICE: Record<ProfileArchetype, ArchetypeVoiceProfile> = {
+  jasonType: {
+    base: "Long-arc, architectural, knowledge-protective, mastery-controlled. Sentences land hard; structure is the texture.",
+    imagery: [
+      "writing the strategy memo nobody asked for",
+      "building the model that explains the noise",
+      "refining a structure past usefulness",
+      "holding a conclusion until it can be revised in public",
+      "naming the load-bearing assumption the room won't surface on its own",
+      "drafting the architecture before anyone has agreed there's a problem",
+      "carrying the second-order consequence two steps further than the meeting wants to",
+    ],
+  },
+  cindyType: {
+    base: "Present-tense, relational, family-protective, belonging-through-usefulness. The room reads first.",
+    imagery: [
+      "noticing what the room needs before anyone names it",
+      "the recurring meal, the standing call",
+      "the structural fix that removes a recurring strain on someone you love",
+      "staying close when the work would be easier from a distance",
+      "remembering the small thing someone mentioned in passing six weeks ago",
+      "carrying the emotional weather of the room so the people in it don't have to",
+      "the standing rhythm that lets someone count on being seen without having to ask",
+    ],
+  },
+  danielType: {
+    base: "Precedent-bound, structural, faith-protective, security-through-structure. What endures gets named.",
+    imagery: [
+      "the standard followed when no one is watching",
+      "the precedent honored across decades",
+      "the system that doesn't ask to be reinvented every morning",
+      "the quiet faithfulness that institutions only notice in its absence",
+      "the slow yes that holds when the fast yes would have collapsed",
+      "the practice kept across a season when the reasons for it have gone quiet",
+      "the long memory that catches the drift before anyone has named the change",
+    ],
+  },
+  unmappedType: {
+    base: "Plain-language, shape-aware. Speak from the user's specific shape without leaning on a named archetype.",
+    imagery: ["concrete imagery should be drawn from what the user's engine read names — do not borrow archetype-coded scenes"],
+  },
 };
+
+/**
+ * Return the per-section voice/imagery guidance the LLM rewriter sees.
+ * `sectionId` selects a deterministic 2-image window into the archetype's
+ * pool so different sections land different concrete imagery and any
+ * single hook (e.g. "strategy memo nobody asked for") shows up in at
+ * most ~⌈7/2⌉ = 4 sections in the worst case, instead of all 7.
+ *
+ * NOT part of the cache key. Swapping the imagery pool (or the windowing)
+ * does NOT invalidate existing cache entries — but cold-render output
+ * shifts. The CC-131 cold re-snapshot is the verification gate.
+ */
+function archetypeVoice(
+  archetype: ProfileArchetype,
+  sectionId: V3SectionId
+): string {
+  const profile = ARCHETYPE_VOICE[archetype];
+  if (archetype === "unmappedType") return profile.base + " " + profile.imagery[0];
+  const sectionIndex = V3_SECTION_IDS.indexOf(sectionId);
+  const pool = profile.imagery;
+  const start = ((sectionIndex >= 0 ? sectionIndex : 0) * 2) % pool.length;
+  const first = pool[start % pool.length];
+  const second = pool[(start + 1) % pool.length];
+  return `${profile.base} Concrete imagery to favor for THIS section (a different window than other sections see; do not import imagery from elsewhere): ${first}; ${second}.`;
+}
 
 // ─────────────────────────────────────────────────────────────────────
 // Per-section target prose guidance (CC §"Scope — expand LLM rewrite").
@@ -196,7 +275,7 @@ export function buildV3UserPrompt(inputs: V3RewriteInputs): string {
     "",
     `Section target: ${V3_SECTION_TARGETS[inputs.sectionId]}`,
     "",
-    `Voice / imagery for this archetype: ${ARCHETYPE_VOICE[inputs.archetype]}`,
+    `Voice / imagery for this archetype: ${archetypeVoice(inputs.archetype, inputs.sectionId)}`,
     "",
   ];
   if (inputs.topCompassValueLabels.length > 0) {

@@ -59,6 +59,10 @@ import {
 } from "./victimOwnerAxis";
 import { computeGrip as computeGripCanonical } from "./gripDecomposition";
 import { buildNextMovesProse } from "./nextMovesProse";
+// CC-131 Part A.1 — signature-fragment registry. Gives the per-card
+// gift/blind-spot composers a way to rotate phrasing when a fragment
+// family has already been emitted earlier in the same render.
+import { pickFragmentVariant } from "./signatureFragmentRegistry";
 // CC-SYNTHESIS-3 — runtime cache lookup for LLM-articulated Path master
 // synthesis paragraph. The composer module (synthesis3Llm) and the
 // inputs-derivation module (synthesis3Inputs) are imported lazily after
@@ -2139,7 +2143,7 @@ export function buildInnerConstitution(
   };
 
   const cross_card: CrossCardSynthesis = {
-    topGifts: synthesizeTopGifts(shape_outputs, stack, topCompass, topGravity, agency, weather, fire),
+    topGifts: synthesizeTopGifts(shape_outputs, stack, topCompass, topGravity, agency, weather, fire, ctx),
     topRisks: synthesizeTopRisks(shape_outputs, weather, fire),
     growthPath: generateGrowthPath(topCompass, stack, topGravity, agency),
     relationshipTranslation: generateRelationshipTranslation(stack, topCompass, fire),
@@ -3905,6 +3909,12 @@ export type BuildContext = {
   usedSentences: Set<string>;
   cardCategoryByCard: Partial<Record<CardKey, GiftCategory>>;
   discernmentGrowthHostCard: CardKey | null;
+  // CC-131 Part A.1 — signature-fragment registry. Tracks how many
+  // times each well-known reused fragment family has been emitted
+  // within this build so subsequent calls can rotate to a variant
+  // phrasing. See lib/signatureFragmentRegistry.ts for the family
+  // catalogue + variant pools.
+  usedFragmentFamilies: Map<string, number>;
 };
 
 function newBuildContext(): BuildContext {
@@ -3913,6 +3923,7 @@ function newBuildContext(): BuildContext {
     usedSentences: new Set(),
     cardCategoryByCard: {},
     discernmentGrowthHostCard: null,
+    usedFragmentFamilies: new Map(),
   };
 }
 
@@ -4602,7 +4613,9 @@ function blindSpotFor(
     signalCtx.topGravity,
     signalCtx.agency,
     signalCtx.weather,
-    signalCtx.fire
+    signalCtx.fire,
+    // CC-131 Part A.1 — thread context for fragment-family dedup.
+    context
   );
   return `${sentence1} ${sentence2}`;
 }
@@ -4621,6 +4634,22 @@ const GIFT_NOUN_PHRASE: Record<GiftCategory, string> = {
   Discernment: "a discernment gift",
   Generativity: "a generative gift",
 };
+
+// CC-131 Part A.1 — Discernment's GIFT_DESCRIPTION fragment also
+// landed verbatim in multiple cards. `giftDescriptionFor` wraps the
+// raw table read with a registry rotation for families that have
+// pool-based variants; other categories return the table value
+// directly. Threads `BuildContext` only when the caller has it
+// available — legacy paths (no ctx) preserve canonical output.
+function giftDescriptionFor(
+  cat: GiftCategory,
+  ctx?: BuildContext
+): string {
+  if (cat === "Discernment") {
+    return pickFragmentVariant(ctx, "discernment_gift_description");
+  }
+  return GIFT_DESCRIPTION[cat];
+}
 
 const GIFT_DESCRIPTION: Record<GiftCategory, string> = {
   Pattern: "you tend to see the deeper shape of a problem before it becomes obvious to others",
@@ -4724,7 +4753,12 @@ export function getGiftSpecificity(
   topGravity: SignalRef[],
   agency: AgencyPattern,
   weather: WeatherLoad,
-  fire: FirePattern
+  fire: FirePattern,
+  // CC-131 Part A.1 — optional build context. When supplied, well-
+  // known reused fragment families consult the registry to rotate
+  // phrasing on subsequent emissions. When omitted (legacy callers),
+  // the canonical phrasing returns and no rotation happens.
+  ctx?: BuildContext
 ): string {
   const dom = stack.dominant;
   const aux = stack.auxiliary;
@@ -4850,7 +4884,11 @@ export function getGiftSpecificity(
       if (dom === "ni" && aux === "ne") {
         return PREFIX + "triangulation across many frames — pattern-matching that holds multiple possibilities at once and tests each against the one being claimed.";
       }
-      return PREFIX + "the eye for what doesn't add up — catching the mismatch before it surfaces in language.";
+      // CC-131 Part A.1 — Discernment generic fallback was emitted
+      // verbatim into every card that fired Discernment as its gift
+      // (Top Gifts, Trust, Conviction); registry picks variant[N] for
+      // the Nth emission within the render.
+      return PREFIX + pickFragmentVariant(ctx, "discernment_gift_generic");
 
     case "Generativity":
       if (dom === "te" && agency.aspiration === "relational") {
@@ -4892,7 +4930,11 @@ export function getBlindSpotSpecificity(
   topGravity: SignalRef[],
   agency: AgencyPattern,
   weather: WeatherLoad,
-  fire: FirePattern
+  fire: FirePattern,
+  // CC-131 Part A.1 — see getGiftSpecificity for the registry
+  // contract. Same per-render rotation applies to blind-spot
+  // fragments that fire across multiple cards.
+  ctx?: BuildContext
 ): string {
   const dom = stack.dominant;
   const has = (id: SignalId) => inCompassTop(topCompass, id, 5);
@@ -5000,7 +5042,11 @@ export function getBlindSpotSpecificity(
         return PREFIX + "anomaly-projection — the eye that catches what doesn't add up starts catching anomalies that aren't there.";
       }
       if (dom === "ni" && (has("faith_priority") || has("honor_priority"))) {
-        return PREFIX + "the long-arc read pre-judging — the pattern your shape has been reaching for becomes more visible than the patterns actually present.";
+        // CC-131 Part A.1 — Discernment Ni-faith blind-spot fragment
+        // is reused across the same cards as the gift fragment;
+        // rotation via the registry breaks the verbatim cross-card
+        // paste.
+        return PREFIX + pickFragmentVariant(ctx, "discernment_blindspot_ni_faith");
       }
       return PREFIX + "suspicion as default — discernment that protects accuracy slowly tilts into reading every difference as deception.";
 
@@ -5586,11 +5632,11 @@ export function deriveCompassOutput(
   );
   const stem = buildGiftStem(cat, cardPos, context);
   // CC-052 — append user-specific Sentence 2 anchor (Rule 2 implementation).
-  const compassSpecificity = getGiftSpecificity(cat, stack, topCompass, topGravity, agency, weather, fire);
+  const compassSpecificity = getGiftSpecificity(cat, stack, topCompass, topGravity, agency, weather, fire, context);
   const giftText =
     topCompass.length === 0
       ? "Your Compass output is thin in this session — the sacred-value rankings did not converge on a clear top."
-      : `${stem} ${GIFT_DESCRIPTION[cat]}. ${compassSpecificity} ` +
+      : `${stem} ${giftDescriptionFor(cat, context)}. ${compassSpecificity} ` +
         `Your top-ranked values (${valueListPhrase(topCompass, 0)}) are the structure that strength is built around.`;
 
   const blindText = blindSpotFor(cat, context, { stack, topCompass, topGravity, agency, weather, fire });
@@ -5658,9 +5704,9 @@ export function deriveConvictionOutput(
   );
   const stem = buildGiftStem(cat, cardPos, context);
   // CC-052 — append user-specific Sentence 2 anchor (Rule 2 implementation).
-  const convictionSpecificity = getGiftSpecificity(cat, stack, topCompass, topGravity, agency, weather, fire);
+  const convictionSpecificity = getGiftSpecificity(cat, stack, topCompass, topGravity, agency, weather, fire, context);
   const giftText =
-    `${stem} ${GIFT_DESCRIPTION[cat]}. ${convictionSpecificity} ` +
+    `${stem} ${giftDescriptionFor(cat, context)}. ${convictionSpecificity} ` +
     `In the moments when belief becomes expensive, that gift is what you tend to lean on.`;
   // CC-025 Step 1.4 — Conviction-register Growth Edge override. The
   // gift-category-keyed BLIND_SPOT_TEXT_VARIANTS pool produces an
@@ -5805,9 +5851,9 @@ export function deriveTrustOutput(
   );
   const stem = buildGiftStem(cat, cardPos, context);
   // CC-052 — append user-specific Sentence 2 anchor (Rule 2 implementation).
-  const trustSpecificity = getGiftSpecificity(cat, stack, topCompass, topGravity, agency, weather, fire);
+  const trustSpecificity = getGiftSpecificity(cat, stack, topCompass, topGravity, agency, weather, fire, context);
   const giftText =
-    `${stem} ${GIFT_DESCRIPTION[cat]}. ${trustSpecificity} ` +
+    `${stem} ${giftDescriptionFor(cat, context)}. ${trustSpecificity} ` +
     `Your top-trusted sources (${joinList([...instLabels, ...personalLabels].slice(0, 3))}) are who you appear to weight most when truth is at stake.`;
   const blindText = blindSpotFor(cat, context, { stack, topCompass, topGravity, agency, weather, fire });
 
@@ -6058,7 +6104,11 @@ export function synthesizeTopGifts(
   weather: WeatherLoad,
   // CC-052 — fire threaded so getGiftSpecificity can fire the
   // willingToBearCost discriminator on Discernment + Integrity.
-  fire: FirePattern
+  fire: FirePattern,
+  // CC-131 Part A.1 — optional BuildContext for signature-fragment
+  // dedup. Threaded so the topGifts call into getGiftSpecificity
+  // consults the same registry as the per-card composers.
+  context?: BuildContext
 ): TopGiftEntry[] {
   // Collect candidate gifts from cards that have category-tagged gifts.
   const candidates: { category: GiftCategory; source: string }[] = [];
@@ -6099,10 +6149,10 @@ export function synthesizeTopGifts(
   return out.map((cat, i) => {
     const closing = TOP_GIFTS_CLOSING_POOL[i % TOP_GIFTS_CLOSING_POOL.length];
     // CC-052 — append user-specific Sentence 2 anchor (Rule 2 implementation).
-    const specificity = getGiftSpecificity(cat, stack, topCompass, topGravity, agency, weather, fire);
+    const specificity = getGiftSpecificity(cat, stack, topCompass, topGravity, agency, weather, fire, context);
     return {
       label: capitalize(GIFT_NOUN_PHRASE[cat]) + ".",
-      paragraph: capitalize(GIFT_DESCRIPTION[cat]) + ". " + specificity + " " + closing,
+      paragraph: capitalize(giftDescriptionFor(cat, context)) + ". " + specificity + " " + closing,
     };
   });
 }
@@ -6570,11 +6620,27 @@ type PathSubsectionTemplate = (ctx: GeneratorContext) => string;
 const PATH_WORK_BY_DOM: Record<CognitiveFunctionId, PathSubsectionTemplate> = {
   ni: (ctx) => {
     const v = topCompassLabel(ctx.topCompass);
+    // CC-131 Part C.2 — rotate the "Tuesday afternoon" lead image so
+    // the engine fallback doesn't stamp "writing the strategy memo
+    // nobody asked for" into every Ni-dom fixture (six-times-repeat
+    // motivator). Pick by a stable shape-signal hash: top compass
+    // signal_id if present, else auxiliary stack id. Two alternates
+    // join the original phrasing in the pool.
+    const NI_TUESDAY_IMAGES = [
+      "naming the structural problem behind the symptom everyone else is treating, sketching the system that won't have to be redesigned in eighteen months, surfacing the load-bearing assumption the room has been working around without naming",
+      "writing the strategy memo nobody asked for, mapping the architecture under a recurring failure, carrying the second-order consequence two steps past where the meeting wants to stop",
+      "drafting the brief that ties three unrelated problems back to one root, walking a colleague through the model that explains the noise, refining a structure past the version the room thought was final",
+    ];
+    const shapeSignal =
+      ctx.topCompass[0]?.signal_id ?? ctx.stack.auxiliary ?? ctx.stack.dominant;
+    let hash = 0;
+    for (let i = 0; i < shapeSignal.length; i++) hash = (hash * 31 + shapeSignal.charCodeAt(i)) >>> 0;
+    const tuesday = NI_TUESDAY_IMAGES[hash % NI_TUESDAY_IMAGES.length];
     return (
       `Work, for this shape, is rarely just labor. It is translation — converting a long-arc read of how things are likely to land into something the people around you can actually act on. ` +
       `You are likely to feel most engaged when work lets you make hidden structure visible: the frame nobody is naming, the model that would explain why the surface is what it is, the strategy that holds three years out instead of three weeks. ` +
       `Good fits tend to share a quiet feature: they reward time spent thinking before acting, and they leave room for the read to mature without demanding constant deliverable proof of it. Bad fits usually announce themselves the same way — pure reactivity, optimization against metrics that miss the point, work that requires you to keep restating the obvious. ` +
-      `On a Tuesday afternoon, the work that lights this shape up looks like: writing the strategy memo nobody asked for, naming the structural problem behind the symptom everyone is treating, designing the system that won't have to be redesigned in eighteen months. ${ctx.topCompass.length > 0 ? `When ${v} is what you're protecting, the engagement deepens — work becomes a way of keeping ${v} structurally in the world.` : ""}`
+      `On a Tuesday afternoon, the work that lights this shape up looks like: ${tuesday}. ${ctx.topCompass.length > 0 ? `When ${v} is what you're protecting, the engagement deepens — work becomes a way of keeping ${v} structurally in the world.` : ""}`
     );
   },
   ne: (ctx) => {

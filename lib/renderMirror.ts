@@ -44,6 +44,11 @@ import {
   type KeystoneRewriteInputs,
 } from "./keystoneRewriteLlm";
 import { readCachedV3Rewrite } from "./launchPolishV3Llm";
+// CC-131 Part C.1 — cross-section polish layer. Render path only LOOKS
+// UP polished entries; misses pass through (no spend, no fallback).
+import { readCachedCrossSectionPolish } from "./crossSectionPolishLlm";
+// CC-132 — 50° Life Individual reformat composer.
+import { composeFiftyDegreeIndividual } from "./fiftyDegreeIndividual";
 // CC-110 — V3 splice into user-mode markdown. The shared helper builds
 // the same V3RewriteInputs the React surface uses, so the cache key
 // matches and every warm V3 entry appears in the Copy/Download export.
@@ -789,6 +794,34 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
   // donut, wrap architect failure-mode in <details>) can branch on it
   // alongside the late splice path.
   const renderMode = args.renderMode ?? "user";
+
+  // CC-132 — Individual reformat. The Individual (`user` mode) is the
+  // 11-section "50° Life" Michele outline; the Guide (`clinician` mode)
+  // is unchanged. Render the Guide internally first so all warm V3 /
+  // prose / keystone splices land (cache keys preserved), then re-place
+  // the warm prose into the new outline via composeFiftyDegreeIndividual
+  // and apply the user-mode mask. `engineOnly` is the cache-key
+  // pre-render escape hatch — it must keep returning raw engine prose
+  // for both modes to preserve cache-key construction in the live
+  // wrapper.
+  if (renderMode === "user" && args.engineOnly !== true) {
+    const guideMd = renderMirrorAsMarkdown({ ...args, renderMode: "clinician" });
+    const followUp = resolveFollowUpNarrative(
+      constitution,
+      args.answers ?? [],
+      demographics ?? null,
+      getUserName(demographics) ?? "You"
+    );
+    const individualMd = composeFiftyDegreeIndividual({
+      constitution,
+      guideMd,
+      generatedAt,
+      demographics: demographics ?? null,
+      answers: args.answers,
+      followUpNarrative: followUp,
+    });
+    return applyUserModeMask(individualMd, getUserName(demographics));
+  }
   // CC-119 — `engineOnly` is an internal escape hatch for the live
   // wrapper's cache-key pre-render. When set, scaffolding-mode emit
   // gates that check `renderMode === "clinician"` also apply, but the
@@ -948,10 +981,19 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
   );
 
   // 2. Core Pattern
-  out.push("");
-  out.push("## Your Core Pattern");
-  out.push("");
-  out.push(constitution.mirror.corePattern);
+  // CC-131 Part B — gated to Guide-only. On the latest user feedback,
+  // Core Pattern duplicates Executive Read's value-at-center read
+  // without a distinct beat the Individual needs. The Guide keeps it
+  // for helper/QA reference per the additive contract; the Individual
+  // loses the restatement. Editorial proposal followed verbatim — no
+  // single-paragraph remainder kept in the Individual (the Executive
+  // Read's verdict already names the shape + growth edge).
+  if (renderMode === "clinician") {
+    out.push("");
+    out.push("## Your Core Pattern");
+    out.push("");
+    out.push(constitution.mirror.corePattern);
+  }
 
   // 3+4. CC-PROSE-1B Layer 6 — Top Gifts and Growth Edges unified table.
   // Replaces the prior separate "## Your Top 3 Gifts" + "## Your Top 3
@@ -1167,8 +1209,12 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
   // closing thesis sentence without duplicating gift/danger content.
   // Order: intro → tercet → Layer 5B callout (gift/danger as blockquote)
   // → closing thesis sentence.
+  // CC-131 Part B — A Synthesis is gated to Guide-only. The section
+  // restates the cross-card thesis Executive Read already lands; in
+  // the Individual it reads as a third pass of the same beat. The
+  // Guide retains it in place per the additive contract.
   const summaryParts = getSimpleSummaryParts(constitution);
-  if (summaryParts.intro.length > 0) {
+  if (summaryParts.intro.length > 0 && renderMode === "clinician") {
     out.push("");
     out.push("## A Synthesis");
     out.push("");
@@ -1214,8 +1260,11 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
   // two-tier closing-phrase substitution ("the early shape of giving"
   // → "Giving is Work that has found its beloved object" when the
   // arrived-state conditions hold). Render layer just emits.
+  // CC-131 Part B — Closing Read is gated to Guide-only. It restates
+  // the "stay rooted, don't soften the standard" beat the Path master
+  // synthesis + Executive Read already deliver. Guide retains it.
   const closingReadProse = composeClosingReadProse(constitution);
-  if (closingReadProse.length > 0) {
+  if (closingReadProse.length > 0 && renderMode === "clinician") {
     out.push("");
     out.push("## Closing Read");
     out.push("");
@@ -2112,6 +2161,64 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
     const cached = readCachedV3Rewrite(inputs);
     if (cached) {
       raw = raw.slice(0, idx) + cached + "\n" + raw.slice(idx + sectionEnd);
+    }
+  }
+
+  // CC-131 Part C.1 — cross-section polish pass. After the V3 splice
+  // has substituted cached rewrites where available, walk the same
+  // section list one more time and look up a polished version of each
+  // section that has cross-section repetition with its neighbors. The
+  // committed cache (`lib/cache/cross-section-polish-rewrites.json`)
+  // ships empty, so all lookups miss and the V3-spliced prose passes
+  // through unchanged — no API spend, no fallback prose. Only `build*`
+  // scripts that opt into `LLM_REWRITE_RUNTIME=on` ever fill this
+  // cache. On hit, the polished prose REPLACES the V3-spliced prose
+  // for that section.
+  //
+  // Two-pass structure (extract → polish) is deliberate: each polish
+  // lookup needs the OTHER sections' rendered bodies as part of its
+  // cache key, so the snapshot of all section bodies must be frozen
+  // before any substitution begins.
+  const polishSectionBodies: Record<string, { idx: number; end: number; body: string }> = {};
+  for (const sectionId of V3_MARKDOWN_SPLICE_SECTION_IDS) {
+    const header = V3_HEADERS[sectionId];
+    if (!header) continue;
+    const idx = raw.indexOf(header);
+    if (idx < 0) continue;
+    const rest = raw.slice(idx);
+    const depth = header.startsWith("## ") && !header.startsWith("### ") ? 2 : 3;
+    const stopPattern = depth === 2 ? /\n## / : /\n## |\n### /;
+    const nextHeaderRel = rest.slice(header.length).search(stopPattern);
+    const sectionEnd =
+      nextHeaderRel < 0 ? raw.length - idx : header.length + nextHeaderRel;
+    polishSectionBodies[sectionId] = {
+      idx,
+      end: idx + sectionEnd,
+      body: raw.slice(idx, idx + sectionEnd),
+    };
+  }
+  // Splice polish results from the END of the document backwards so
+  // that earlier indices remain valid as later sections are replaced.
+  const polishArchetype =
+    constitution.profileArchetype?.primary ?? "unmappedType";
+  const orderedSectionIds = Object.keys(polishSectionBodies).sort(
+    (a, b) => polishSectionBodies[b].idx - polishSectionBodies[a].idx
+  );
+  for (const sectionId of orderedSectionIds) {
+    const entry = polishSectionBodies[sectionId];
+    const otherBodies: Record<string, string> = {};
+    for (const otherId of Object.keys(polishSectionBodies)) {
+      if (otherId === sectionId) continue;
+      otherBodies[otherId] = polishSectionBodies[otherId].body;
+    }
+    const polished = readCachedCrossSectionPolish({
+      sectionId,
+      archetype: polishArchetype,
+      targetSectionBody: entry.body,
+      otherSectionBodies: otherBodies,
+    });
+    if (polished !== null) {
+      raw = raw.slice(0, entry.idx) + polished + raw.slice(entry.end);
     }
   }
 

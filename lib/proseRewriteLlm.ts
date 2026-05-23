@@ -35,16 +35,75 @@ export interface ProseRewriteInputs {
 // Voice / imagery libraries per archetype + card
 // ─────────────────────────────────────────────────────────────────────
 
-const ARCHETYPE_VOICE: Record<ProfileArchetype, string> = {
-  jasonType:
-    "Long-arc, architectural, knowledge-protective, mastery-controlled. An architect's read of an architect. Sentences land hard; structure is the texture. Concrete imagery: writing the strategy memo nobody asked for; building the model that explains the noise; refining a structure past usefulness; holding a conclusion until it can be revised in public.",
-  cindyType:
-    "Present-tense, relational, family-protective, belonging-through-usefulness. A caregiver's read of a caregiver. The room reads first. Concrete imagery: noticing what the room needs before anyone names it; the recurring meal, the standing call; the structural fix that removes a recurring strain on someone you love; staying close when the work would be easier from a distance.",
-  danielType:
-    "Precedent-bound, structural, faith-protective, security-through-structure. A steward's read of a steward. What endures gets named. Concrete imagery: the standard followed when no one is watching; the precedent honored across decades; the system that doesn't ask to be reinvented every morning; the quiet faithfulness that institutions only notice in its absence.",
-  unmappedType:
-    "Plain-language, shape-aware. Speak from the user's specific shape without leaning on a named archetype. Concrete imagery should be drawn from what their engine read names.",
+// CC-131 Part C.2 — imagery is now a POOL per archetype with a per-card
+// window. See `archetypeVoice` below + the matching block in
+// `launchPolishV3Llm.ts` (which holds the canonical doc comment). Pool
+// offset is keyed by `ProseCardId` (lens=0, compass=1, hands=2, path=3)
+// times 2 so each card sees a different 2-image window, wrapping the pool.
+
+interface ArchetypeVoiceProfile {
+  base: string;
+  imagery: string[];
+}
+
+const ARCHETYPE_VOICE: Record<ProfileArchetype, ArchetypeVoiceProfile> = {
+  jasonType: {
+    base: "Long-arc, architectural, knowledge-protective, mastery-controlled. An architect's read of an architect. Sentences land hard; structure is the texture.",
+    imagery: [
+      "writing the strategy memo nobody asked for",
+      "building the model that explains the noise",
+      "refining a structure past usefulness",
+      "holding a conclusion until it can be revised in public",
+      "naming the load-bearing assumption the room won't surface on its own",
+      "drafting the architecture before anyone has agreed there's a problem",
+      "carrying the second-order consequence two steps further than the meeting wants to",
+    ],
+  },
+  cindyType: {
+    base: "Present-tense, relational, family-protective, belonging-through-usefulness. A caregiver's read of a caregiver. The room reads first.",
+    imagery: [
+      "noticing what the room needs before anyone names it",
+      "the recurring meal, the standing call",
+      "the structural fix that removes a recurring strain on someone you love",
+      "staying close when the work would be easier from a distance",
+      "remembering the small thing someone mentioned in passing six weeks ago",
+      "carrying the emotional weather of the room so the people in it don't have to",
+      "the standing rhythm that lets someone count on being seen without having to ask",
+    ],
+  },
+  danielType: {
+    base: "Precedent-bound, structural, faith-protective, security-through-structure. A steward's read of a steward. What endures gets named.",
+    imagery: [
+      "the standard followed when no one is watching",
+      "the precedent honored across decades",
+      "the system that doesn't ask to be reinvented every morning",
+      "the quiet faithfulness that institutions only notice in its absence",
+      "the slow yes that holds when the fast yes would have collapsed",
+      "the practice kept across a season when the reasons for it have gone quiet",
+      "the long memory that catches the drift before anyone has named the change",
+    ],
+  },
+  unmappedType: {
+    base: "Plain-language, shape-aware. Speak from the user's specific shape without leaning on a named archetype.",
+    imagery: ["concrete imagery should be drawn from what the user's engine read names — do not borrow archetype-coded scenes"],
+  },
 };
+
+const PROSE_CARD_ORDER: ProseCardId[] = ["lens", "compass", "hands", "path"];
+
+function archetypeVoice(
+  archetype: ProfileArchetype,
+  cardId: ProseCardId
+): string {
+  const profile = ARCHETYPE_VOICE[archetype];
+  if (archetype === "unmappedType") return profile.base + " " + profile.imagery[0];
+  const cardIndex = PROSE_CARD_ORDER.indexOf(cardId);
+  const pool = profile.imagery;
+  const start = ((cardIndex >= 0 ? cardIndex : 0) * 2) % pool.length;
+  const first = pool[start % pool.length];
+  const second = pool[(start + 1) % pool.length];
+  return `${profile.base} Concrete imagery to favor for THIS card (a different window than other cards see; do not import imagery from elsewhere): ${first}; ${second}.`;
+}
 
 const CARD_GUIDANCE: Record<ProseCardId, string> = {
   lens:
@@ -140,7 +199,7 @@ export function buildProseRewriteUserPrompt(
     "",
     `Card guidance: ${CARD_GUIDANCE[inputs.cardId]}`,
     "",
-    `Voice / imagery for this archetype: ${ARCHETYPE_VOICE[inputs.archetype]}`,
+    `Voice / imagery for this archetype: ${archetypeVoice(inputs.archetype, inputs.cardId)}`,
     "",
   ];
   const shapeConstraint = SHAPE_AWARE_VOICE_CONSTRAINTS[inputs.archetype];

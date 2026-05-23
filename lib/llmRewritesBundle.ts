@@ -47,6 +47,12 @@ export interface LlmRewritesBundle {
   synthesis3: Record<string, { paragraph: string }>;
   grip: Record<string, { paragraph: string }>;
   launchPolishV3: Record<string, { rewrite: string }>;
+  /** CC-131 Part C.1 — cross-section polish layer. Runs AFTER the
+   *  other layers; its rewrites take precedence over the upstream
+   *  prose when a cache hit is present. Default is empty, which means
+   *  the render path uses the upstream rewrite unchanged (no spend,
+   *  no fallback). See [[crossSectionPolishLlm.ts]]. */
+  crossSectionPolish: Record<string, { rewrite: string }>;
   generatedAt: string;
   bundleVersion: 1;
 }
@@ -66,6 +72,7 @@ export function emptyLlmRewritesBundle(): LlmRewritesBundle {
     synthesis3: {},
     grip: {},
     launchPolishV3: {},
+    crossSectionPolish: {},
     generatedAt: new Date().toISOString(),
     bundleVersion: CURRENT_BUNDLE_VERSION,
   };

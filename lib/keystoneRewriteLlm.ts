@@ -75,6 +75,8 @@ WARM PRECISION. Closer to a thoughtful friend's read than a clinician's note. No
 
 2. **Engage the wording itself.** Name what the wording reveals — its tone, its theological or moral register, what it suggests about HOW the user holds the belief. Notice specific words and what they imply. Do NOT say "this is doctrine" or "this is sentiment." Read the actual sentence the user wrote.
 
+   **CC-131 Part A.3 — no paraphrase-back.** The blockquote already carries the sentence verbatim; the reader has just read it. Do NOT begin the prose by paraphrasing the belief back at them in synonyms ("In other words, …", "What you're saying is …", "Put another way, …", "This belief that …", "You're naming a conviction that …"). Skip the restate beat and go straight to *what the wording does* — what register it sits in, what it commits to, what it refuses. The interpretation begins where the recitation would have.
+
 3. **Place inside the value cluster.** Name the values the engine placed the belief inside. Fold them into the prose; do not list them as a metadata row.
 
 4. **Engage the cost surface.** The user marked specific stakes (close relationships, money, reputation, career, health) as concrete costs they'd bear for this belief. Name those specific costs in plain language. Land the point: the belief is not decorative; it belongs to the part of the user that would pay a price. If the user marked NONE, name that refusal: the belief sits inside what the user would not trade.

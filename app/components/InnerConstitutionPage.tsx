@@ -25,6 +25,8 @@ import type {
 import TensionCard from "./TensionCard";
 import MbtiDisclosure from "./MbtiDisclosure";
 import MirrorSection from "./MirrorSection";
+// CC-132 — 50° Life Individual surface (renders for renderMode === "user").
+import FiftyDegreeIndividualSection from "./FiftyDegreeIndividualSection";
 import MapSection from "./MapSection";
 import UseCasesSection from "./UseCasesSection";
 import WorkMap from "./WorkMap";
@@ -547,12 +549,14 @@ export default function InnerConstitutionPage({
           >
             The Inner Constitution
           </p>
-          <p
-            className="font-serif italic text-[15px] md:text-[16px]"
-            style={{ color: "var(--ink-soft)", margin: 0 }}
-          >
-            a possibility, not a verdict
-          </p>
+          {mode !== "user" ? (
+            <p
+              className="font-serif italic text-[15px] md:text-[16px]"
+              style={{ color: "var(--ink-soft)", margin: 0 }}
+            >
+              a possibility, not a verdict
+            </p>
+          ) : null}
         </header>
 
         <div
@@ -562,41 +566,72 @@ export default function InnerConstitutionPage({
           }}
         />
 
-        {/* MIRROR — top, default visible, ~700 words */}
-        <div style={{ paddingTop: 32 }}>
-          <MirrorSection
-            mirror={constitution.mirror}
-            mbtiSlot={
-              <MbtiDisclosure
-                stack={constitution.lens_stack}
+        {/* CC-132 — Individual ("user") renders the 11-section 50° Life
+            outline. Guide ("clinician") keeps the existing flat layout
+            (MirrorSection + all downstream <section> blocks). */}
+        {mode === "user" ? (
+          <div style={{ paddingTop: 32 }}>
+            <FiftyDegreeIndividualSection
+              constitution={constitution}
+              demographics={demographics ?? null}
+              generatedAt={sessionDate ?? new Date()}
+              liveRewrites={{
+                executiveRead: liveScopedRewrites.executiveRead,
+                corePattern: liveScopedRewrites.corePattern,
+                pathTriptych: liveScopedRewrites.pathTriptych,
+                keystone: liveScopedRewrites.keystone,
+                closingRead: liveScopedRewrites.closingRead,
+                synthesis: liveScopedRewrites.synthesis,
+              }}
+            />
+          </div>
+        ) : (
+          <>
+            {/* MIRROR — top, default visible, ~700 words */}
+            <div style={{ paddingTop: 32 }}>
+              <MirrorSection
+                mirror={constitution.mirror}
+                mbtiSlot={
+                  <MbtiDisclosure
+                    stack={constitution.lens_stack}
+                    renderMode={mode}
+                  />
+                }
+                belief={constitution.belief_under_tension}
+                beliefValueListPhrase={valueListPhrase(
+                  getTopCompassValues(constitution.signals),
+                  0
+                )}
+                demographics={demographics}
+                answers={answers}
+                constitution={constitution}
+                liveKeystoneRewriteProse={liveScopedRewrites.keystone}
+                liveExecutiveReadRewrite={liveScopedRewrites.executiveRead}
+                liveCorePatternRewrite={liveScopedRewrites.corePattern}
+                liveWhatOthersMayExperienceRewrite={
+                  liveScopedRewrites.whatOthersMayExperience
+                }
+                liveWhenTheLoadGetsHeavyRewrite={
+                  liveScopedRewrites.whenTheLoadGetsHeavy
+                }
+                liveSynthesisRewrite={liveScopedRewrites.synthesis}
                 renderMode={mode}
               />
-            }
-            belief={constitution.belief_under_tension}
-            beliefValueListPhrase={valueListPhrase(
-              getTopCompassValues(constitution.signals),
-              0
-            )}
-            demographics={demographics}
-            answers={answers}
-            constitution={constitution}
-            liveKeystoneRewriteProse={liveScopedRewrites.keystone}
-            liveExecutiveReadRewrite={liveScopedRewrites.executiveRead}
-            liveCorePatternRewrite={liveScopedRewrites.corePattern}
-            liveWhatOthersMayExperienceRewrite={
-              liveScopedRewrites.whatOthersMayExperience
-            }
-            liveWhenTheLoadGetsHeavyRewrite={
-              liveScopedRewrites.whenTheLoadGetsHeavy
-            }
-            liveSynthesisRewrite={liveScopedRewrites.synthesis}
-            renderMode={mode}
-          />
-        </div>
+            </div>
 
-        <SectionRule />
+            <SectionRule />
+          </>
+        )}
 
-        {closingReadProse ? (
+        {/* CC-132 — sections below are Guide-only. The Individual is
+            rendered by FiftyDegreeIndividualSection above. */}
+        {mode === "clinician" ? (
+          <>
+        {/* CC-131 Part B — Closing Read gated to Guide-only. It restates
+            "stay rooted, don't soften the standard" — already lands via
+            Path master synthesis + Executive Read. Mirrors markdown
+            gating in lib/renderMirror.ts. */}
+        {closingReadProse && mode === "clinician" ? (
           <>
             <section
               className="flex flex-col"
@@ -1355,6 +1390,9 @@ export default function InnerConstitutionPage({
             suppresses both — admin has its own Re-Render panel). Placed
             immediately above the Share This Reading block so the bookmark
             affordance is the first share-class action the user sees. */}
+          </>
+        ) : null}
+
         {hideShareBlock || !sessionId ? null : (
         <div data-print-hide="permalink" data-section="permalink">
           <SectionRule />

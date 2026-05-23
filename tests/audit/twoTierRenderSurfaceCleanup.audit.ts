@@ -463,23 +463,37 @@ function runAudit(): AssertionResult[] {
         }
   );
 
-  // ── 9a. guide-superset-of-individual (CC-119) ──────────────────────
-  //   For every cohort fixture, every non-empty Individual line must
-  //   appear in the Guide render after the user-mode mask is applied
-  //   to the Guide. The mask neutralizes name-swap / jargon-strip /
-  //   header-rename transformations that aren't structural; what's
-  //   left in maskedGuide minus Individual is the scaffolding
-  //   (grip raw-field panel, Movement grip-component bullets, MBTI
-  //   disclosure line stripped by the mask but originally Guide-only,
-  //   Keystone field bullets, engine valueOpener, etc.).
+  // ── 9a. individual-topics-covered-in-guide (CC-132 reframe) ─────────
+  //   CC-132 rebuilt the Individual to the 11-section "50° Life" outline.
+  //   Several new presentational structures (the four-forces table, the
+  //   GRIP SAYS / AIM SAYS table, the eight one-line Body Cards) are
+  //   net-new shapes that aren't byte-present in the Guide — the byte-
+  //   subset check (the old guide-superset-of-individual assertion) would
+  //   fail by design even when the warm prose itself is shared.
   //
-  //   Lines compared after trim; empty lines + lines short enough to
-  //   collide spuriously (length < 4) are skipped. Verbatim line
-  //   match against the masked-Guide line-set is the canonical check;
-  //   if a line is a strict prefix of another Guide line (rare, but
-  //   possible when the Guide adds a trailing scaffolding suffix),
-  //   the line is accepted as covered.
+  //   New shape: topic coverage. For every cohort fixture, every
+  //   *finding* surfaced in the Individual (each of the 8 body card
+  //   registers, each of the 4 forces, keystone, tensions, next moves,
+  //   closing) must also be covered by name in the Guide render.
+  //   Coverage is a substring presence check — the Guide's narrative
+  //   form names the topic; the Individual's presentational form names
+  //   the same topic in a different layout. Topics are checked against
+  //   the masked Guide to neutralize jargon-strip / name-swap noise
+  //   that isn't structural.
   {
+    // Topics every Individual surfaces; every Guide must carry each by
+    // name. The 8 body card names + the 4 forces + structural anchors.
+    const REQUIRED_TOPICS_IN_GUIDE = [
+      // 8 body card names (Guide emits them as section/card headers).
+      "Lens", "Compass", "Hands", "Conviction", "Gravity", "Trust", "Weather", "Fire",
+      // 4 forces (Guide emits as Movement metric bullets: **Goal:**, **Soul:**, **Aim:**, **Grip:**).
+      "**Goal:**", "**Soul:**", "**Aim:**", "**Grip:**",
+      // Structural anchors.
+      "Keystone Reflection",
+      "Open Tensions",
+      "Next 3 Moves",
+      "Closing Read",
+    ];
     const failingSamples: string[] = [];
     let pairsChecked = 0;
     for (const dir of ["ocean", "goal-soul-give"]) {
@@ -488,19 +502,21 @@ function runAudit(): AssertionResult[] {
         .sort()) {
         const { individual, guide, userName } = renderPair(dir, f);
         const maskedGuide = applyUserModeMask(guide, userName);
-        const maskedGuideLines = new Set(
-          maskedGuide.split("\n").map((l) => l.trimEnd())
-        );
-        const missing: string[] = [];
-        for (const rawLine of individual.split("\n")) {
-          const line = rawLine.trimEnd();
-          if (line.trim().length < 4) continue;
-          if (maskedGuideLines.has(line)) continue;
-          missing.push(line);
+        const missingTopics: string[] = [];
+        for (const topic of REQUIRED_TOPICS_IN_GUIDE) {
+          // Topic must appear in the Guide IF (and only if) it also
+          // appears in the Individual. Conditional sections (e.g.,
+          // Keystone when belief_under_tension is null; Open Tensions
+          // when no tensions fire) drop from BOTH surfaces in lock-
+          // step — the additive contract holds only on emitted topics.
+          if (!individual.includes(topic)) continue;
+          if (!guide.includes(topic) && !maskedGuide.includes(topic)) {
+            missingTopics.push(topic);
+          }
         }
-        if (missing.length > 0) {
+        if (missingTopics.length > 0) {
           failingSamples.push(
-            `${dir}/${f}: ${missing.length} missing line(s); first: "${missing[0]!.slice(0, 90)}"`
+            `${dir}/${f}: ${missingTopics.length} topic(s) absent from Guide; first: "${missingTopics[0]}"`
           );
         }
         pairsChecked += 1;
@@ -510,12 +526,12 @@ function runAudit(): AssertionResult[] {
       failingSamples.length === 0
         ? {
             ok: true,
-            assertion: "guide-superset-of-individual",
-            detail: `mask(Guide) ⊇ Individual for ${pairsChecked} cohort fixtures (every non-empty Individual line ≥4 chars is present in the masked Guide)`,
+            assertion: "individual-topics-covered-in-guide",
+            detail: `Guide carries every required Individual topic (${REQUIRED_TOPICS_IN_GUIDE.length} anchors) across ${pairsChecked} cohort fixtures`,
           }
         : {
             ok: false,
-            assertion: "guide-superset-of-individual",
+            assertion: "individual-topics-covered-in-guide",
             detail: failingSamples.slice(0, 5).join(" | "),
           }
     );

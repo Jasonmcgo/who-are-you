@@ -213,11 +213,45 @@ function emotionalReactivityProxyDisclosure(): string {
 
 // ── Per-trait paragraph composer ────────────────────────────────────────
 
+// CC-131 Part A.2 — non-lede opener rotation. Four shapes, picked
+// deterministically by (position - 1) % 4 so the panel reads as
+// authored prose rather than five copies of one scaffold. Each
+// variant preserves the load-bearing fields (narrative-name, Big
+// Five trait name, band) so downstream readers (canon audits,
+// summary lines) still pattern-match on them.
+function composeFollowingOpener(
+  narrative: string,
+  traitName: string,
+  band: string,
+  position: number
+): string {
+  const slot = ((position - 1) % 4 + 4) % 4;
+  switch (slot) {
+    case 0:
+      // Original scaffold — kept as one variant so the read still
+      // includes a familiar shape.
+      return `*${narrative}* — Big Five ${traitName} — registers as ${band}. `;
+    case 1:
+      return `On Big Five ${traitName}, *${narrative}* lands ${band}. `;
+    case 2:
+      return `*${narrative}* — the Big Five ${traitName} register — reads ${band}. `;
+    case 3:
+    default:
+      return `Where Big Five ${traitName} is concerned, *${narrative}* sits at ${band}. `;
+  }
+}
+
 function composeTraitParagraph(
   bucket: OceanBucket,
   mix: DispositionSignalMix,
   goalSoulGive: GoalSoulGiveOutput | undefined,
-  isLede: boolean
+  isLede: boolean,
+  // CC-131 Part A.2 — rank position in the dominance order (0 = lede,
+  // 1..4 = following). Used to rotate non-lede opener forms so the
+  // five-paragraph panel doesn't read as one scaffold stamped five
+  // times. Defaults to a "subsequent" rotation slot when unset (so old
+  // callers stay safe).
+  position: number = isLede ? 0 : 1
 ): string {
   const intensity = bucketIntensity(bucket, mix);
   const band = bucketBand(bucket, mix);
@@ -242,9 +276,17 @@ function composeTraitParagraph(
   }
 
   // Standard per-trait paragraph: narrative-name + Big Five name + band.
+  //
+  // CC-131 Part A.2 — opener rotation. Pre-CC-131 every non-lede trait
+  // used the identical scaffold `*X* — Big Five Y — registers as Z.`,
+  // which made the five-paragraph panel read as one template stamped
+  // five times. Lede slot keeps the canonical "Your strongest signal
+  // is in *X*" framing (still recognizable as the panel's opener).
+  // Slots 1-4 rotate through four distinct sentence shapes by
+  // (position - 1) % 4, fully deterministic on dominance rank.
   const lede = isLede
     ? `Your strongest signal is in *${narrative}* — Big Five ${traitName} — registering as ${band}. `
-    : `*${narrative}* — Big Five ${traitName} — registers as ${band}. `;
+    : composeFollowingOpener(narrative, traitName, band, position);
 
   // Openness gets the flavor sentence first.
   const opennessFlavor =
@@ -337,8 +379,10 @@ export function composeOceanProse(
 ): OceanProseBlock {
   const paragraphs: string[] = [];
   mix.dominance.ranked.forEach((bucket, i) => {
+    // CC-131 Part A.2 — thread the dominance-rank position so the
+    // composer can rotate non-lede opener forms across slots 1-4.
     paragraphs.push(
-      composeTraitParagraph(bucket, mix, goalSoulGive, i === 0)
+      composeTraitParagraph(bucket, mix, goalSoulGive, i === 0, i)
     );
   });
   return {

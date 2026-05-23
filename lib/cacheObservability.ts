@@ -15,7 +15,11 @@ export type CacheMissNamespace =
   | "keystone-rewrites"
   // CC-LAUNCH-VOICE-POLISH-V3 — seven additional sections share a single
   // namespace; the section ID disambiguates per-event.
-  | "launch-polish-v3-rewrites";
+  | "launch-polish-v3-rewrites"
+  // CC-131 Part C.1 — cross-section polish layer; ships with empty
+  // committed cache so every render-path lookup is a miss until build*
+  // scripts opt into the runtime gate and populate entries.
+  | "cross-section-polish-rewrites";
 
 export interface CacheMissEvent {
   /** Cache namespace — one of the LLM-rewrite caches. */

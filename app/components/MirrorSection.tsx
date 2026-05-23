@@ -423,25 +423,33 @@ export default function MirrorSection({
         </>
       ) : null}
 
-      <HairlineRule />
-
-      {/* 2. Core Pattern. CC-LAUNCH-VOICE-POLISH-V3 — live LLM rewrite
-          overrides the engine paragraph when present. */}
-      <div className="flex flex-col" style={{ gap: 12 }}>
-        <SectionLabel>Your Core Pattern</SectionLabel>
-        {liveCorePatternRewrite
-          ? liveCorePatternRewrite
-              .split(/\n\n+/)
-              .map((p) => p.trim())
-              .filter((p) => p.length > 0)
-              .map((para, idx) => (
-                <BodyParagraph
-                  key={`corepat-${idx}`}
-                  text={para.replace(/^\*+|\*+$/g, "")}
-                />
-              ))
-          : <BodyParagraph text={mirror.corePattern} />}
-      </div>
+      {/* CC-131 Part B — Core Pattern gated to Guide-only (clinician
+          mode). Restates Executive Read's value-at-center beat; the
+          Individual loses it, the Guide keeps it in place per the
+          additive contract. Mirrors the markdown gating in
+          lib/renderMirror.ts. */}
+      {renderMode === "clinician" ? (
+        <>
+          <HairlineRule />
+          {/* 2. Core Pattern. CC-LAUNCH-VOICE-POLISH-V3 — live LLM rewrite
+              overrides the engine paragraph when present. */}
+          <div className="flex flex-col" style={{ gap: 12 }}>
+            <SectionLabel>Your Core Pattern</SectionLabel>
+            {liveCorePatternRewrite
+              ? liveCorePatternRewrite
+                  .split(/\n\n+/)
+                  .map((p) => p.trim())
+                  .filter((p) => p.length > 0)
+                  .map((para, idx) => (
+                    <BodyParagraph
+                      key={`corepat-${idx}`}
+                      text={para.replace(/^\*+|\*+$/g, "")}
+                    />
+                  ))
+              : <BodyParagraph text={mirror.corePattern} />}
+          </div>
+        </>
+      ) : null}
 
       <HairlineRule />
 
@@ -542,7 +550,10 @@ export default function MirrorSection({
           tercet → 5B callout → thesis). The 5B content is identical to
           generateSimpleSummary's pre-1B "Your gift is X. Your danger is
           Y." line, just promoted to a callout block. */}
-      {summaryParts ? (
+      {/* CC-131 Part B — A Synthesis gated to Guide-only. Restates
+          cross-card thesis Executive Read already lands; Individual
+          loses it, Guide keeps it in place. Mirrors markdown gating. */}
+      {summaryParts && renderMode === "clinician" ? (
         <>
           <HairlineRule />
           <div className="flex flex-col" style={{ gap: 12 }}>

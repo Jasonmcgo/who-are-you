@@ -455,7 +455,16 @@ export function generateWorkProse(matches: WorkMapMatch[]): string {
   if (matches.length === 0) return "";
   if (matches.length === 1) {
     const m = matches[0];
-    return `Your composite read points toward ${m.register.register_label.toLowerCase()}. ${m.register.short_description}`;
+    // CC-131 Part A.3 — recitation sweep. Pre-CC-131 this concatenated
+    // `register_label` and `short_description`, and the description
+    // itself re-uses the register's vocabulary so the reader saw the
+    // category named twice within a sentence of itself. The full
+    // `short_description` is still rendered immediately below this
+    // line in the report (see the Work Map register block in
+    // renderMirror.ts), so this opening sentence now names the
+    // category once and stops — the description carries the meaning
+    // on its own from the next paragraph forward.
+    return `Your composite read points toward ${m.register.register_label.toLowerCase()}.`;
   }
   const primary = matches[0];
   const secondary = matches[1];
