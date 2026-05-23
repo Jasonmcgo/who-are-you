@@ -27,6 +27,8 @@ import type {
 } from "../../../lib/types";
 import { detectStaleShape } from "../../../lib/staleShape";
 import { DEMOGRAPHIC_FIELDS } from "../../../data/demographics";
+// CC-127 — client component sibling: Copy follow-up link button.
+import CopySessionLinkButton from "./CopySessionLinkButton";
 
 const ALLOCATION_TENSION_IDS = new Set(["T-013", "T-014", "T-015"]);
 
@@ -723,18 +725,31 @@ export default async function SessionsPage({
                         <Badge count={s.attachments_count} />
                       </td>
                       <td style={cellStyle}>
-                        <Link
-                          href={`/admin/sessions/${s.id}`}
-                          className="font-mono uppercase"
+                        <span
                           style={{
-                            fontSize: 10,
-                            letterSpacing: "0.12em",
-                            color: "var(--umber)",
-                            textDecoration: "underline",
+                            display: "inline-flex",
+                            gap: 10,
+                            alignItems: "center",
                           }}
                         >
-                          view →
-                        </Link>
+                          <Link
+                            href={`/admin/sessions/${s.id}`}
+                            className="font-mono uppercase"
+                            style={{
+                              fontSize: 10,
+                              letterSpacing: "0.12em",
+                              color: "var(--umber)",
+                              textDecoration: "underline",
+                            }}
+                          >
+                            view →
+                          </Link>
+                          {/* CC-127 — Copy follow-up link. Mints a
+                              tokenized public URL and writes it to the
+                              clipboard. The operator emails it by
+                              hand. */}
+                          <CopySessionLinkButton sessionId={s.id} />
+                        </span>
                       </td>
                     </tr>
                   );
