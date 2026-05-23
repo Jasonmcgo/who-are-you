@@ -138,6 +138,11 @@ export async function POST(
       attachmentId,
       originalFilename: file.name,
       buffer,
+      // CC-130 — thread the upload's content type so the Vercel Blob
+      // branch sets it on the stored object. The fs branch ignores it
+      // (local files carry no metadata; the row's mime_type column is
+      // authoritative).
+      contentType: file.type,
     });
   } catch (e) {
     return NextResponse.json(
