@@ -29,6 +29,8 @@ import { detectStaleShape } from "../../../lib/staleShape";
 import { DEMOGRAPHIC_FIELDS } from "../../../data/demographics";
 // CC-127 — client component sibling: Copy follow-up link button.
 import CopySessionLinkButton from "./CopySessionLinkButton";
+// CC-129 Part B — client component sibling: Copy report URL button.
+import CopyReportLinkButton from "./CopyReportLinkButton";
 
 const ALLOCATION_TENSION_IDS = new Set(["T-013", "T-014", "T-015"]);
 
@@ -728,27 +730,76 @@ export default async function SessionsPage({
                         <span
                           style={{
                             display: "inline-flex",
-                            gap: 10,
-                            alignItems: "center",
+                            flexDirection: "column",
+                            gap: 6,
+                            alignItems: "flex-start",
                           }}
                         >
-                          <Link
-                            href={`/admin/sessions/${s.id}`}
-                            className="font-mono uppercase"
+                          {/* Row 1: view + Report ↗ + copy-report-url */}
+                          <span
                             style={{
-                              fontSize: 10,
-                              letterSpacing: "0.12em",
-                              color: "var(--umber)",
-                              textDecoration: "underline",
+                              display: "inline-flex",
+                              gap: 10,
+                              alignItems: "center",
+                              flexWrap: "wrap",
                             }}
                           >
-                            view →
-                          </Link>
-                          {/* CC-127 — Copy follow-up link. Mints a
-                              tokenized public URL and writes it to the
-                              clipboard. The operator emails it by
-                              hand. */}
-                          <CopySessionLinkButton sessionId={s.id} />
+                            <Link
+                              href={`/admin/sessions/${s.id}`}
+                              className="font-mono uppercase"
+                              style={{
+                                fontSize: 10,
+                                letterSpacing: "0.12em",
+                                color: "var(--umber)",
+                                textDecoration: "underline",
+                              }}
+                            >
+                              view →
+                            </Link>
+                            {/* CC-129 Part B — public report link (the
+                                /report/[sessionId] page is already public). */}
+                            <a
+                              href={`/report/${s.id}`}
+                              target="_blank"
+                              rel="noopener"
+                              className="font-mono uppercase"
+                              style={{
+                                fontSize: 10,
+                                letterSpacing: "0.12em",
+                                color: "var(--umber)",
+                                textDecoration: "underline",
+                              }}
+                            >
+                              report ↗
+                            </a>
+                            <CopyReportLinkButton sessionId={s.id} />
+                          </span>
+                          {/* Row 2: follow-up link mint + copy */}
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              gap: 10,
+                              alignItems: "center",
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            {/* CC-127 — Copy follow-up link. Mints a
+                                tokenized public URL. */}
+                            <CopySessionLinkButton sessionId={s.id} />
+                          </span>
+                          {/* Row 3: selectable session UUID (mono, muted) */}
+                          <span
+                            className="font-mono"
+                            style={{
+                              fontSize: 9,
+                              color: "var(--ink-faint)",
+                              userSelect: "all",
+                              wordBreak: "break-all",
+                              lineHeight: 1.3,
+                            }}
+                          >
+                            {s.id}
+                          </span>
                         </span>
                       </td>
                     </tr>

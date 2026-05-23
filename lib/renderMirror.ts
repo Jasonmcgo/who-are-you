@@ -81,6 +81,14 @@ import {
   CRISIS_STANDING_REMINDER,
   crisisFallbackParagraph,
 } from "./crisisProseTemplates";
+// CC-129 Part A — follow-up answer → narrative resolver. Read-side
+// only; numeric derivation in identityEngine.ts is untouched.
+import {
+  renderFollowUpNarrativeMarkdown,
+  renderLensCompressionNoteSentence,
+  resolveFollowUpNarrative,
+  type FollowUpNarrative,
+} from "./followUpNarrative";
 import type {
   Answer,
   ConvictionTemperature,
@@ -788,6 +796,18 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
   // re-creates the pre-CC-119 "clinician = raw engine" semantic for
   // cache-key purposes only.
   const engineOnly = args.engineOnly === true;
+  // CC-129 Part A — resolve the session's follow-up picks into a
+  // structured narrative once, up front. Null when no follow-up
+  // answers exist; in that case all CC-129 emit sites are no-ops and
+  // the report renders exactly as it did pre-CC-129. The resolver does
+  // NOT change any numeric derivation — it only re-matches stored
+  // picks to their source option text + interpretation.
+  const followUpNarrative: FollowUpNarrative | null = resolveFollowUpNarrative(
+    constitution,
+    args.answers ?? [],
+    demographics ?? null,
+    getUserName(demographics) ?? "You"
+  );
   const out: string[] = [];
   // CC-PROSE-1B Layer 5 — three callouts at three depths. Computed once
   // so 5A (after Top Gifts/Edges table), 5B (inside Synthesis section),
@@ -1355,6 +1375,16 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
   //      named grips fired, or cluster genuinely tied)
   emitGripSection(out, constitution, renderMode);
 
+  // CC-129 Part A — "From Grip to Aim" block. Slots immediately after
+  // the Grip section so the warm prose flows into the user's own
+  // picks: what their grip is protecting, what would make release
+  // safe, and the aim move they chose. No follow-up answers on the
+  // session → `renderFollowUpNarrativeMarkdown` returns `[]` and the
+  // report renders exactly as today.
+  if (followUpNarrative) {
+    out.push(...renderFollowUpNarrativeMarkdown(followUpNarrative, renderMode));
+  }
+
   // 10. CC-072 — Disposition Signal Mix (replaces the pre-CC-072
   // "Disposition Map" 100%-summing render). Section heading is exactly
   // "Disposition Signal Mix" per memo §6.1; trait names appear after
@@ -1552,6 +1582,19 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
         out.push(
           `*The engine's read of your cognitive pattern is uncertain. ${card.cardHeader.replace(/\.$/, "")}, but the signal isn't strong — trust your own knowledge of yourself if this doesn't fit.*`
         );
+      }
+      // CC-129 Part A — compression-check follow-up appendix. When the
+      // session carries a `compression_check` pick (low Lens confidence
+      // + high load + meaningful stakes-amplifier delta routed the
+      // follow-up resolver to that swap probe), append a one-sentence
+      // state-vs-shape clarifier. Per
+      // docs/canon/state-compression-model.md this stays a NOTE — the
+      // Lens type read above is unchanged.
+      const compressionNote =
+        renderLensCompressionNoteSentence(followUpNarrative);
+      if (compressionNote) {
+        out.push("");
+        out.push(compressionNote);
       }
     } else {
       out.push(`*${card.cardHeader}*`);

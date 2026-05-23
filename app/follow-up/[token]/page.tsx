@@ -65,7 +65,10 @@ type LoadState =
 type SubmitState =
   | { status: "idle" }
   | { status: "submitting" }
-  | { status: "submitted" }
+  // CC-129 Part C — capture `reportUrl` from the POST response so the
+  // confirmation can reveal the user's public report page as the
+  // reward for completing the follow-ups.
+  | { status: "submitted"; reportUrl: string | null }
   | { status: "error"; message: string };
 
 // ─────────────────────────────────────────────────────────────────────
@@ -148,7 +151,13 @@ export default function FollowUpAnswerPage({
         };
         throw new Error(body.error ?? `submit failed (${res.status})`);
       }
-      setSubmitState({ status: "submitted" });
+      const body = (await res.json().catch(() => ({}))) as {
+        reportUrl?: string;
+      };
+      setSubmitState({
+        status: "submitted",
+        reportUrl: typeof body.reportUrl === "string" ? body.reportUrl : null,
+      });
     } catch (e) {
       setSubmitState({
         status: "error",
@@ -175,7 +184,10 @@ export default function FollowUpAnswerPage({
         ) : load.status === "error" ? (
           <InactiveLinkState detail={load.message} />
         ) : submitState.status === "submitted" ? (
-          <SubmittedState personName={load.data.personName} />
+          <SubmittedState
+            personName={load.data.personName}
+            reportUrl={submitState.reportUrl}
+          />
         ) : (
           <ReadyForm
             data={load.data}
@@ -252,9 +264,15 @@ function InactiveLinkState({ detail }: { detail: string }) {
   );
 }
 
-function SubmittedState({ personName }: { personName: string }) {
+function SubmittedState({
+  personName,
+  reportUrl,
+}: {
+  personName: string;
+  reportUrl: string | null;
+}) {
   return (
-    <div className="flex flex-col" style={{ gap: 14, paddingTop: 40 }}>
+    <div className="flex flex-col" style={{ gap: 16, paddingTop: 40 }}>
       <p
         className="font-mono uppercase"
         style={{
@@ -277,8 +295,33 @@ function SubmittedState({ personName }: { personName: string }) {
         }}
       >
         Thanks{personName && personName !== "You" ? `, ${personName}` : ""} —
-        your report is updating.
+        your page is ready.
       </h1>
+      {/* CC-129 Part C — the report link is the reward for completing
+          the follow-ups. It appears only after a successful submit.
+          The link is opened in a new tab so the confirmation stays
+          available behind it. */}
+      {reportUrl ? (
+        <a
+          href={reportUrl}
+          target="_blank"
+          rel="noopener"
+          className="font-mono uppercase"
+          style={{
+            display: "inline-block",
+            alignSelf: "flex-start",
+            fontSize: 12,
+            letterSpacing: "0.12em",
+            background: "var(--umber)",
+            color: "var(--paper, #fff)",
+            border: "1px solid var(--umber)",
+            padding: "12px 18px",
+            textDecoration: "none",
+          }}
+        >
+          Open your report ↗
+        </a>
+      ) : null}
       <p
         className="font-serif italic"
         style={{
@@ -288,9 +331,8 @@ function SubmittedState({ personName }: { personName: string }) {
           lineHeight: 1.55,
         }}
       >
-        Your follow-up answers landed and the report is being re-derived. You
-        can close this tab; the person who sent the link will see the updated
-        read.
+        Your follow-up answers are folded in and the report has updated. Bookmark
+        the page above — it&apos;s how you&apos;ll find your read again.
       </p>
     </div>
   );

@@ -429,9 +429,16 @@ export async function POST(
       .where(eq(followUpLinks.token, token));
   }
 
+  // CC-129 Part C — return the public report URL so the answer page
+  // can reveal it as a "your page is ready" link post-submit. The
+  // origin comes from the inbound request so this works in
+  // dev/staging/prod without configuration.
+  const reportUrl = `${new URL(req.url).origin}/report/${link.session_id}`;
+
   return NextResponse.json({
     ok: true,
     reDerived: true,
     answersCount: merged.length,
+    reportUrl,
   });
 }
