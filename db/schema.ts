@@ -167,6 +167,32 @@ export const ghostMappingAudit = pgTable("ghost_mapping_audit", {
   after_snapshot: jsonb("after_snapshot").notNull(),
 });
 
+// CC-126 — Follow-up links. One row per tokenized public link minted by
+// the admin "Copy URL" button (CC-127). The token is an unguessable
+// random string; the public follow-up page at /api/follow-up/[token]
+// resolves it to a session and serves that session's missing-question
+// gap-fill + the CC-125 follow-up set. On submit, the API marks
+// `used_at` so the link is recognized as already-redeemed for telemetry
+// purposes — the link itself remains queryable (POST is idempotent by
+// design; re-submit dedupes by question_id rather than rejecting).
+// Cascade-deletes when the underlying session is deleted; the link is
+// meaningless without the row it pertains to.
+export const followUpLinks = pgTable("follow_up_links", {
+  // The unguessable token (32 base64url chars from crypto.randomBytes).
+  // Used as the primary key — direct lookup from the URL path segment.
+  token: text("token").primaryKey(),
+  session_id: uuid("session_id")
+    .notNull()
+    .references(() => sessions.id, { onDelete: "cascade" }),
+  created_at: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  // Nullable until the first successful POST. Subsequent POSTs are
+  // idempotent (dedupe by question_id) but leave used_at on its first
+  // value for audit.
+  used_at: timestamp("used_at", { withTimezone: true }),
+});
+
 // CC-021a — Attachments table. One row per uploaded file associated with a
 // session. The file bytes live on disk under attachments/<session_id>/; only
 // the metadata + relative path live in Postgres. Cascade-deletes on session
