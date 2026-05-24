@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { questions } from "../../data/questions";
+// CC-138.2 — re-ask of skipped questions; if a backward-compat
+// session has legacy Q-T in skippedQuestionIds, look it up in the
+// full bank rather than the filtered presented view.
+import { allQuestions as questions } from "../../data/questions";
 import type {
   CardId,
   RankingQuestion,

@@ -31,7 +31,12 @@ import type {
   TopRiskEntry,
   UncomfortableButTrueClass,
 } from "./types";
-import { questions } from "../data/questions";
+// CC-138.2 — engine parses SAVED answers, so it must see every
+// question definition including legacy retired-from-flow entries
+// (Q-T1–Q-T8). `allQuestions` is the full bank; `questions` is the
+// filtered presented-flow view. Rename here to `questions` for
+// minimal diff against the existing engine code.
+import { allQuestions as questions } from "../data/questions";
 import { extractBeliefUnderTension } from "./beliefHeuristics";
 import { buildDriveTension, computeDriveOutput } from "./drive";
 import { computeOceanOutput } from "./ocean";
@@ -2554,6 +2559,23 @@ function attachCrossSignalDriverInference(
       "ns-valence",
       "judging-cooccurrence",
       "thin-floor",
+      // CC-138.1 — binary-format contamination fingerprints. Same
+      // intent as CC-141's other blocks: dominant agreement cannot
+      // resolve an axis the dominant inference doesn't speak to.
+      //   - `binary-attitude-violation`: same-attitude pick on either
+      //     axis (Ni+Si, Te+Fe, etc.). Impossible canonical stack →
+      //     a true contamination fingerprint → the LEAST liftable
+      //     state. Without this block, the CC-097B lift could harden
+      //     a contaminated binary typing to `high`, re-opening the
+      //     exact failure mode CC-141 closed for ranking sessions.
+      //   - `binary-dominance-ambiguous`: dominance ordering missing
+      //     or doesn't match either parent pick. Dominant agreement
+      //     can't reconcile an unresolved dominance call.
+      // String literals match `aggregateLensStackBinary` emission
+      // sites in lib/jungianStack.ts byte-for-byte (a typo here
+      // silently no-ops the gate).
+      "binary-attitude-violation",
+      "binary-dominance-ambiguous",
     ];
     const liftIsBlocked =
       (constitution.lens_stack.confidenceLowReasons ?? []).some((r) =>

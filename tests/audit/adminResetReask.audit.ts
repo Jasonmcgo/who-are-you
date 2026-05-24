@@ -25,7 +25,8 @@ import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { questions } from "../../data/questions";
+// CC-138.2 — audit operates on the full bank including legacy Q-T defs.
+import { allQuestions as questions } from "../../data/questions";
 import { missingQuestionIds } from "../../lib/missingQuestions";
 import { ALWAYS_COLLECT_QUESTION_IDS } from "../../lib/answerHistory";
 import type { Answer } from "../../lib/types";

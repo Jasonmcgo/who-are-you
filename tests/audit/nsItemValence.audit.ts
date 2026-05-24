@@ -7,7 +7,8 @@
 // catches obvious regressions; subtle valence drift remains a human-read
 // judgment call.
 
-import { questions } from "../../data/questions";
+// CC-138.2 — audit operates on the full bank including legacy Q-T defs.
+import { allQuestions as questions } from "../../data/questions";
 import type { RankingQuestion } from "../../lib/types";
 
 const PERCEIVING_BLOCK_IDS = ["Q-T1", "Q-T2", "Q-T3", "Q-T4"];

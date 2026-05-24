@@ -17,7 +17,8 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { questions } from "../../data/questions";
+// CC-138.2 — audit operates on the full bank including legacy Q-T defs.
+import { allQuestions as questions } from "../../data/questions";
 import type { Answer, RankingAnswer, RankingQuestion } from "../../lib/types";
 
 const __filename = fileURLToPath(import.meta.url);

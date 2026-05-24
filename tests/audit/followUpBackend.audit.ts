@@ -22,6 +22,12 @@ import { missingQuestionIds } from "../../lib/missingQuestions";
 import { resolveFollowUps } from "../../lib/followUpResolver";
 import { generateUnguessableToken } from "../../lib/followUpLink";
 import { buildInnerConstitution, deriveSignals } from "../../lib/identityEngine";
+// CC-138.2 — this audit compares its expectations against the values
+// returned by `missingQuestionIds`, which operates on the presented-flow
+// `questions` view (legacy Q-T1–Q-T8 excluded by design — new sessions
+// should not see them surface as missing). Use the same filtered view
+// here so the expectation set matches what the function under test
+// actually emits.
 import { questions } from "../../data/questions";
 import type {
   Answer,

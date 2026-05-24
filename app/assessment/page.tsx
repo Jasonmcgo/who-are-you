@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { questions } from "../../data/questions";
 import {
   buildInnerConstitution,
@@ -275,6 +275,73 @@ export default function Home() {
 
   // CC-017 — belief anchor (Q-I1 → Q-I1b fallback). Surfaced above Q-I2 / Q-I3.
   const beliefAnchor = useMemo(() => findBeliefAnchor(answers), [answers]);
+
+  // CC-138.2 — single-sourced skip predicate. Returns true when the
+  // question at index `i` is in an auto-advance state — i.e. one of
+  // the three forward effects below (~L283/307/330) would skip past
+  // it on entry. The Back handler (`handleBack`) uses this to walk
+  // backward past auto-skip questions, fixing the "Back appears
+  // dead" defect where pressing Back onto a derived card whose
+  // parents were skipped or a conditional whose target was answered
+  // would bounce the user forward.
+  //
+  // **Predicate consistency.** The skip-conditions encoded here MUST
+  // match the three effects exactly; otherwise the user can land on
+  // a card that the forward effect immediately advances past. The
+  // three effects retain their inline conditions (each emits its own
+  // meta-signal); this predicate is the read-only mirror used by Back
+  // and `canGoBack`.
+  const isAutoSkipQuestion = useCallback(
+    (i: number): boolean => {
+      const q = questions[i];
+      if (!q) return false;
+      // Effect 1 — conditional freeform/forced whose target was answered.
+      if ((q.type === "freeform" || q.type === "forced") && q.render_if_skipped) {
+        const target = q.render_if_skipped;
+        const wasSkipped = skippedQuestionIds.includes(target);
+        const wasAnswered = answers.some((a) => a.question_id === target);
+        if (!wasSkipped && wasAnswered) return true;
+      }
+      // Effect 2 — ranking_derived with insufficient parent data.
+      if (q.type === "ranking_derived") {
+        const items = deriveItemsForCrossRank(
+          q.question_id,
+          q.derived_from,
+          q.derived_top_n ?? 2,
+          answers
+        );
+        if (items === null) return true;
+      }
+      // Effect 3 — multiselect_derived with insufficient parent data.
+      if (q.type === "multiselect_derived") {
+        const items = deriveItemsForMultiSelect(
+          q.derived_from,
+          q.derived_top_n_per_source ?? 3,
+          answers
+        );
+        if (items === null) return true;
+      }
+      return false;
+    },
+    [answers, skippedQuestionIds]
+  );
+
+  // CC-138.2 — Back handler walks backward from `current - 1` until
+  // it finds a presentable question (one that `isAutoSkipQuestion`
+  // returns false for). Returns the index, or -1 when no prior
+  // presentable card exists (Back should be disabled). The walk also
+  // stops at index 0 to never overshoot the bank.
+  const previousPresentableIndex = useCallback((): number => {
+    for (let i = current - 1; i >= 0; i--) {
+      if (!isAutoSkipQuestion(i)) return i;
+    }
+    return -1;
+  }, [current, isAutoSkipQuestion]);
+
+  function handleBack() {
+    const prev = previousPresentableIndex();
+    if (prev >= 0) setCurrent(prev);
+  }
 
   // CC-017 — Q-I1b is conditional. Renders only when its `render_if_skipped`
   // target (Q-I1) is in skippedQuestionIds. If Q-I1 was answered, advance
@@ -903,7 +970,7 @@ export default function Home() {
       }
       currentIndex={current}
       totalCount={questions.length}
-      onBack={current > 0 ? () => setCurrent(current - 1) : undefined}
+      onBack={previousPresentableIndex() >= 0 ? handleBack : undefined}
       canContinue={canContinue}
       onContinue={handleContinue}
       mode="first_pass"

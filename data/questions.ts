@@ -1,6 +1,18 @@
 import type { Question } from "../lib/types";
 
-export const questions: Question[] = [
+// CC-138.2 — `allQuestions` is the FULL bank (including legacy
+// retired-from-flow definitions like Q-T1–Q-T8). Saved-answer
+// parsers, the lens resolver's legacy branch, and any other code
+// that consumes question DEFINITIONS to interpret stored answers
+// reads `allQuestions`. The live assessment flow + anything that
+// reflects the presented sequence reads `questions` (the filtered
+// view that excludes `legacy: true` entries).
+//
+// Keep the source array ordered as presented today; CC-138.2 only
+// flags Q-T1–Q-T8 with `legacy: true` rather than reordering /
+// removing — backward-compat for cohort fixtures requires the defs
+// stay intact.
+export const allQuestions: Question[] = [
   {
     question_id: "Q-C1",
     card_id: "conviction",
@@ -264,6 +276,7 @@ export const questions: Question[] = [
   },
   {
     question_id: "Q-T1",
+    legacy: true,
     card_id: "temperament",
     type: "ranking",
     text: "When you're working on a hard problem",
@@ -276,6 +289,7 @@ export const questions: Question[] = [
   },
   {
     question_id: "Q-T2",
+    legacy: true,
     card_id: "temperament",
     type: "ranking",
     text: "When you walk into a new environment",
@@ -288,6 +302,7 @@ export const questions: Question[] = [
   },
   {
     question_id: "Q-T3",
+    legacy: true,
     card_id: "temperament",
     type: "ranking",
     text: "When you're learning something new",
@@ -300,6 +315,7 @@ export const questions: Question[] = [
   },
   {
     question_id: "Q-T4",
+    legacy: true,
     card_id: "temperament",
     type: "ranking",
     text: "When you're trying to read a complex situation",
@@ -312,6 +328,7 @@ export const questions: Question[] = [
   },
   {
     question_id: "Q-T5",
+    legacy: true,
     card_id: "temperament",
     type: "ranking",
     text: "When a plan isn't working",
@@ -324,6 +341,7 @@ export const questions: Question[] = [
   },
   {
     question_id: "Q-T6",
+    legacy: true,
     card_id: "temperament",
     type: "ranking",
     text: "When someone you respect disagrees with you",
@@ -336,6 +354,7 @@ export const questions: Question[] = [
   },
   {
     question_id: "Q-T7",
+    legacy: true,
     card_id: "temperament",
     type: "ranking",
     text: "When you have to make a hard call",
@@ -348,6 +367,7 @@ export const questions: Question[] = [
   },
   {
     question_id: "Q-T8",
+    legacy: true,
     card_id: "temperament",
     type: "ranking",
     text: "When someone close to you is struggling",
@@ -840,3 +860,18 @@ export const questions: Question[] = [
     other_option: { id: "other", label: "Other (please specify)", allows_text: true },
   },
 ];
+
+// CC-138.2 — `questions` is the filtered presented-flow view: every
+// non-legacy entry in `allQuestions`, in source order. The live
+// assessment surface, the second-pass / missing-question logic, the
+// admin answer-review page, and any other consumer reflecting "what
+// the user actually answered in the current question bank" reads this
+// view. Backward-compat consumers (saved-answer parsers, the lens
+// resolver's legacy branch) read `allQuestions` directly.
+//
+// **Preserved invariants:** array order is unchanged for non-legacy
+// entries → `Q_I1_INDEX` / other index-based anchors hold their
+// values when computed against `questions`. (Anchors computed
+// against `allQuestions` may move because retired entries no longer
+// contribute to the index — currently no consumer does that.)
+export const questions: Question[] = allQuestions.filter((q) => !q.legacy);

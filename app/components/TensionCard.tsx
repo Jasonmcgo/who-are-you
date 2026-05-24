@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { questions } from "../../data/questions";
+// CC-138.2 — signal→question lookup must see legacy Q-T defs so
+// stored cohort signals resolve. Use `allQuestions`.
+import { allQuestions as questions } from "../../data/questions";
 import { SIGNAL_DESCRIPTIONS } from "../../lib/identityEngine";
 import type {
   CardId,

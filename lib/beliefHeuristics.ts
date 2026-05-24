@@ -28,7 +28,9 @@ import type {
   MultiSelectDerivedAnswer,
   ValueDomain,
 } from "./types";
-import { questions } from "../data/questions";
+// CC-138.2 — heuristic analysis of saved answers must see every
+// question def including legacy entries; use `allQuestions`.
+import { allQuestions as questions } from "../data/questions";
 
 // ── Anchor + Q-I2 / Q-I3 lookup helpers ──────────────────────────────────
 

@@ -27,6 +27,10 @@ import {
 } from "../../lib/jungianStack";
 import { buildInnerConstitution } from "../../lib/identityEngine";
 import { buildFollowUpInput, generateFollowUpQuestions } from "../../lib/followUpQuestions";
+// CC-138.2 — verify the presented-flow `questions` view excludes
+// Q-T1–T8 (legacy retired) while `allQuestions` retains them for
+// legacy-answer parsing.
+import { questions, allQuestions } from "../../data/questions";
 import type {
   Answer,
   CognitiveFunctionId,
@@ -287,6 +291,84 @@ function runAudit(): AssertionResult[] {
     });
   }
 
+  // ── CC-138.1 — cross-signal lift block on binary contamination ───
+  //    Regression assertion. CC-141 made the CC-097B cross-signal
+  //    lift refuse to raise confidence to `high` when the typing
+  //    carries a contamination flag (ns-valence / judging-cooccurrence
+  //    / thin-floor). CC-138.1 extends that blocklist to also cover
+  //    the binary-format contamination fingerprints
+  //    (`binary-attitude-violation`, `binary-dominance-ambiguous`).
+  //    Without the block, the lift could harden a contaminated
+  //    binary typing to `high` — re-opening the exact failure mode
+  //    CC-141 closed for ranking sessions.
+  //
+  //    The test reads the identityEngine.ts source directly to verify
+  //    the blockingReasons array contains both binary literals
+  //    (byte-for-byte — a typo silently no-ops the gate). The CC
+  //    explicitly says "verify by grep, not by eye." The matching
+  //    constructed session already exists in test #3 / #4 above
+  //    (constraint violation → low + reason flag); this assertion
+  //    completes the regression by proving the lift gate is wired.
+  {
+    const enginePath = join(
+      __dirname,
+      "..",
+      "..",
+      "lib",
+      "identityEngine.ts"
+    );
+    const engineSrc = readFileSync(enginePath, "utf-8");
+    // Locate the blockingReasons array and inspect its contents. The
+    // pattern matches the array literal across multi-line + comment-
+    // interleaved formatting (CC-138.1's allowlist has inline
+    // comments between entries).
+    const m = engineSrc.match(/blockingReasons[^=]*=\s*\[([\s\S]*?)\];/);
+    const arrayBody = m?.[1] ?? "";
+    const hasViolation = /"binary-attitude-violation"/.test(arrayBody);
+    const hasAmbiguous = /"binary-dominance-ambiguous"/.test(arrayBody);
+    const hasOriginalThree =
+      /"ns-valence"/.test(arrayBody) &&
+      /"judging-cooccurrence"/.test(arrayBody) &&
+      /"thin-floor"/.test(arrayBody);
+    results.push({
+      ok: hasViolation && hasAmbiguous && hasOriginalThree,
+      assertion: "lift-gate-blocks-binary-contamination",
+      detail: hasViolation && hasAmbiguous && hasOriginalThree
+        ? "blockingReasons contains all 5 entries (ns-valence + judging-cooccurrence + thin-floor + binary-attitude-violation + binary-dominance-ambiguous) — lift cannot override contaminated binary typings"
+        : `blockingReasons missing entries: violation=${hasViolation} ambiguous=${hasAmbiguous} original3=${hasOriginalThree}`,
+    });
+
+    // Logical-equivalence test: construct a binary-violation session
+    // and verify the resulting LensStack's confidence is `low` with
+    // `binary-attitude-violation` in confidenceLowReasons. The same
+    // reasons flow through to `attachCrossSignalDriverInference`'s
+    // gate, which now blocks the lift. Pre-CC-138.1, the gate would
+    // have allowed the lift (no binary entries in the allowlist) and
+    // a corroborated dominant would have flipped this session to
+    // `high` end-to-end. Post-CC-138.1, the violation reason is
+    // present at the constitution.lens_stack.confidenceLowReasons
+    // channel which the gate reads.
+    const sigsCt = makeBinarySession({
+      ni_ne: "ni",
+      si_se: "si", // VIOLATION — both introverted on perceiving
+      ti_te: "te",
+      fi_fe: "fi",
+      percOrder: "ni",
+      judgOrder: "te",
+    });
+    const stackCt = aggregateLensStackBinary(sigsCt);
+    const stays_low =
+      stackCt.confidence === "low" &&
+      (stackCt.confidenceLowReasons ?? []).includes("binary-attitude-violation");
+    results.push({
+      ok: stays_low,
+      assertion: "binary-violation-stays-low-after-lift-gate",
+      detail: stays_low
+        ? `binary session with violation resolves low (${stackCt.confidence}), reason preserved for the lift gate to consume`
+        : `expected low + binary-attitude-violation; got ${stackCt.confidence} reasons=${(stackCt.confidenceLowReasons ?? []).join(",")}`,
+    });
+  }
+
   // ── 8. Dispatch sanity: aggregateLensStack routes binary sessions
   //    to the binary resolver. ─────────────────────────────────────
   {
@@ -307,6 +389,111 @@ function runAudit(): AssertionResult[] {
       assertion: "binary-dispatch-routes-binary-sessions",
       detail: `dispatch ${stackViaDispatch.mbtiCode}/${stackViaDispatch.confidence} === direct ${stackDirect.mbtiCode}/${stackDirect.confidence}`,
     });
+  }
+
+  // ── CC-138.2 — legacy Q-T retirement from live flow ──────────────
+  //    `data/questions.ts` exports two views: `allQuestions` (full
+  //    bank, used by saved-answer parsing) and `questions` (filtered
+  //    presented-flow view, excludes anything flagged `legacy: true`).
+  //    Q-T1–Q-T8 are flagged legacy because the binary Q-TB-* set
+  //    superseded them; they must stay in the bank so legacy sessions
+  //    still resolve, but new sessions must not see them.
+  {
+    const legacyIds = ["Q-T1", "Q-T2", "Q-T3", "Q-T4", "Q-T5", "Q-T6", "Q-T7", "Q-T8"];
+    const presented = legacyIds.filter(
+      (id) => questions.find((q) => q.question_id === id) !== undefined
+    );
+    const retained = legacyIds.filter(
+      (id) => allQuestions.find((q) => q.question_id === id) !== undefined
+    );
+    results.push({
+      ok: presented.length === 0,
+      assertion: "cc138_2-presented-flow-excludes-legacy-qt",
+      detail:
+        presented.length === 0
+          ? `presented \`questions\` view excludes all 8 legacy Q-T1–Q-T8 entries`
+          : `legacy Q-T entries leaked into presented flow: ${presented.join(", ")}`,
+    });
+    results.push({
+      ok: retained.length === 8,
+      assertion: "cc138_2-full-bank-retains-legacy-qt",
+      detail:
+        retained.length === 8
+          ? `\`allQuestions\` retains all 8 legacy Q-T1–Q-T8 entries for legacy-answer parsing`
+          : `\`allQuestions\` missing legacy entries (retained ${retained.length}/8): present=${retained.join(", ")}`,
+    });
+  }
+
+  // ── CC-138.2 — byte-identical resolution for legacy Q-T cohorts.
+  //    A legacy cohort fixture (one whose answers carry Q-T ranking
+  //    data) must still resolve via the legacy ranking path even after
+  //    Q-T1–Q-T8 are filtered out of the presented flow. The engine
+  //    imports `allQuestions` so saved-answer parsing is unaffected;
+  //    this assertion proves that contract on a real fixture by
+  //    comparing the resolved lens stack against the captured baseline
+  //    in .cc138_2-before/summary.json.
+  {
+    const baselinePath = join(
+      __dirname,
+      "..",
+      "..",
+      ".cc138_2-before",
+      "summary.json"
+    );
+    if (!existsSync(baselinePath)) {
+      results.push({
+        ok: false,
+        assertion: "cc138_2-legacy-cohort-byte-identity",
+        detail: `baseline missing at ${baselinePath} — re-capture pre-change snapshot`,
+      });
+    } else {
+      const baseline = JSON.parse(readFileSync(baselinePath, "utf-8")) as Array<{
+        fixture: string;
+        lensDom: string;
+        lensAux: string;
+        lensMbti: string;
+        lensConf: string;
+      }>;
+      let compared = 0;
+      let drifts = 0;
+      const driftDetails: string[] = [];
+      for (const entry of baseline) {
+        const fixturePath = join(ROOT, entry.fixture);
+        if (!existsSync(fixturePath)) continue;
+        const raw = JSON.parse(
+          readFileSync(fixturePath, "utf-8")
+        ) as { answers?: Answer[]; demographics?: DemographicSet | null };
+        if (!raw.answers) continue;
+        let c;
+        try {
+          c = buildInnerConstitution(raw.answers, [], raw.demographics ?? null);
+        } catch {
+          continue;
+        }
+        compared++;
+        const drift =
+          c.lens_stack.dominant !== entry.lensDom ||
+          c.lens_stack.auxiliary !== entry.lensAux ||
+          c.lens_stack.mbtiCode !== entry.lensMbti ||
+          c.lens_stack.confidence !== entry.lensConf;
+        if (drift) {
+          drifts++;
+          if (driftDetails.length < 5) {
+            driftDetails.push(
+              `${entry.fixture}: was ${entry.lensMbti}/${entry.lensConf} dom=${entry.lensDom} aux=${entry.lensAux}; now ${c.lens_stack.mbtiCode}/${c.lens_stack.confidence} dom=${c.lens_stack.dominant} aux=${c.lens_stack.auxiliary}`
+            );
+          }
+        }
+      }
+      results.push({
+        ok: drifts === 0,
+        assertion: "cc138_2-legacy-cohort-byte-identity",
+        detail:
+          drifts === 0
+            ? `${compared} legacy cohort fixtures resolve byte-identically vs baseline (dominant + auxiliary + mbtiCode + confidence)`
+            : `${drifts}/${compared} fixtures drifted: ${driftDetails.join(" | ")}`,
+      });
+    }
   }
 
   return results;

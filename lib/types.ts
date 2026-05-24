@@ -63,6 +63,14 @@ export type ForcedFreeformQuestion = {
   // requires non-empty content.
   render_if_skipped?: string;
   unskippable?: boolean;
+  // CC-138.2 — when true, the question DEFINITION stays in the bank
+  // (so saved-answer parsers + the lens resolver's legacy branch
+  // still resolve to its items / signal map) but the live assessment
+  // flow filters it out (see `data/questions.ts`'s `questions` vs
+  // `allQuestions` split). Used to retire the legacy Q-T1–Q-T8
+  // ranking cards after CC-138 introduced the Q-TB-* binaries
+  // without breaking backward-compat for cohort fixtures.
+  legacy?: boolean;
 };
 
 export type RankingQuestion = {
@@ -73,6 +81,11 @@ export type RankingQuestion = {
   helper?: string;
   options?: never;
   items: RankingItem[];
+  /** See CC-138.2 note on `ForcedFreeformQuestion.legacy`. Applied to
+   *  the retired Q-T1–Q-T8 4-way ranking cards after CC-138 added the
+   *  Q-TB-* binaries — the legacy ranking defs stay in the bank so
+   *  cohort fixtures resolve, but the live assessment filters them. */
+  legacy?: boolean;
 };
 
 // CC-016 — derived ranking. Items populate at render time from the top-N
@@ -86,6 +99,10 @@ export type DerivedRankingQuestion = {
   derived_top_n?: number; // defaults to 2
   text: string;
   helper?: string;
+  /** CC-138.2 — same semantics as ForcedFreeformQuestion.legacy.
+   *  Retired derived children whose parents are also legacy land
+   *  here. */
+  legacy?: boolean;
 };
 
 // CC-017 — multi-select question whose items populate at render time from the
@@ -102,6 +119,8 @@ export type MultiSelectDerivedQuestion = {
   helper?: string;
   none_option?: { id: string; label: string };
   other_option?: { id: string; label: string; allows_text?: boolean };
+  /** CC-138.2 — same semantics as ForcedFreeformQuestion.legacy. */
+  legacy?: boolean;
 };
 
 // CC-138 — binary-pick (select-one-of-two) question type for the
@@ -124,6 +143,10 @@ export type BinaryPickQuestion = {
   text: string;
   helper?: string;
   items: RankingItem[]; // length must be 2; the same-dimension attitude pair
+  /** CC-138.2 — same semantics as ForcedFreeformQuestion.legacy. The
+   *  Q-TB-* binaries are intentionally NOT legacy; field reserved
+   *  for any future binary retirement. */
+  legacy?: boolean;
 };
 
 // CC-138 — binary-pick whose two items derive from the user's prior
@@ -138,6 +161,8 @@ export type BinaryPickDerivedQuestion = {
   derived_from: string[]; // typically 2 question_ids whose picks become the items
   text: string;
   helper?: string;
+  /** CC-138.2 — same semantics as ForcedFreeformQuestion.legacy. */
+  legacy?: boolean;
 };
 
 export type Question =
