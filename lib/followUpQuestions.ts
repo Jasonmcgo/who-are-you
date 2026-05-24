@@ -54,10 +54,17 @@ export type FollowUpInput = {
     // (one of {ni, ne} + one of {si, se}). The pre-CC-159 N/S
     // clarifier never fired on aux-ambiguous, so e.g. an Fi-dom with
     // Ne/Se aux close went unasked.
+    //
+    // CC-161 — `binary_contested_perceiving` is the binary-format
+    // analogue: fires when `binaryContestedPerceivingPair` is set on
+    // LensStack (the respondent's actual ni/ne + si/se picks are in
+    // contention). Pre-CC-161 the binary path either skipped the
+    // clarifier or fired it with garbage `topPickCountFor` leaders.
     nsHeadToHeadTrigger?:
       | "low_confidence"
       | "ns_split_suspect"
-      | "aux_ambiguous_perceiving";
+      | "aux_ambiguous_perceiving"
+      | "binary_contested_perceiving";
     // CC-134.1 §Task 3 — judging-axis head-to-head. Fires when both
     // members of an impossible same-attitude judging pair (Ti & Fi, or
     // Te & Fe) accumulate ≥ JUDGING_COOCCURRENCE_THRESHOLD top-picks —
@@ -71,12 +78,31 @@ export type FollowUpInput = {
     // {ti, te} + one of {fi, fe}). This is the INTJ↔INFJ class
     // (Te vs Fe auxiliary) that pre-CC-159 detected ambiguity but
     // asked nothing to resolve it.
+    //
+    // CC-161 — `binary_contested_judging` is the binary-format
+    // analogue: fires when `binaryContestedJudgingPair` is set on
+    // LensStack (the respondent's actual ti/te + fi/fe picks are in
+    // contention). The Nat case: Ni-dominant clean, judging axis
+    // contested → fires Fi-vs-Fe (and optionally Te-vs-Ti) instead
+    // of garbage Ne-vs-Si on the wrong axis.
     judgingHeadToHeadA?: CognitiveFunctionId;
     judgingHeadToHeadB?: CognitiveFunctionId;
     judgingHeadToHeadTrigger?:
       | "ti_fi_cooccurrence"
       | "te_fe_cooccurrence"
-      | "aux_ambiguous_judging";
+      | "aux_ambiguous_judging"
+      | "binary_contested_judging";
+    // CC-161.1 — optional secondary judging head-to-head. INTJ↔INFJ
+    // (and analogue classes) hang on BOTH attitudes: feeling-pick
+    // attitude (Fi-vs-Fe) AND thinking-pick attitude (Te-vs-Ti).
+    // Emit up to two clarifiers, leading with the feeling pair
+    // (cleaner discriminator). Pre-CC-161.1 a single
+    // `[thinkingPick, feelingPick]` pair was pitted against itself
+    // (e.g. Te-vs-Fi), which doesn't discriminate the type because
+    // Te+Fi are both in the INTJ stack.
+    judgingHeadToHeadA2?: CognitiveFunctionId;
+    judgingHeadToHeadB2?: CognitiveFunctionId;
+    judgingHeadToHeadTrigger2?: "binary_contested_judging";
   };
   // CC-134 Part D §D.2 — large-gap blind spots whose underlying input
   // is suspect (untouched ranking heuristic or low-confidence Lens).
@@ -517,16 +543,23 @@ export function buildFollowUpInput(
   // N-vs-S top-pick split. CC-134.1's clarifier originally gated on
   // `confidence === "low"`; CC-141 widens the gate to the reasons so
   // a Megan-shape (lifted to high on a corroborated Fi dominant +
-  // contaminated N/S) still gets asked. CC-138 adds the binary flags.
-  const nsClarifierEligible =
-    nsValenceReason ||
-    thinFloorReason ||
-    binaryAttitudeViolation ||
-    binaryDominanceAmbiguous;
-  const judgingClarifierEligible =
-    judgingCooccurrenceReason ||
-    binaryAttitudeViolation ||
-    binaryDominanceAmbiguous;
+  // contaminated N/S) still gets asked.
+  //
+  // CC-161 — `binary-attitude-violation` and `binary-dominance-ambiguous`
+  // are NO LONGER on this blanket eligibility list. Pre-CC-161 they
+  // made BOTH axes eligible, and the leader builder then ran
+  // `topPickCountFor` (which counts legacy Q-T rank picks — empty in a
+  // binary session) → garbage Ne/Si leaders selected for an Ni-dominant
+  // INTJ-shape binary respondent. The fix is the contested-pair routing
+  // below: only the actually-contested axis fires, and the leaders come
+  // from the respondent's binary picks via `binaryContestedJudgingPair`
+  // / `binaryContestedPerceivingPair`, not from `topPickCountFor`.
+  // `binaryAttitudeViolation`/`binaryDominanceAmbiguous` are read
+  // (kept above for context-clarity) but no longer used as gates here.
+  void binaryAttitudeViolation;
+  void binaryDominanceAmbiguous;
+  const nsClarifierEligible = nsValenceReason || thinFloorReason;
+  const judgingClarifierEligible = judgingCooccurrenceReason;
 
   // CC-134 Part D §D.1 — pull the per-pool top-pick leaders so the
   // generator can build an N-vs-S head-to-head clarifier. The leaders
@@ -535,12 +568,13 @@ export function buildFollowUpInput(
   // function id to keep the resolver deterministic.
   let nsLeaderN: CognitiveFunctionId | undefined;
   let nsLeaderS: CognitiveFunctionId | undefined;
-  // CC-159 — `aux_ambiguous_perceiving` added so a perceiving-aux
-  // ambiguity (e.g. Fi-dom with Ne/Se aux within margin) routes here.
+  // CC-159 — `aux_ambiguous_perceiving` added.
+  // CC-161 — `binary_contested_perceiving` added.
   let nsHeadToHeadTrigger:
     | "low_confidence"
     | "ns_split_suspect"
     | "aux_ambiguous_perceiving"
+    | "binary_contested_perceiving"
     | undefined;
   if (nsClarifierEligible) {
     const nCandidates: CognitiveFunctionId[] = ["ni", "ne"];
@@ -573,13 +607,21 @@ export function buildFollowUpInput(
   // lift raised display confidence.
   let judgingHeadToHeadA: CognitiveFunctionId | undefined;
   let judgingHeadToHeadB: CognitiveFunctionId | undefined;
-  // CC-159 — `aux_ambiguous_judging` added so an INTJ↔INFJ (Te/Fe aux)
-  // / INTP↔INFP (Ti/Fi aux) etc. ambiguity routes here.
+  // CC-159 — `aux_ambiguous_judging` added.
+  // CC-161 — `binary_contested_judging` added.
   let judgingHeadToHeadTrigger:
     | "ti_fi_cooccurrence"
     | "te_fe_cooccurrence"
     | "aux_ambiguous_judging"
+    | "binary_contested_judging"
     | undefined;
+  // CC-161.1 — optional secondary slot for the second attitude
+  // head-to-head (e.g. Te-vs-Ti) when the binary judging axis has
+  // both feeling AND thinking picks in contention. Lead pair stays
+  // in the primary slots; this is appended after.
+  let judgingHeadToHeadA2: CognitiveFunctionId | undefined;
+  let judgingHeadToHeadB2: CognitiveFunctionId | undefined;
+  let judgingHeadToHeadTrigger2: "binary_contested_judging" | undefined;
   if (judgingClarifierEligible) {
     const tiTop = topPickCountFor(constitution.signals, "ti");
     const fiTop = topPickCountFor(constitution.signals, "fi");
@@ -618,6 +660,88 @@ export function buildFollowUpInput(
   // cooccurrence/binary path already populated that slot. The pre-
   // existing trigger keeps its semantic; aux-ambiguous fills in only
   // where the slot was empty.
+  // CC-161 — binary-path contested-pair routing. When the lens layer
+  // surfaces a binary contested pair (judging and/or perceiving),
+  // build the head-to-head from the respondent's actual binary picks
+  // — NOT from `topPickCountFor` (which counts legacy Q-T rank picks
+  // that don't exist in a binary session and selected Ne/Si garbage
+  // on the Nat case). Routes per-axis: only the contested axis gets
+  // its clarifier; the other stays empty so a confident axis isn't
+  // asked. No-double-emit: if the existing cooccurrence path already
+  // populated a slot, the binary-contested routing skips it
+  // (mirrors CC-159's gate).
+  //
+  // CC-161.1 — CRITICAL CORRECTION. CC-161 pitted the two picks
+  // against each other (e.g. Te-vs-Fi for an INTJ-shape binary
+  // respondent) — but Te and Fi are BOTH in the INTJ stack, so
+  // Te-vs-Fi can't discriminate INTJ from INFJ. The discriminators
+  // are the *attitudes*: pit each picked function against its
+  // same-dimension opposite. Feeling pick `fi` → Fi-vs-Fe head-to-
+  // head; thinking pick `te` → Te-vs-Ti head-to-head. Up to two
+  // clarifiers per axis, leading with feeling (cleaner type tell).
+  // The contested pair from the lens layer keeps its "what was
+  // picked" meaning; the attitude-opposite transformation lives
+  // here in the routing layer.
+  const ATTITUDE_OPPOSITE: Record<CognitiveFunctionId, CognitiveFunctionId> = {
+    ni: "ne", ne: "ni",
+    si: "se", se: "si",
+    ti: "te", te: "ti",
+    fi: "fe", fe: "fi",
+  };
+  const FEELING_FNS = new Set<CognitiveFunctionId>(["fi", "fe"]);
+  const THINKING_FNS = new Set<CognitiveFunctionId>(["ti", "te"]);
+  const binaryJudgingPair = ls?.binaryContestedJudgingPair;
+  if (binaryJudgingPair && judgingHeadToHeadA === undefined) {
+    // Lead with feeling. Find the feeling pick (fi or fe) — pit it
+    // against its attitude opposite for the primary clarifier.
+    const feelingPick = binaryJudgingPair.find((fn) => FEELING_FNS.has(fn));
+    const thinkingPick = binaryJudgingPair.find((fn) => THINKING_FNS.has(fn));
+    if (feelingPick) {
+      judgingHeadToHeadA = feelingPick;
+      judgingHeadToHeadB = ATTITUDE_OPPOSITE[feelingPick];
+      judgingHeadToHeadTrigger = "binary_contested_judging";
+    } else if (thinkingPick) {
+      // Edge case: contested pair has no feeling member (shouldn't
+      // happen for a well-formed binary session, but be defensive).
+      judgingHeadToHeadA = thinkingPick;
+      judgingHeadToHeadB = ATTITUDE_OPPOSITE[thinkingPick];
+      judgingHeadToHeadTrigger = "binary_contested_judging";
+    }
+    // CC-161.1 — secondary clarifier when both members of the
+    // judging axis are in question (INTJ↔INFJ class hangs on both
+    // Fi/Fe AND Te/Ti). Skip if only one dimension is in the pair.
+    if (feelingPick && thinkingPick) {
+      judgingHeadToHeadA2 = thinkingPick;
+      judgingHeadToHeadB2 = ATTITUDE_OPPOSITE[thinkingPick];
+      judgingHeadToHeadTrigger2 = "binary_contested_judging";
+    }
+  }
+  const binaryPerceivingPair = ls?.binaryContestedPerceivingPair;
+  if (binaryPerceivingPair && nsLeaderN === undefined && nsLeaderS === undefined) {
+    // CC-161.1 — pit attitude opposites, not the two picks. e.g.
+    // contested `ni` → Ni-vs-Ne, contested `se` → Se-vs-Si. Prefer
+    // the N-side member for the primary slot to match the existing
+    // `nsLeaderN` / `nsLeaderS` convention; the builder doesn't
+    // enforce axis-split (it just pits two perceiving functions
+    // labeled "Voice A" / "Voice B" with the function id in tags[0]).
+    const N_SET = new Set<CognitiveFunctionId>(["ni", "ne"]);
+    const S_SET = new Set<CognitiveFunctionId>(["si", "se"]);
+    const nMember = binaryPerceivingPair.find((fn) => N_SET.has(fn));
+    const sMember = binaryPerceivingPair.find((fn) => S_SET.has(fn));
+    // Lead with whichever picked member is present; pit against its
+    // attitude opposite. (Don't pit the two picks against each other
+    // — same INTJ↔INFJ-style confound applies on the perceiving axis.)
+    if (nMember) {
+      nsLeaderN = nMember;
+      nsLeaderS = ATTITUDE_OPPOSITE[nMember];
+      nsHeadToHeadTrigger = "binary_contested_perceiving";
+    } else if (sMember) {
+      nsLeaderN = sMember;
+      nsLeaderS = ATTITUDE_OPPOSITE[sMember];
+      nsHeadToHeadTrigger = "binary_contested_perceiving";
+    }
+  }
+
   const auxAmbiguousReason = reasons.includes("aux-ambiguous");
   const auxPair = ls?.auxAmbiguousPair;
   if (auxAmbiguousReason && auxPair) {
@@ -682,6 +806,11 @@ export function buildFollowUpInput(
       judgingHeadToHeadA,
       judgingHeadToHeadB,
       judgingHeadToHeadTrigger,
+      // CC-161.1 — secondary judging head-to-head (only set when both
+      // attitudes of the contested judging axis are in question).
+      judgingHeadToHeadA2,
+      judgingHeadToHeadB2,
+      judgingHeadToHeadTrigger2,
     },
     blindspotsToConfirm: blindspotsToConfirm.length > 0 ? blindspotsToConfirm : undefined,
     movement: {
@@ -988,6 +1117,19 @@ export function generateFollowUpQuestions(input: FollowUpInput): FollowUpQuestio
       )
     );
   }
+  // CC-161.1 — secondary judging head-to-head when both attitudes of
+  // the contested judging axis are in question (the INTJ↔INFJ class:
+  // the type hangs on Fi/Fe AND Te/Ti, so test both). Distinct id
+  // suffix so the two clarifiers don't collide on the question key.
+  if (input.lens?.judgingHeadToHeadA2 && input.lens?.judgingHeadToHeadB2) {
+    extras.push(
+      buildJudgingClarityHeadToHead(
+        input.lens.judgingHeadToHeadA2,
+        input.lens.judgingHeadToHeadB2,
+        "fq5b_type_clarity_judging_secondary"
+      )
+    );
+  }
 
   // CC-134 Part D §D.2 — append `blindspot_confirm` clarifiers for
   // any large-gap blind spots whose input is suspect (current proxy:
@@ -1019,17 +1161,42 @@ export function generateFollowUpQuestions(input: FollowUpInput): FollowUpQuestio
 // CC-134 Part D — clarifier builders
 // ─────────────────────────────────────────────────────────────────────
 
+// CC-161.1 §T3 — voices MUST test what the function attends to (its
+// object), never its inward/outward flavor. An exceptionally introverted
+// person leans toward any introverted-sounding voice on every binary
+// regardless of true function — so a truly-Fe INFJ would pick Fi just
+// for the introversion, re-triggering the misread CC-161 was trying to
+// fix. Each option in an attitude pair is phrased so an exceptional
+// introvert can fully own it; the choice reflects what the function
+// attends to, not the person's overall temperament.
 const PERCEIVING_VOICE: Record<CognitiveFunctionId, { framing: string; texture: string }> = {
   ni: { framing: "the long arc lands first", texture: "I notice patterns forming before they finish — the trajectory is what I read first, even when the data is incomplete." },
   ne: { framing: "possibilities branch first", texture: "I see the openings before they're named — a single input fans out into adjacent ideas I want to chase." },
   si: { framing: "the precedent lands first", texture: "I notice what's different from how it has gone before — the felt continuity is the anchor, and any deviation registers immediately." },
   se: { framing: "what's right here lands first", texture: "I notice what's actually in the room — the texture, the tempo, the move available now. The present is more vivid than the projection." },
-  // Judging functions included to keep the record exhaustive; never
-  // emitted by the N/S head-to-head clarifier.
-  ti: { framing: "the logic lands first", texture: "I work out whether the pieces hold together internally before I commit." },
-  te: { framing: "the structure lands first", texture: "I look for the most efficient ordering and run the plan." },
-  fi: { framing: "the value lands first", texture: "I check whether this aligns with what I most deeply care about." },
-  fe: { framing: "the room lands first", texture: "I read what the people present need and respond to it." },
+  // CC-161.1 — judging voices re-phrased to be I/E-neutral and
+  // object-based per owner-identified confound. Both options in a
+  // Ti/Te or Fi/Fe pair must be equally ownable by an exceptionally
+  // introverted person; the choice reflects what the function
+  // attends to (own values vs the people you're responsible for; own
+  // internal logic vs what actually works), NOT outward-vs-inward
+  // flavor.
+  ti: {
+    framing: "my own internal logic",
+    texture: "When I'm deciding, I check whether it holds together by my own internal logic — does it make sense on its own terms?",
+  },
+  te: {
+    framing: "what actually works",
+    texture: "When I'm deciding, I check it against what works — the external result, what the world does back when this lands.",
+  },
+  fi: {
+    framing: "my own values",
+    texture: "When I'm deciding, my read calibrates to my own values — what feels true to me, what I'd refuse to compromise.",
+  },
+  fe: {
+    framing: "what the people I'm responsible for need",
+    texture: "When I'm deciding, my read calibrates to what the people I'm responsible for need — the harmony of the room, who lands well in this. (This is not about being social; it's the object the read tunes to.)",
+  },
 };
 
 function buildTypeClarityHeadToHead(
@@ -1076,14 +1243,18 @@ function buildTypeClarityHeadToHead(
  */
 function buildJudgingClarityHeadToHead(
   aLeader: CognitiveFunctionId,
-  bLeader: CognitiveFunctionId
+  bLeader: CognitiveFunctionId,
+  // CC-161.1 — optional id override for the secondary head-to-head
+  // (the second attitude pair when both Fi/Fe AND Te/Ti are in
+  // question). Defaults to the original CC-134.1 id.
+  id: string = "fq5_type_clarity_judging"
 ): FollowUpQuestion {
   const aVoice = PERCEIVING_VOICE[aLeader];
   const bVoice = PERCEIVING_VOICE[bLeader];
   // CC-141 §D — neutral "Voice A / Voice B" labels (see comment on
   // buildTypeClarityHeadToHead). Function id stays in `tags[0]`.
   return {
-    id: "fq5_type_clarity_judging",
+    id,
     purpose: "type_clarity",
     question:
       "When you have to make a hard call, which of these is closer to how the decision actually settles inside you?",
@@ -1099,7 +1270,7 @@ function buildJudgingClarityHeadToHead(
         label: "Voice B",
         text: `${bVoice.framing} — ${bVoice.texture}`,
         tags: [bLeader, "judging", "type_clarity"],
-        interpretation: `Confirms ${bLeader.toUpperCase()}-led judging. (CC-134.1 §Task 3: pair surfaced because both ${aLeader.toUpperCase()} & ${bLeader.toUpperCase()} accumulated significant top-picks — a canonical stack cannot hold both, so this pick resolves the contamination.)`,
+        interpretation: `Confirms ${bLeader.toUpperCase()}-led judging.`,
       },
     ],
   };

@@ -426,6 +426,17 @@ function hasBinarySignals(signals: Signal[]): boolean {
  */
 export function aggregateLensStackBinary(signals: Signal[]): LensStack {
   const reasons: ConfidenceLowReason[] = [];
+  // CC-161 — track which axis each binary-* reason fires on so the
+  // follow-up generator can pit the actually-picked functions
+  // head-to-head (instead of falling back to `topPickCountFor` which
+  // counts empty legacy Q-T rank slots in a binary session and
+  // selected Ne/Si garbage on the Nat case).
+  let binaryContestedJudgingPair:
+    | [CognitiveFunctionId, CognitiveFunctionId]
+    | undefined;
+  let binaryContestedPerceivingPair:
+    | [CognitiveFunctionId, CognitiveFunctionId]
+    | undefined;
 
   // Helper: get the function id chosen for a binary-pick question.
   const pickFor = (qid: string): CognitiveFunctionId | null => {
@@ -461,6 +472,8 @@ export function aggregateLensStackBinary(signals: Signal[]): LensStack {
     isIntroverted(nePick) === isIntroverted(sePick)
   ) {
     reasons.push("binary-attitude-violation");
+    // CC-161 — perceiving axis is the one in violation.
+    binaryContestedPerceivingPair = [nePick, sePick];
   }
   if (
     tePick &&
@@ -468,6 +481,8 @@ export function aggregateLensStackBinary(signals: Signal[]): LensStack {
     isIntroverted(tePick) === isIntroverted(fePick)
   ) {
     reasons.push("binary-attitude-violation");
+    // CC-161 — judging axis is the one in violation.
+    binaryContestedJudgingPair = [tePick, fePick];
   }
 
   // Dominance ordering picks. Each names which of the user's two
@@ -483,17 +498,37 @@ export function aggregateLensStackBinary(signals: Signal[]): LensStack {
   if (nePick && sePick && percOrderPick) {
     if (percOrderPick === nePick) perceivingLeader = nePick;
     else if (percOrderPick === sePick) perceivingLeader = sePick;
-    else reasons.push("binary-dominance-ambiguous");
+    else {
+      reasons.push("binary-dominance-ambiguous");
+      // CC-161 — perceiving axis contested.
+      binaryContestedPerceivingPair =
+        binaryContestedPerceivingPair ?? [nePick, sePick];
+    }
   } else if (nePick || sePick) {
     reasons.push("binary-dominance-ambiguous");
+    // CC-161 — both perc picks present but no ordering → still
+    // ambiguous on perceiving.
+    if (nePick && sePick) {
+      binaryContestedPerceivingPair =
+        binaryContestedPerceivingPair ?? [nePick, sePick];
+    }
   }
   let judgingLeader: CognitiveFunctionId | null = null;
   if (tePick && fePick && judgOrderPick) {
     if (judgOrderPick === tePick) judgingLeader = tePick;
     else if (judgOrderPick === fePick) judgingLeader = fePick;
-    else reasons.push("binary-dominance-ambiguous");
+    else {
+      reasons.push("binary-dominance-ambiguous");
+      // CC-161 — judging axis contested.
+      binaryContestedJudgingPair =
+        binaryContestedJudgingPair ?? [tePick, fePick];
+    }
   } else if (tePick || fePick) {
     reasons.push("binary-dominance-ambiguous");
+    if (tePick && fePick) {
+      binaryContestedJudgingPair =
+        binaryContestedJudgingPair ?? [tePick, fePick];
+    }
   }
 
   // I/E inference: prefer the existing extraversion proxy signal
@@ -562,6 +597,8 @@ export function aggregateLensStackBinary(signals: Signal[]): LensStack {
       inferior: "se",
       confidence: "low",
       confidenceLowReasons: reasons.length > 0 ? reasons : ["binary-thin"],
+      binaryContestedJudgingPair,
+      binaryContestedPerceivingPair,
     };
   }
 
@@ -574,6 +611,10 @@ export function aggregateLensStackBinary(signals: Signal[]): LensStack {
   const mbtiCode = MBTI_LOOKUP[key];
   if (!stackTuple) {
     reasons.push("binary-attitude-violation");
+    // CC-161 — fallback case: the dom|aux pair itself is non-canonical.
+    // Treat it as contested on the judging axis as a default (the
+    // most common cause is mismatched judging attitudes); the
+    // followup generator surfaces the actually-picked judging pair.
     return {
       dominant,
       auxiliary,
@@ -581,6 +622,9 @@ export function aggregateLensStackBinary(signals: Signal[]): LensStack {
       inferior: "se",
       confidence: "low",
       confidenceLowReasons: reasons,
+      binaryContestedJudgingPair:
+        binaryContestedJudgingPair ?? (tePick && fePick ? [tePick, fePick] : undefined),
+      binaryContestedPerceivingPair,
     };
   }
 
@@ -594,6 +638,14 @@ export function aggregateLensStackBinary(signals: Signal[]): LensStack {
     mbtiCode,
     confidence,
     confidenceLowReasons: reasons.length > 0 ? reasons : undefined,
+    // CC-161 — only surface contested pairs when reasons actually
+    // include a binary-* flag. A confident binary session has no
+    // contested pair (otherwise the follow-up generator would
+    // double-emit a clarifier where none is warranted).
+    binaryContestedJudgingPair:
+      reasons.length > 0 ? binaryContestedJudgingPair : undefined,
+    binaryContestedPerceivingPair:
+      reasons.length > 0 ? binaryContestedPerceivingPair : undefined,
   };
 }
 

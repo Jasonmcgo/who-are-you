@@ -387,6 +387,23 @@ export type LensStack = {
   // uncertainty but asked nothing to resolve it. Only populated when
   // `aux-ambiguous` is among the reasons; absent otherwise.
   auxAmbiguousPair?: [CognitiveFunctionId, CognitiveFunctionId];
+  // CC-161 — binary-format analogue of `auxAmbiguousPair`. Populated by
+  // `aggregateLensStackBinary` when a binary-dominance-ambiguous or
+  // binary-attitude-violation reason fires on the *judging* pair
+  // (Ti/Te + Fi/Fe). Carries the two actually-picked functions so the
+  // follow-up generator can pit them head-to-head with voices from
+  // the respondent's own picks — NOT from `topPickCountFor` (which
+  // counts legacy Q-T rank picks that don't exist in binary sessions
+  // and previously selected Ne/Si garbage for binary-format follow-ups).
+  // Pre-CC-161 this was the Nat-case bug: an Ni-dominant INTJ-shape
+  // binary respondent got asked Ne vs Si, functions she never picked.
+  // Pair is `[picked_ti_or_te, picked_fi_or_fe]`.
+  binaryContestedJudgingPair?: [CognitiveFunctionId, CognitiveFunctionId];
+  // CC-161 — perceiving analogue of `binaryContestedJudgingPair`.
+  // Populated when the binary-dominance-ambiguous or
+  // binary-attitude-violation reason fires on the *perceiving* pair
+  // (Ni/Ne + Si/Se). Pair is `[picked_ni_or_ne, picked_si_or_se]`.
+  binaryContestedPerceivingPair?: [CognitiveFunctionId, CognitiveFunctionId];
 };
 
 // CC-141 + CC-138 — reason flags for `LensStack.confidenceLowReasons`.
