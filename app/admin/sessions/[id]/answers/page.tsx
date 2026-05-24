@@ -33,14 +33,19 @@ import {
 import CopySessionLinkButton from "../../CopySessionLinkButton";
 import type {
   Answer,
+  // CC-160 — binary editor types
+  BinaryPickDerivedQuestion,
+  BinaryPickQuestion,
   ForcedFreeformAnswer,
   ForcedFreeformQuestion,
   MultiSelectDerivedAnswer,
   MultiSelectDerivedQuestion,
   Question,
   RankingAnswer,
+  RankingItem,
   RankingQuestion,
   SessionDetail,
+  SinglePickAnswer,
 } from "../../../../../lib/types";
 import RankingAnswerEditor from "./RankingAnswerEditor";
 import FreeformAnswerEditor from "./FreeformAnswerEditor";
@@ -462,11 +467,16 @@ export default function AnswerReviewPage({
                 <EditorDispatch
                   question={q}
                   answer={answer}
+                  allAnswers={data.answers ?? []}
                   onSave={handleSave}
                   onCancel={handleCancel}
                 />
               ) : (
-                <ReadOnlyAnswer question={q} answer={answer} />
+                <ReadOnlyAnswer
+                  question={q}
+                  answer={answer}
+                  allAnswers={data.answers ?? []}
+                />
               )}
 
               {wasJustUpdated ? (
@@ -826,12 +836,47 @@ function FollowUpAnswerValue({ answer }: { answer: Answer }) {
 
 // ── Read-only renderer ──────────────────────────────────────────────────
 
+// CC-160 — resolve a `binary_pick_derived` picked_id's voice quote via
+// its parent binary_pick questions' items. The derived question itself
+// carries no items (`derived_from` names the parents); items materialize
+// at survey time from each parent's user-picked item. So to display the
+// chosen voice on read, we walk the parent answers + their question
+// definitions and find the item whose id matches the picked_id.
+//
+// Returns the quote string when resolvable, or null when no match (callers
+// fall back to the raw picked_id via the existing voiceQuoteFor path).
+function binaryDerivedQuoteFor(
+  question: Question,
+  pickedId: string,
+  allAnswers: Answer[],
+  allBank: Question[]
+): string | null {
+  if (question.type !== "binary_pick_derived") return null;
+  for (const parentId of question.derived_from ?? []) {
+    const parentAnswer = allAnswers.find((a) => a.question_id === parentId);
+    if (!parentAnswer || parentAnswer.type !== "single_pick") continue;
+    const parentQ = allBank.find((q) => q.question_id === parentId);
+    if (!parentQ || parentQ.type !== "binary_pick") continue;
+    const item = parentQ.items.find((i) => i.id === parentAnswer.picked_id);
+    if (item && item.id === pickedId) {
+      return item.quote ?? item.label ?? pickedId;
+    }
+  }
+  return null;
+}
+
 function ReadOnlyAnswer({
   question,
   answer,
+  allAnswers,
 }: {
   question: Question;
   answer: Answer | undefined;
+  // CC-160 — passed so `binary_pick_derived` answers can resolve their
+  // picked voice via parent binary_pick item lookups. Optional with `?`
+  // default `[]` so any caller that doesn't thread it still functions
+  // (the binary_pick_derived branch then falls back to raw id display).
+  allAnswers?: Answer[];
 }) {
   if (!answer) {
     return (
@@ -890,7 +935,24 @@ function ReadOnlyAnswer({
     // CC-122/CC-135 warm-balanced voice prose, and (b) legacy Q-T
     // re-asks served as single_pick against a `ranking` question. Falls
     // back through label → raw id so quote-less options still render.
-    const display = voiceQuoteFor(question, answer.picked_id);
+    //
+    // CC-160 — binary_pick + binary_pick_derived also store as
+    // single_pick (see app/assessment/page.tsx CC-138 emit path). The
+    // binary_pick case is already handled by voiceQuoteFor's `items`
+    // branch; binary_pick_derived needs the parent-walk because its
+    // items don't exist on the question itself. Try the derived
+    // resolver first when applicable; fall back to the general
+    // voiceQuoteFor on miss.
+    const derivedDisplay =
+      question.type === "binary_pick_derived"
+        ? binaryDerivedQuoteFor(
+            question,
+            answer.picked_id,
+            allAnswers ?? [],
+            allQuestions
+          )
+        : null;
+    const display = derivedDisplay ?? voiceQuoteFor(question, answer.picked_id);
     const showRawCode = display === answer.picked_id;
     return (
       <p
@@ -957,7 +1019,30 @@ function ReadOnlyAnswer({
       </ul>
     );
   }
-  return null;
+  // CC-160 — durable fail-safe. If no branch above matched (a future
+  // answer type lands before the editor learns about it, or a stored
+  // shape is corrupt), render the raw JSON as muted mono text rather
+  // than returning null and letting some upstream `.map()` /
+  // property-access crash white-screen the entire admin page. The
+  // pre-CC-160 surface returned `null` here, which would have been
+  // safe in isolation — but a *single* unhandled type in a long
+  // question list could blow up an adjacent component and take the
+  // page down with it. The visible JSON also gives the admin enough
+  // context to diagnose the underlying shape mismatch.
+  return (
+    <p
+      className="font-mono italic"
+      style={{
+        fontSize: 11,
+        color: "var(--ink-mute, #6a5d40)",
+        margin: 0,
+        wordBreak: "break-all",
+        whiteSpace: "pre-wrap",
+      }}
+    >
+      unsupported answer type ({(answer as { type?: string }).type ?? "unknown"}) — raw: {JSON.stringify(answer)}
+    </p>
+  );
 }
 
 // ── Editor dispatcher ──────────────────────────────────────────────────
@@ -965,11 +1050,15 @@ function ReadOnlyAnswer({
 function EditorDispatch({
   question,
   answer,
+  allAnswers,
   onSave,
   onCancel,
 }: {
   question: Question;
   answer: Answer | undefined;
+  // CC-160 — passed for the binary_pick_derived editor's parent-item
+  // resolution (the derived question itself has no items).
+  allAnswers: Answer[];
   onSave: (newAnswer: Answer) => Promise<void>;
   onCancel: () => void;
 }) {
@@ -1009,6 +1098,65 @@ function EditorDispatch({
       />
     );
   }
+  // CC-160 — binary_pick: pick-one-of-two via items. Save as
+  // SinglePickAnswer (same shape the assessment flow writes — see
+  // app/assessment/page.tsx CC-138 emit). Pre-CC-160 this fell through
+  // to SinglepickAnswerEditor which reads question.options (undefined
+  // on binary types) and crashed the editor mount.
+  if (question.type === "binary_pick") {
+    return (
+      <BinaryPickAnswerEditor
+        question={question}
+        items={question.items}
+        currentAnswer={
+          answer?.type === "single_pick" ? (answer as SinglePickAnswer) : undefined
+        }
+        onSave={onSave}
+        onCancel={onCancel}
+      />
+    );
+  }
+  // CC-160 — binary_pick_derived: same editor, with items resolved
+  // from the parent binary_pick answers. If both parents aren't
+  // answered, items can't be derived → safe-inert message mirroring
+  // the ranking_derived pattern.
+  if (question.type === "binary_pick_derived") {
+    const derivedItems: RankingItem[] = [];
+    for (const parentId of question.derived_from ?? []) {
+      const parentAnswer = allAnswers.find((a) => a.question_id === parentId);
+      if (!parentAnswer || parentAnswer.type !== "single_pick") continue;
+      const parentQ = allQuestions.find((q) => q.question_id === parentId);
+      if (!parentQ || parentQ.type !== "binary_pick") continue;
+      const item = parentQ.items.find((i) => i.id === parentAnswer.picked_id);
+      if (item) derivedItems.push(item);
+    }
+    if (derivedItems.length < 2) {
+      return (
+        <p
+          className="font-serif italic"
+          style={{ fontSize: 12, color: "var(--ink-mute, #6a5d40)", margin: 0 }}
+        >
+          Derived binary picks compose from parent binary answers at survey
+          time. {derivedItems.length === 0
+            ? "Both parents are unanswered, so there are no items to choose between."
+            : "Only one parent is answered; the second pair member is missing."}{" "}
+          Edit the parents first; this question will re-derive on the next
+          re-render.
+        </p>
+      );
+    }
+    return (
+      <BinaryPickAnswerEditor
+        question={question}
+        items={derivedItems}
+        currentAnswer={
+          answer?.type === "single_pick" ? (answer as SinglePickAnswer) : undefined
+        }
+        onSave={onSave}
+        onCancel={onCancel}
+      />
+    );
+  }
   // forced / freeform — branch on the answer's stored type when present,
   // otherwise infer from the question's type field.
   const ffq = question as ForcedFreeformQuestion;
@@ -1034,5 +1182,133 @@ function EditorDispatch({
       onSave={onSave}
       onCancel={onCancel}
     />
+  );
+}
+
+// CC-160 — pick-one-of-two editor for binary_pick + binary_pick_derived
+// questions. Saves a SinglePickAnswer (matching the assessment flow's
+// CC-138 emit), so the round-trip via updateSessionAnswer is byte-
+// for-byte compatible with the original answer shape.
+function BinaryPickAnswerEditor({
+  question,
+  items,
+  currentAnswer,
+  onSave,
+  onCancel,
+}: {
+  question: BinaryPickQuestion | BinaryPickDerivedQuestion;
+  items: RankingItem[];
+  currentAnswer: SinglePickAnswer | undefined;
+  onSave: (newAnswer: Answer) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [pickedId, setPickedId] = useState<string | null>(
+    currentAnswer?.picked_id ?? null
+  );
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function handleSave() {
+    if (!pickedId) return;
+    const item = items.find((i) => i.id === pickedId);
+    if (!item) {
+      setErr("internal: picked item not found in items list");
+      return;
+    }
+    setSaving(true);
+    setErr(null);
+    try {
+      const next: SinglePickAnswer = {
+        question_id: question.question_id,
+        card_id: question.card_id,
+        question_text: question.text,
+        type: "single_pick",
+        picked_id: item.id,
+        picked_signal: item.signal,
+      };
+      await onSave(next);
+    } catch (e) {
+      setErr((e as Error).message);
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col" style={{ gap: 10 }}>
+      {items.map((it) => {
+        const selected = pickedId === it.id;
+        return (
+          <button
+            key={it.id}
+            type="button"
+            onClick={() => setPickedId(it.id)}
+            disabled={saving}
+            style={{
+              textAlign: "left",
+              padding: "10px 12px",
+              border: `1px solid ${selected ? "var(--umber, #8a6f3a)" : "var(--rule, #d4c8a8)"}`,
+              background: selected
+                ? "var(--umber-wash, #f0e6d2)"
+                : "var(--paper, #f7f1e6)",
+              color: "var(--ink, #2b2417)",
+              cursor: saving ? "wait" : "pointer",
+              borderRadius: 4,
+            }}
+          >
+            <span className="font-mono uppercase" style={{ fontSize: 10, color: "var(--ink-mute)" }}>
+              {it.id}
+            </span>
+            <p className="font-serif italic" style={{ margin: "4px 0 0 0", fontSize: 13, lineHeight: 1.5 }}>
+              {it.quote ?? it.label ?? it.id}
+            </p>
+          </button>
+        );
+      })}
+      <div className="flex flex-row" style={{ gap: 8, marginTop: 4 }}>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={!pickedId || saving}
+          className="font-mono uppercase"
+          style={{
+            fontSize: 11,
+            letterSpacing: "0.10em",
+            padding: "5px 14px",
+            border: "1px solid var(--umber, #8a6f3a)",
+            background: "var(--umber, #8a6f3a)",
+            color: "var(--paper, #f7f1e6)",
+            cursor: !pickedId || saving ? "not-allowed" : "pointer",
+            opacity: !pickedId || saving ? 0.5 : 1,
+          }}
+        >
+          {saving ? "Saving…" : "Save"}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={saving}
+          className="font-mono uppercase"
+          style={{
+            fontSize: 11,
+            letterSpacing: "0.10em",
+            padding: "5px 14px",
+            border: "1px solid var(--rule, #d4c8a8)",
+            background: "transparent",
+            color: "var(--ink, #2b2417)",
+            cursor: saving ? "wait" : "pointer",
+          }}
+        >
+          Cancel
+        </button>
+      </div>
+      {err ? (
+        <p
+          className="font-mono"
+          style={{ fontSize: 11, color: "var(--danger, #a83a3a)", margin: 0 }}
+        >
+          ✕ {err}
+        </p>
+      ) : null}
+    </div>
   );
 }
