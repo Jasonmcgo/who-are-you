@@ -33,6 +33,16 @@ import {
   bodyCardFieldsFor,
   bodyGripBlockFor,
 } from "../../lib/bodyCardFieldMap";
+// CC-162 — body-card glyph icons. Same `<img>` pattern the Guide uses
+// in `MapSection.tsx` (CardSvgPlate / Hands plate). SHAPE_CARD_SVG_PATHS
+// keys are ShapeCardId (lens / compass / conviction / gravity / trust /
+// weather / fire / path); Hands uses the PNG sibling.
+import {
+  HANDS_CARD_IMAGE_PATH,
+  SHAPE_CARD_SVG_PATHS,
+} from "../../lib/cardAssets";
+import type { ShapeCardId } from "../../lib/identityEngine";
+import type { BodyCardSource } from "../../lib/bodyCardFieldMap";
 import { renderDriveDistributionDonut } from "../../lib/driveDistributionChart";
 import { renderOceanDashboardSVG } from "../../lib/oceanDashboard";
 import { composeDispositionSummaryLine } from "../../lib/renderMirror";
@@ -608,6 +618,46 @@ function PatternAndGrip({
   );
 }
 
+// CC-162 — body-card glyph rendered above each card's kicker. Mirrors
+// MapSection's CardSvgPlate / Hands plate pattern (centered <img>,
+// alt="" because the kicker below names the card). Hands uses the PNG
+// sibling; the other 7 sources are all valid ShapeCardId keys in
+// SHAPE_CARD_SVG_PATHS. Sized smaller than the Guide's 200px body-map
+// plate — the Individual stacks all 8 cards with prose blocks, so a
+// 120px glyph keeps the layout breathable while staying above the
+// 96px line-work floor noted in `cardAssets.ts`.
+const BODY_CARD_ICON_SIZE_PX = 120;
+
+function BodyCardIcon({ source }: { source: BodyCardSource }) {
+  const src =
+    source === "hands"
+      ? HANDS_CARD_IMAGE_PATH
+      : SHAPE_CARD_SVG_PATHS[source as ShapeCardId];
+  if (!src) return null;
+  return (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "center",
+        margin: "0 0 8px 0",
+      }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt=""
+        width={BODY_CARD_ICON_SIZE_PX}
+        height={BODY_CARD_ICON_SIZE_PX}
+        style={{
+          width: BODY_CARD_ICON_SIZE_PX,
+          height: BODY_CARD_ICON_SIZE_PX,
+          display: "block",
+        }}
+      />
+    </div>
+  );
+}
+
 function BodyCards({
   constitution,
   warmRewrites,
@@ -661,6 +711,7 @@ function BodyCards({
                 padding: "10px 14px",
               }}
             >
+              <BodyCardIcon source={card.source} />
               <p
                 className="font-mono uppercase"
                 style={{
