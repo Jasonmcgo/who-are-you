@@ -66,9 +66,27 @@ import type { AgencyPattern } from "./identityEngine";
 
 // ── Threshold constants (named for visible tuning) ──────────────────────
 
-export const LOVE_REGISTER_TOP1_THRESHOLD = 0.7;
+// CC-143 — register selection thresholds. Pre-CC-143:
+//   top1=0.7 / top2=0.5 / floor=0.4 — collapsed to a single register
+//   the moment top.score > 0.7, with no margin requirement. With the
+//   pre-CC-143 over-broad devoted_partner predicate clearing 0.7-1.0
+//   on near-universal signals, devoted_partner became the SOLE match
+//   for ~48% of cohort fixtures and the top-2 path was effectively
+//   dead (matchedCount=1 across all 25 cohorts in the baseline run).
+//
+// CC-143 calibration:
+//   - TOP1 raised to 0.80 (above the universal-signal floor; only a
+//     genuine convergence clears it)
+//   - MARGIN_FOR_SINGLE: a top.score - second.score gap must clear
+//     this margin before collapsing to a single register; otherwise
+//     emit both as a top-2. Pulls the top-2 path back into use for
+//     genuinely mixed shapes.
+//   - TOP2_FLOOR (the runner-up must also clear) stays at 0.5; FLOOR
+//     (single-best when neither path qualifies) stays at 0.4.
+export const LOVE_REGISTER_TOP1_THRESHOLD = 0.8;
 export const LOVE_REGISTER_TOP2_FLOOR = 0.5;
 export const LOVE_REGISTER_FLOOR = 0.4;
+export const LOVE_REGISTER_MARGIN_FOR_SINGLE = 0.12;
 export const LOVE_FLAVOR_FLOOR = 0.5;
 export const RESOURCE_BALANCE_DELTA_THRESHOLD = 0.25;
 export const RESOURCE_BALANCE_HEALTHY_DELTA_THRESHOLD = 0.20;
@@ -311,29 +329,63 @@ type RegisterPredicate = (inp: LoveMapInputs) => number;
 
 const devotedPartnerPredicate: RegisterPredicate = (inp) => {
   const { signals, lensStack, driveOutput } = inp;
-  const partnerTrust = rankAtMost(signals, "partner_trust_priority", 1) ? 1 : 0;
+  // CC-143 §Task 1 — partner PRIMACY, not partner presence. Pre-CC-143
+  // `partner_trust_priority` at rank 1 scored 0.30 even though nearly
+  // every respondent ranks "a spouse / partner" first in Q-X4. The
+  // sharper signal is partner-trust outranking BOTH friend-trust AND
+  // family-trust — a real pair-bond-first read, not a baseline-human
+  // ranking artifact.
+  const partnerRank = rankOf(signals, "partner_trust_priority");
+  const friendRank = rankOf(signals, "friend_trust_priority");
+  const familyRank = rankOf(signals, "family_trust_priority");
+  const partnerOutranksBoth =
+    partnerRank !== undefined &&
+    (friendRank === undefined || partnerRank < friendRank) &&
+    (familyRank === undefined || partnerRank < familyRank)
+      ? 1
+      : 0;
+  // CC-143 — de-weighted from 0.20 to 0.10. Loyalty OR family in top-3
+  // is near-universal (most respondents have one of these in their
+  // top values list); it shouldn't anchor the register on its own.
   const valueGate =
     rankAtMost(signals, "loyalty_priority", 3) ||
     rankAtMost(signals, "family_priority", 3)
       ? 1
       : 0;
+  // CC-143 — de-weighted from 0.15 to 0.10. Family-spending in top-2
+  // is common even outside pair-bond patterns.
   const familySpending = rankAtMost(signals, "family_spending_priority", 2) ? 1 : 0;
+  // CC-143 — de-weighted from 0.15 to 0.05. Close-relationships in
+  // top-2 Q-Stakes is near-universal; barely a discriminator.
   const closeStakes = rankAtMost(signals, "close_relationships_stakes_priority", 2)
     ? 1
     : 0;
+  // CC-143 — de-weighted from 0.10 to 0.05. PAIR_BONDER_LENSES is
+  // 12-of-16 stacks; lens membership is a weak signal.
   const lensOk = lensInPairs(lensStack, PAIR_BONDER_LENSES) ? 1 : 0;
-  const coverageBoost = isCoverageLeaning(driveOutput) ? 0.2 : 0;
-  // Weighted: partner-trust gate is the strongest single signal (0.30); the
-  // four AND-conjuncts contribute remaining weight; coverage adds a soft boost.
-  return Math.min(
-    1,
-    partnerTrust * 0.3 +
-      valueGate * 0.2 +
-      familySpending * 0.15 +
-      closeStakes * 0.15 +
-      lensOk * 0.1 +
-      coverageBoost
-  );
+  const coverageBoost = isCoverageLeaning(driveOutput) ? 0.1 : 0;
+  // CC-143 §Task 3 — Q-L1 lift. love_presence (durability via
+  // showing-up) and love_quiet_sacrifice (devoted-care fingerprint)
+  // anchor the devoted-partner register at the Q-L1 layer — the most
+  // discriminating love-expression signal the engine collects.
+  // love_protection ALSO contributes (parental-or-partner guardian).
+  const directLift = loveDirectLift(signals, [
+    "love_presence",
+    "love_quiet_sacrifice",
+    "love_protection",
+  ]);
+  // Inferred-from-signals component (sums to 0.40 when ALL fire) +
+  // partner-primacy gate (0.30, only when partner outranks both peers)
+  // + Q-L1 lift up to 0.30 = max 1.0. Pre-CC-143 max was also 1.0 but
+  // distributed across less-discriminating components.
+  const inferred =
+    partnerOutranksBoth * 0.3 +
+    valueGate * 0.1 +
+    familySpending * 0.1 +
+    closeStakes * 0.05 +
+    lensOk * 0.05 +
+    coverageBoost;
+  return Math.min(1, inferred + directLift * 0.3);
 };
 
 const parentalHeartPredicate: RegisterPredicate = (inp) => {
@@ -345,14 +397,21 @@ const parentalHeartPredicate: RegisterPredicate = (inp) => {
     ? 1
     : 0;
   const coverageDrive = isCoverageLeaning(driveOutput) ? 1 : 0;
-  return Math.min(
-    1,
-    family * 0.25 +
-      caringEnergy * 0.2 +
-      familySpending * 0.2 +
-      closeStakes * 0.2 +
-      coverageDrive * 0.15
-  );
+  // CC-143 §Task 3 — Q-L1 lift. love_protection (guarding the people
+  // you love) and love_co_construction (building conditions for their
+  // flourishing) both anchor the parental-heart register at the Q-L1
+  // layer — the most discriminating love-expression evidence.
+  const directLift = loveDirectLift(signals, [
+    "love_protection",
+    "love_co_construction",
+  ]);
+  const inferred =
+    family * 0.2 +
+    caringEnergy * 0.2 +
+    familySpending * 0.15 +
+    closeStakes * 0.15 +
+    coverageDrive * 0.1;
+  return Math.min(1, inferred + directLift * 0.3);
 };
 
 const chosenFamilyPredicate: RegisterPredicate = (inp) => {
@@ -362,14 +421,18 @@ const chosenFamilyPredicate: RegisterPredicate = (inp) => {
   const socialSpending = rankAtMost(signals, "social_spending_priority", 2) ? 1 : 0;
   const loyalty = rankAtMost(signals, "loyalty_priority", 3) ? 1 : 0;
   const lensPreferred = lensInPairs(lensStack, CHOSEN_FAMILY_PREFERRED) ? 1 : 0;
-  return Math.min(
-    1,
-    friendTrust * 0.25 +
-      friendsSpending * 0.2 +
-      socialSpending * 0.2 +
-      loyalty * 0.2 +
-      lensPreferred * 0.15
-  );
+  // CC-143 §Task 3 — Q-L1 lift. love_shared_experience (creating /
+  // sharing moments) is the canonical chosen-family love-expression
+  // marker — chosen-family love is built through shared time +
+  // ritual + the moments lived together.
+  const directLift = loveDirectLift(signals, ["love_shared_experience"]);
+  const inferred =
+    friendTrust * 0.2 +
+    friendsSpending * 0.15 +
+    socialSpending * 0.15 +
+    loyalty * 0.2 +
+    lensPreferred * 0.1;
+  return Math.min(1, inferred + directLift * 0.3);
 };
 
 const companionPredicate: RegisterPredicate = (inp) => {
@@ -400,15 +463,18 @@ const companionPredicate: RegisterPredicate = (inp) => {
     rankAtMost(signals, "truth_priority", 3)
       ? 1
       : 0;
-  return Math.min(
-    1,
-    friendTrust * 0.25 +
-      partnerTrust * 0.2 +
-      caringFit * 0.15 +
-      valueGate * 0.2 +
-      caringEnergyModerate * 0.05 +
-      balanceBonus
-  );
+  // CC-143 §Task 3 — Q-L1 lift. love_presence (showing-up over time)
+  // is the canonical companion register marker — companionship is
+  // steady presence, not active care (which leans parental_heart).
+  const directLift = loveDirectLift(signals, ["love_presence"]);
+  const inferred =
+    friendTrust * 0.2 +
+    partnerTrust * 0.15 +
+    caringFit * 0.1 +
+    valueGate * 0.15 +
+    caringEnergyModerate * 0.05 +
+    balanceBonus;
+  return Math.min(1, inferred + directLift * 0.3);
 };
 
 const belongingHeartPredicate: RegisterPredicate = (inp) => {
@@ -427,13 +493,22 @@ const belongingHeartPredicate: RegisterPredicate = (inp) => {
     : 0;
   const family = rankAtMost(signals, "family_priority", 3) ? 1 : 0;
   const coverageDrive = isCoverageLeaning(driveOutput) ? 1 : 0;
-  return Math.min(
-    1,
-    faithOrReligious * 0.35 +
-      nonprofitsReligiousSpending * 0.25 +
-      family * 0.2 +
-      coverageDrive * 0.2
-  );
+  // CC-143 §Task 3 — Q-L1 lift. love_co_construction (building shared
+  // structure / conditions for flourishing) leans belonging-heart
+  // when paired with faith/religious signals — collective construction
+  // through ritual + practice. love_quiet_sacrifice ALSO leans here
+  // (the unspoken service register that belonging-tradition often
+  // privileges over verbal expression).
+  const directLift = loveDirectLift(signals, [
+    "love_co_construction",
+    "love_quiet_sacrifice",
+  ]);
+  const inferred =
+    faithOrReligious * 0.3 +
+    nonprofitsReligiousSpending * 0.2 +
+    family * 0.15 +
+    coverageDrive * 0.15;
+  return Math.min(1, inferred + directLift * 0.3);
 };
 
 const loyalistPredicate: RegisterPredicate = (inp) => {
@@ -452,13 +527,17 @@ const loyalistPredicate: RegisterPredicate = (inp) => {
   const closeStakes = rankAtMost(signals, "close_relationships_stakes_priority", 3)
     ? 1
     : 0;
-  return Math.min(
-    1,
-    fiDriver * 0.35 +
-      valueGate * 0.25 +
-      convictionFires * 0.25 +
-      closeStakes * 0.15
-  );
+  // CC-143 §Task 3 — Q-L1 lift. love_verbal_expression (naming the
+  // person, saying what they mean to you) is the canonical loyalist
+  // marker — loyalist love expressed through explicit commitment +
+  // articulation, not silent presence.
+  const directLift = loveDirectLift(signals, ["love_verbal_expression"]);
+  const inferred =
+    fiDriver * 0.3 +
+    valueGate * 0.2 +
+    convictionFires * 0.2 +
+    closeStakes * 0.1;
+  return Math.min(1, inferred + directLift * 0.3);
 };
 
 const openHeartPredicate: RegisterPredicate = (inp) => {
@@ -468,14 +547,23 @@ const openHeartPredicate: RegisterPredicate = (inp) => {
   const learningEnergy = rankAtMost(signals, "learning_energy_priority", 2) ? 1 : 0;
   const enjoyingEnergy = rankAtMost(signals, "enjoying_energy_priority", 2) ? 1 : 0;
   const socialSpending = rankAtMost(signals, "social_spending_priority", 2) ? 1 : 0;
-  return Math.min(
-    1,
-    neDriver * 0.3 +
-      freedom * 0.2 +
-      learningEnergy * 0.15 +
-      enjoyingEnergy * 0.15 +
-      socialSpending * 0.2
-  );
+  // CC-143 §Task 3 — Q-L1 lift. love_shared_experience (creating /
+  // sharing moments) anchors open-heart love AND love_problem_solving
+  // ALSO contributes (the curious-builder open-heart sub-pattern that
+  // expresses love through "let me help you figure this out"). Both
+  // pull open-heart-leaning shapes (Ne-driver + freedom + curiosity)
+  // away from the partner-bond default.
+  const directLift = loveDirectLift(signals, [
+    "love_shared_experience",
+    "love_problem_solving",
+  ]);
+  const inferred =
+    neDriver * 0.25 +
+    freedom * 0.15 +
+    learningEnergy * 0.1 +
+    enjoyingEnergy * 0.15 +
+    socialSpending * 0.15;
+  return Math.min(1, inferred + directLift * 0.3);
 };
 
 const REGISTER_PREDICATES: Record<LoveRegisterKey, RegisterPredicate> = {
@@ -827,17 +915,34 @@ export function computeLoveMapOutput(
   const resourceBalance = computeResourceBalance(inputs);
 
   const top = registerScores[0];
+  const second = registerScores[1];
+  // CC-143 — selection rule refined to require a MARGIN over the
+  // runner-up before collapsing to a single register. Pre-CC-143 the
+  // pure top1 > 0.7 check meant: as soon as the top score crossed
+  // 0.7, the runner-up was discarded — even when scores were 0.85
+  // and 0.83. With the post-CC-143 raised top1 (0.80) AND a margin
+  // gate (0.12), genuinely-mixed shapes surface BOTH registers as a
+  // top-2 even when the top is high.
   let matchedRegisters: LoveRegisterMatch[];
-  if (top && top.score > LOVE_REGISTER_TOP1_THRESHOLD) {
+  const margin = top && second ? top.score - second.score : Infinity;
+  if (
+    top &&
+    top.score > LOVE_REGISTER_TOP1_THRESHOLD &&
+    margin >= LOVE_REGISTER_MARGIN_FOR_SINGLE
+  ) {
+    // Top is high AND clearly clears the runner-up — single match.
     matchedRegisters = [top];
   } else if (
     top &&
-    registerScores[1] &&
+    second &&
     top.score > LOVE_REGISTER_TOP2_FLOOR &&
-    registerScores[1].score > LOVE_REGISTER_TOP2_FLOOR
+    second.score > LOVE_REGISTER_TOP2_FLOOR
   ) {
-    matchedRegisters = [top, registerScores[1]];
+    // Top-2 path: both clear the floor, or top is high but margin is
+    // tight — surface both.
+    matchedRegisters = [top, second];
   } else if (top && top.score > LOVE_REGISTER_FLOOR) {
+    // Single-best fallback when the runner-up doesn't qualify.
     matchedRegisters = [top];
   } else {
     matchedRegisters = [];
