@@ -16,7 +16,14 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { questions as allQuestions } from "../../../../../data/questions";
+// CC-148 — use the FULL bank (`allQuestions`), not the filtered presented-flow
+// view (`questions`). The admin review surface intentionally shows every
+// answered question, including legacy retired-from-flow defs (Q-T1–Q-T8) so
+// their saved answers render with the question's items/voices. Pre-fix this
+// page imported the filtered view aliased as `allQuestions`, which (a) hid
+// legacy Q-T from the main list and (b) swept them into the follow-up /
+// clarifier section, where they rendered as raw signal codes.
+import { allQuestions } from "../../../../../data/questions";
 import {
   updateSessionAnswer,
   resetSessionAnswer,
@@ -44,6 +51,46 @@ type LastUpdate = {
   questionId: string;
   at: number;
 };
+
+// CC-148 — Shared voice/quote lookup. Given a question definition and an
+// id-or-signal (the shape stored on saved answers — `picked_id` is the
+// item id; ranking `order` entries are item ids), return the human voice
+// `quote` text when the question defines one, falling back to the item
+// label and finally the raw id. Handles the two question shapes that
+// carry static voice items: `ranking` (legacy Q-T1–Q-T8 + Q-S3/E1 etc.)
+// and `binary_pick` (Q-TB-*). `binary_pick_derived` populates items at
+// render time and so cannot be resolved post-hoc here. For `forced`
+// questions the option array shape (`QuestionOption`) does not currently
+// carry a quote, but the lookup checks defensively so any future quote-
+// bearing option renders correctly.
+function voiceQuoteFor(question: Question, idOrSignal: string): string {
+  const items =
+    question.type === "ranking" || question.type === "binary_pick"
+      ? question.items
+      : undefined;
+  if (items && items.length > 0) {
+    const byId = items.find((i) => i.id === idOrSignal);
+    if (byId) return byId.quote ?? byId.label ?? idOrSignal;
+    const bySignal = items.find((i) => i.signal === idOrSignal);
+    if (bySignal) return bySignal.quote ?? bySignal.label ?? idOrSignal;
+  }
+  if (
+    (question.type === "forced" || question.type === "freeform") &&
+    Array.isArray(question.options)
+  ) {
+    const byLabel = question.options.find((o) => o.label === idOrSignal);
+    if (byLabel) {
+      const q = (byLabel as { quote?: string }).quote;
+      return q ?? byLabel.label;
+    }
+    const bySignal = question.options.find((o) => o.signal === idOrSignal);
+    if (bySignal) {
+      const q = (bySignal as { quote?: string }).quote;
+      return q ?? bySignal.label;
+    }
+  }
+  return idOrSignal;
+}
 
 export default function AnswerReviewPage({
   params,
@@ -646,6 +693,16 @@ function FollowUpAnswerRow({
 }
 
 function FollowUpAnswerValue({ answer }: { answer: Answer }) {
+  // CC-148 — Voice quote lookup is NOT applied here. Two reasons:
+  //   1. Follow-up / clarifier answers (fq*) carry no question definition
+  //      in the canonical bank, so there's nothing to look the quote up
+  //      against. Genuine fq* head-to-heads display "Voice A/B" by
+  //      design; inventing voice prose would be dishonest display.
+  //   2. After T1's import fix, legacy Q-T answers (which DO have quotes
+  //      on their bank definitions) route to the main list + ReadOnlyAnswer
+  //      instead of falling through to this renderer.
+  // Anything reaching this function is either an fq* clarifier (label +
+  // signal is the honest display) or a freeform response.
   if (answer.type === "single_pick") {
     return (
       <p
@@ -828,6 +885,13 @@ function ReadOnlyAnswer({
     );
   }
   if (answer.type === "single_pick") {
+    // CC-148 — Look up the picked item's voice quote on the question
+    // definition. Covers (a) Q-TB-* binary picks whose items carry the
+    // CC-122/CC-135 warm-balanced voice prose, and (b) legacy Q-T
+    // re-asks served as single_pick against a `ranking` question. Falls
+    // back through label → raw id so quote-less options still render.
+    const display = voiceQuoteFor(question, answer.picked_id);
+    const showRawCode = display === answer.picked_id;
     return (
       <p
         className="font-serif"
@@ -835,9 +899,29 @@ function ReadOnlyAnswer({
           fontSize: 13.5,
           color: "var(--ink, #2b2417)",
           margin: 0,
+          lineHeight: 1.5,
         }}
       >
-        Picked: <span className="font-mono">{answer.picked_id}</span>
+        Picked:{" "}
+        {showRawCode ? (
+          <span className="font-mono">{answer.picked_id}</span>
+        ) : (
+          <span style={{ fontStyle: "italic" }}>{display}</span>
+        )}
+        <span
+          className="font-mono"
+          style={{
+            marginLeft: 8,
+            color: "var(--ink-mute)",
+            fontSize: 11,
+          }}
+        >
+          (id: {answer.picked_id}
+          {answer.picked_signal && answer.picked_signal !== answer.picked_id
+            ? ` · signal: ${answer.picked_signal}`
+            : ""}
+          )
+        </span>
       </p>
     );
   }

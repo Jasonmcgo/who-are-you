@@ -61,37 +61,57 @@ export default function SinglepickAnswerEditor({
           gap: 4,
         }}
       >
-        {question.options.map((opt: QuestionOption, idx: number) => (
-          <label
-            key={`${opt.label}-${idx}`}
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              gap: 8,
-              padding: "6px 8px",
-              border: "1px solid var(--rule, #d4c8a8)",
-              background:
-                picked === opt.label
-                  ? "var(--rule-soft, #e8dec8)"
-                  : "var(--paper, #f7f1e6)",
-              cursor: "pointer",
-              fontSize: 13,
-              lineHeight: 1.4,
-            }}
-          >
-            <input
-              type="radio"
-              name={question.question_id}
-              checked={picked === opt.label}
-              onChange={() => setPicked(opt.label)}
-              disabled={saving}
-              style={{ marginTop: 3 }}
-            />
-            <span className="font-serif" style={{ flex: 1 }}>
-              {opt.label}
-            </span>
-          </label>
-        ))}
+        {question.options.map((opt: QuestionOption, idx: number) => {
+          // CC-148 — Display the voice quote when one is present, falling
+          // back to the label. The stored value remains the label (still
+          // what the radio sets + saves) — this only changes what the
+          // admin sees in the choice list.
+          const quote = (opt as { quote?: string }).quote;
+          const display = quote && quote.length > 0 ? quote : opt.label;
+          return (
+            <label
+              key={`${opt.label}-${idx}`}
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 8,
+                padding: "6px 8px",
+                border: "1px solid var(--rule, #d4c8a8)",
+                background:
+                  picked === opt.label
+                    ? "var(--rule-soft, #e8dec8)"
+                    : "var(--paper, #f7f1e6)",
+                cursor: "pointer",
+                fontSize: 13,
+                lineHeight: 1.4,
+              }}
+            >
+              <input
+                type="radio"
+                name={question.question_id}
+                checked={picked === opt.label}
+                onChange={() => setPicked(opt.label)}
+                disabled={saving}
+                style={{ marginTop: 3 }}
+              />
+              <span className="font-serif" style={{ flex: 1 }}>
+                {display}
+                {quote && quote.length > 0 ? (
+                  <span
+                    className="font-mono"
+                    style={{
+                      marginLeft: 8,
+                      color: "var(--ink-mute)",
+                      fontSize: 10,
+                    }}
+                  >
+                    ({opt.label})
+                  </span>
+                ) : null}
+              </span>
+            </label>
+          );
+        })}
       </div>
       <div style={{ display: "flex", gap: 8 }}>
         <button
