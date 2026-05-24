@@ -34,14 +34,22 @@ export async function PATCH(
     );
   }
 
-  let body: { label?: unknown; notes?: unknown };
+  let body: {
+    label?: unknown;
+    notes?: unknown;
+    shared_with_individual?: unknown;
+  };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const updates: { label?: string | null; notes?: string | null } = {};
+  const updates: {
+    label?: string | null;
+    notes?: string | null;
+    shared_with_individual?: boolean;
+  } = {};
   if (body.label !== undefined) {
     if (body.label === null) {
       updates.label = null;
@@ -62,9 +70,21 @@ export async function PATCH(
       return NextResponse.json({ error: "notes must be a string or null" }, { status: 400 });
     }
   }
+  // CC-165 — toggle the share-with-individual flag. Accept-and-set only
+  // when an explicit boolean is provided; anything else is a 400 so
+  // accidental string "true" / "false" payloads don't silently no-op.
+  if (body.shared_with_individual !== undefined) {
+    if (typeof body.shared_with_individual !== "boolean") {
+      return NextResponse.json(
+        { error: "shared_with_individual must be a boolean" },
+        { status: 400 }
+      );
+    }
+    updates.shared_with_individual = body.shared_with_individual;
+  }
   if (Object.keys(updates).length === 0) {
     return NextResponse.json(
-      { error: "Provide at least one of: label, notes" },
+      { error: "Provide at least one of: label, notes, shared_with_individual" },
       { status: 400 }
     );
   }
@@ -93,6 +113,7 @@ export async function PATCH(
     storage_path: row.storage_path,
     label: row.label,
     notes: row.notes,
+    shared_with_individual: row.shared_with_individual,
   };
   return NextResponse.json(result);
 }

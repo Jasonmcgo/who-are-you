@@ -66,10 +66,20 @@ export interface CoupleGameOption {
 
 export interface CoupleGameItemSpec {
   itemId: string;
-  // Second-person prompt — rendered as either "When you are under pressure…"
-  // (self answer) or "When your partner is under pressure…" (guess) by the
-  // CC-COUPLE-3 UI layer.
+  // Self-answer form — first-person ("When you are under pressure…"). Used by
+  // the symmetric self-pass (Phase 3). NOT the string rendered to the
+  // guessing partner; see `promptAboutPartner` below.
   prompt: string;
+  // CC-COUPLE-6 — guess-about-subject template. Authored with explicit
+  // role tokens so subject vs guesser references never collide:
+  //   {S}      → subject first name (or "your partner" when no name on file)
+  //   {S_pron} → she / he / they
+  //   {S_poss} → her / his / their
+  //   {S_refl} → herself / himself / themselves
+  // Guesser refs are literal "you" / "your" — never substituted.
+  // The server (`/api/couple/[token]/route.ts`) resolves these into the
+  // final string before shipping to the client; the client only renders.
+  promptAboutPartner: string;
   options: CoupleGameOption[];
   // Engine signal this whole item maps to. Load-bearing for CC-COUPLE-5
   // calibration: disagreements on items tagged to a fragile signal are

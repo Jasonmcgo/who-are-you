@@ -64,6 +64,20 @@
       "when": 1779591441011,
       "tag": "0008_whole_nick_fury",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1779654824710,
+      "tag": "0009_rare_azazel",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1779659804232,
+      "tag": "0010_legal_mesmero",
+      "breakpoints": true
     }
   ]
 }

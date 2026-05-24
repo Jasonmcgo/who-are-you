@@ -106,6 +106,7 @@ export async function GET(
     storage_path: a.storage_path,
     label: a.label,
     notes: a.notes,
+    shared_with_individual: a.shared_with_individual,
   }));
 
   const detail: SessionDetail = {

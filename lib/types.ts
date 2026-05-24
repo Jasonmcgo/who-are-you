@@ -1463,6 +1463,9 @@ export type Attachment = {
   storage_path: string;
   label: string | null;
   notes: string | null;
+  // CC-165 — admin-flipped flag exposing this file on the individual's
+  // /report/[sessionId] permalink. Defaults false (admin-only).
+  shared_with_individual: boolean;
 };
 
 // One row in the sessions table view. Pre-computed columns (dominant

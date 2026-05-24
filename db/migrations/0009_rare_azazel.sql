@@ -1,0 +1,1 @@
+ALTER TABLE "attachments" ADD COLUMN "shared_with_individual" boolean DEFAULT false NOT NULL;

@@ -34,6 +34,11 @@ import CopyReportLinkButton from "./CopyReportLinkButton";
 // CC-155 — client component sibling: Delete-session control (hard
 // delete; FK cascades clean child rows).
 import DeleteSessionButton from "./DeleteSessionButton";
+// CC-COUPLE-7 — client component sibling: Create-couple-game form
+// (mints a two-sided bond from two assessed sessions).
+import CreateCoupleGameForm, {
+  type RosterEntry,
+} from "./CreateCoupleGameForm";
 
 const ALLOCATION_TENSION_IDS = new Set(["T-013", "T-014", "T-015"]);
 
@@ -413,6 +418,17 @@ export default async function SessionsPage({
   const professionField = DEMOGRAPHIC_FIELDS.find((f) => f.field_id === "profession");
   const professionOptions = professionField?.options ?? [];
 
+  // CC-COUPLE-7 — flatten summaries into the roster shape the bond form
+  // expects. Only id + display name are exposed — the bond form doesn't
+  // need anything else from the summary row.
+  const coupleRoster: RosterEntry[] = summaries.map((s) => ({
+    id: s.id,
+    name:
+      s.name_state === "specified" && s.name_value && s.name_value.trim().length > 0
+        ? s.name_value.trim().split(/\s+/)[0]
+        : null,
+  }));
+
   return (
     <main
       className="min-h-screen"
@@ -466,7 +482,13 @@ export default async function SessionsPage({
             </p>
           ) : null}
         </div>
-        <div className="flex flex-row" style={{ gap: 10, alignItems: "center" }}>
+        <div
+          className="flex flex-row"
+          style={{ gap: 10, alignItems: "flex-start", flexWrap: "wrap" }}
+        >
+          {/* CC-COUPLE-7 — admin Create-couple-game entry. Collapsed
+              button until clicked, then expands inline. */}
+          <CreateCoupleGameForm roster={coupleRoster} />
           {/* CC-153 — entry into the admin import surface. Adjacent to
               Logout in the header so it's discoverable without
               scrolling the roster. The link target itself is

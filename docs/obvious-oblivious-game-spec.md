@@ -115,3 +115,25 @@ Mode 1 needs only A assessed (B just guesses). Mode 2 is a *comparison*, so it n
 ## Funnel / growth loop (the strategic point)
 
 Mode 1 is the **low-barrier viral entry** (one assessed, partner guesses) — and it naturally pulls the guessing partner to take the assessment themselves. Once both are assessed, **Mode 2 unlocks** (play together). So: **Mode 1 invite → B assesses → Mode 2** — the two modes are a growth loop, not competitors. Build Mode 1's scoring/reveal first (closest to the existing MVP); Mode 2 is the both-assessed layer after.
+
+---
+
+# Score history over time (parked idea — owner, 2026-05-24)
+
+## Where scoring stands today
+
+The game already keeps score per play: the reveal computes a warm total (`totalPoints`/`maxPoints` + clean/close/adjacent/off + "how clearly you read them"), persisted to `couple_sessions.game_results`. Limit: **one score per bond** — play is idempotent (a completed token returns the saved reveal, never re-scores). No history, no trend. A screenshot is the only way to keep a result. That's fine for now.
+
+## The idea
+
+Track score *over time* so a couple sees themselves getting to know each other better — a climbing trend as encouragement. Owner's instinct: this could contribute positively to trajectory movement.
+
+## Two mechanisms (keep them separate — very different builds)
+
+1. **Indirect (recommended near-term).** The individual trajectory (Goal/Soul/Grip/Movement) is computed purely from that person's own assessment answers — the couple game feeds nothing into it today. What actually moves the chart is real change (less defensiveness, more generous reading) followed by **re-taking the assessment**, which the trajectory chart's feedback loop then renders as a delta. A score *history* is the between-assessments motivator that nudges toward re-assessment. Loosely coupled, low-risk, on-thesis (lower Grip → more Movement).
+
+2. **Direct (defer; needs a canon decision).** Explicitly wire game-score trend as an input into the individual trajectory. Powerful, but makes the instrument partly *behavioral* rather than purely self-report — a deliberate decision about whether relational logging should move someone's personal shape. Hold for a proper design conversation.
+
+## Sketch (when picked up — ~CC-COUPLE-9, after bond CC-COUPLE-7 + Mode 2 CC-COUPLE-8)
+
+Replayable bonds + a small per-bond results log (append each play instead of one-shot overwrite) → a "you've played N times, here's the climb" view. Keep the trajectory engine assessment-driven; the score history stands on its own and points back toward re-assessment.

@@ -19,6 +19,10 @@ export interface CoupleSessionRow {
   invite_token: string;
   partner_a_session_id: string;
   partner_b_session_id: string | null;
+  // CC-COUPLE-7 — bond display names. Null on legacy one-sided rows
+  // and on rows where the sender left a name blank.
+  partner_a_name: string | null;
+  partner_b_name: string | null;
   status: CoupleSessionStatus;
   game_results: CoupleGameResults | null;
   created_at: Date;
@@ -33,6 +37,8 @@ function castRow(
     invite_token: raw.invite_token,
     partner_a_session_id: raw.partner_a_session_id,
     partner_b_session_id: raw.partner_b_session_id,
+    partner_a_name: raw.partner_a_name,
+    partner_b_name: raw.partner_b_name,
     status: raw.status as CoupleSessionStatus,
     game_results: raw.game_results as CoupleGameResults | null,
     created_at: raw.created_at,

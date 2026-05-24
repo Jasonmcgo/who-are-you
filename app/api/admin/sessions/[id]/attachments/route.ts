@@ -125,6 +125,12 @@ export async function POST(
     typeof notesRaw === "string" && notesRaw.trim().length > 0
       ? notesRaw.trim()
       : null;
+  // CC-165 — admin/guide opt-in flag for individual-side download. Accept
+  // common truthy form serializations ("true" from explicit append,
+  // "on" from a default checkbox, "1" for lazy callers). Default false.
+  const sharedRaw = formData.get("shared_with_individual");
+  const shared_with_individual =
+    sharedRaw === "true" || sharedRaw === "on" || sharedRaw === "1";
 
   const attachmentId = randomUUID();
   const buffer = Buffer.from(await file.arrayBuffer());
@@ -165,6 +171,7 @@ export async function POST(
       storage_path: storagePath,
       label,
       notes,
+      shared_with_individual,
     })
     .returning();
   const row = inserted[0];
@@ -179,6 +186,7 @@ export async function POST(
     storage_path: row.storage_path,
     label: row.label,
     notes: row.notes,
+    shared_with_individual: row.shared_with_individual,
   };
   return NextResponse.json(result, { status: 201 });
 }

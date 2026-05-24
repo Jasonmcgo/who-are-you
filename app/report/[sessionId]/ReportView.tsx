@@ -27,6 +27,7 @@ import type {
   InnerConstitution,
   TensionStatus,
 } from "../../../lib/types";
+import type { SharedAttachmentSummary } from "./page";
 
 type Confirmation = {
   status: TensionStatus;
@@ -39,6 +40,9 @@ type Props = {
   answers: Answer[];
   demographics: DemographicSet | null;
   sessionDate: Date | null;
+  // CC-165 — files the admin/guide flipped "Share with individual" on.
+  // Empty list when nothing is shared (the section then doesn't render).
+  sharedAttachments?: SharedAttachmentSummary[];
 };
 
 export default function ReportView({
@@ -47,6 +51,7 @@ export default function ReportView({
   answers,
   demographics,
   sessionDate,
+  sharedAttachments,
 }: Props) {
   const [confirmations, setConfirmations] = useState<Record<string, Confirmation>>({});
   const [explainOpen, setExplainOpen] = useState<Record<string, boolean>>({});
@@ -74,9 +79,144 @@ export default function ReportView({
         answers={answers}
         sessionId={sessionId}
       />
+      <SharedFilesSection
+        sessionId={sessionId}
+        attachments={sharedAttachments ?? []}
+      />
       <CoupleInviteCTA sessionId={sessionId} />
     </>
   );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// CC-165 — "Files shared with you" section. Renders ONLY when the
+// admin/guide has flipped one or more attachments to shared; otherwise
+// returns null so a fully un-shared session looks unchanged.
+//
+// Surface is intentionally minimal: filename, size, optional label,
+// and a Download link pointing at the public-route. No notes, no
+// storage_path, no share flag — all admin-only fields stay admin-only.
+// ─────────────────────────────────────────────────────────────────────
+
+function SharedFilesSection({
+  sessionId,
+  attachments,
+}: {
+  sessionId: string;
+  attachments: SharedAttachmentSummary[];
+}) {
+  if (attachments.length === 0) return null;
+  return (
+    <aside
+      className="flex flex-col"
+      style={{
+        maxWidth: 720,
+        margin: "32px auto 0",
+        padding: "20px 18px",
+        gap: 12,
+        background: "var(--paper-warm)",
+        border: "1px solid var(--rule-soft)",
+        borderRadius: 8,
+      }}
+    >
+      <p
+        className="font-mono uppercase"
+        style={{
+          fontSize: 11,
+          letterSpacing: "0.16em",
+          color: "var(--ink-mute)",
+          margin: 0,
+        }}
+      >
+        Files shared with you
+      </p>
+      <p
+        className="font-serif italic"
+        style={{
+          fontSize: 13,
+          color: "var(--ink-soft)",
+          margin: 0,
+          lineHeight: 1.55,
+        }}
+      >
+        Documents your guide shared. Click to download.
+      </p>
+      <ul
+        className="flex flex-col"
+        style={{
+          listStyle: "none",
+          padding: 0,
+          margin: 0,
+          gap: 8,
+        }}
+      >
+        {attachments.map((att) => (
+          <li
+            key={att.id}
+            className="flex flex-col"
+            style={{
+              gap: 4,
+              padding: "10px 12px",
+              background: "var(--paper)",
+              border: "1px solid var(--rule)",
+              borderRadius: 6,
+            }}
+          >
+            <div
+              className="flex flex-row items-baseline"
+              style={{ gap: 8, flexWrap: "wrap" }}
+            >
+              <a
+                href={`/api/report/${sessionId}/attachments/${att.id}/download`}
+                download={att.filename}
+                data-focus-ring
+                className="font-serif"
+                style={{
+                  fontSize: 14,
+                  color: "var(--umber)",
+                  textDecoration: "underline",
+                  wordBreak: "break-all",
+                }}
+              >
+                {att.filename}
+              </a>
+              {att.label ? (
+                <span
+                  className="font-mono uppercase"
+                  style={{
+                    fontSize: 10,
+                    letterSpacing: "0.08em",
+                    padding: "2px 8px",
+                    background: "var(--umber-wash)",
+                    color: "var(--umber)",
+                    borderRadius: 999,
+                  }}
+                >
+                  {att.label}
+                </span>
+              ) : null}
+            </div>
+            <p
+              className="font-mono"
+              style={{
+                fontSize: 11,
+                color: "var(--ink-mute)",
+                margin: 0,
+              }}
+            >
+              {formatSize(att.size_bytes)}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </aside>
+  );
+}
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 // ─────────────────────────────────────────────────────────────────────

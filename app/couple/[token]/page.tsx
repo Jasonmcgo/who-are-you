@@ -28,9 +28,18 @@ interface ItemPayload {
   options: { id: string; label: string }[];
 }
 
+interface BondInfo {
+  hasPartnerB: boolean;
+}
+
 interface IntroPayload {
   status: "invited" | "b_joined";
+  /** CC-COUPLE-7 — alias of `partnerAName`, kept for back-compat. */
   personName: string;
+  partnerAName: string;
+  /** CC-COUPLE-7 — guesser display name (null on legacy one-sided invites). */
+  partnerBName: string | null;
+  bond: BondInfo;
   items: ItemPayload[];
 }
 
@@ -64,6 +73,9 @@ interface WarmTotalPayload {
 interface RevealPayload {
   status: "completed";
   personName: string;
+  partnerAName: string;
+  partnerBName: string | null;
+  bond: BondInfo;
   warmTotal: WarmTotalPayload;
   items: ResolvedItem[];
 }
@@ -307,9 +319,12 @@ function RankForm({
             lineHeight: 1.25,
           }}
         >
-          {data.personName === "your partner"
-            ? "Your partner already knows this about you. You may or may not."
-            : `${data.personName} already knows this about you. You may or may not.`}
+          {/* CC-COUPLE-7 — address B by name when the bond carries one. */}
+          {data.partnerBName
+            ? `How well do you know ${data.partnerAName === "your partner" ? "your partner" : data.partnerAName}, ${data.partnerBName}?`
+            : data.partnerAName === "your partner"
+            ? "How well do you know your partner?"
+            : `How well do you know ${data.partnerAName}?`}
         </h1>
         <p
           className="font-serif italic"
@@ -331,7 +346,6 @@ function RankForm({
           <RankBlock
             key={item.itemId}
             item={item}
-            personName={data.personName}
             order={rankings[item.itemId]}
             onChange={(order) =>
               setRankings((prev) => ({ ...prev, [item.itemId]: order }))
@@ -392,30 +406,17 @@ function RankForm({
 
 function RankBlock({
   item,
-  personName,
   order,
   onChange,
 }: {
   item: ItemPayload;
-  personName: string;
   order: string[] | undefined;
   onChange: (order: string[]) => void;
 }) {
-  // Rephrase the item prompt from first-person ("you") to guess-about-A
-  // ("{name}"). Mirrors the CC-COUPLE-3 substitution chain.
-  const subject = personName === "your partner" ? "they" : personName;
-  const possessive = personName === "your partner" ? "their" : `${personName}'s`;
-  const asGuessPrompt = item.prompt
-    .replace(/\byou are\b/gi, `${subject} is`)
-    .replace(/\byou usually become\b/gi, `${subject} usually becomes`)
-    .replace(/\byou say you are helping\b/gi, `${subject} says they are helping`)
-    .replace(/\byou most need\b/gi, `${subject} most needs`)
-    .replace(/\byou most want\b/gi, `${subject} most wants`)
-    .replace(/\byou are at your best\b/gi, `${subject} is at their best`)
-    .replace(/\byour fear takes over\b/gi, `${subject}'s fear takes over`)
-    .replace(/\byou give your partner\b/gi, `${subject} gives you`)
-    .replace(/\byou\b/gi, subject)
-    .replace(/\byour\b/gi, possessive);
+  // CC-COUPLE-6 — `item.prompt` arrives fully resolved from the server
+  // (template substitution of subject name + pronouns happens in
+  // `/api/couple/[token]/route.ts`). No client-side regex chain — that
+  // approach mangled prompts with mixed subject/guesser refs.
 
   // Map our flat option shape onto RankingItem.
   const items: RankingItem[] = item.options.map((o) => ({
@@ -458,7 +459,7 @@ function RankBlock({
           lineHeight: 1.4,
         }}
       >
-        {asGuessPrompt}
+        {item.prompt}
       </h2>
       <p
         className="font-mono uppercase"
@@ -502,7 +503,12 @@ const TIER_BLURB: Record<RankedRevealTier, string> = {
 };
 
 function RevealScreen({ data }: { data: RevealPayload }) {
-  const { warmTotal, items, personName } = data;
+  const { warmTotal, items, personName, partnerAName, partnerBName, bond } =
+    data;
+  // CC-COUPLE-7 — prefer the bond-resolved partnerAName; the legacy
+  // `personName` alias matches it but keeps any downstream consumer of
+  // the older field happy.
+  const aName = partnerAName || personName;
   return (
     <>
       <header className="flex flex-col" style={{ gap: 10 }}>
@@ -527,12 +533,16 @@ function RevealScreen({ data }: { data: RevealPayload }) {
             lineHeight: 1.25,
           }}
         >
-          How clearly you read{" "}
-          {personName === "your partner" ? "your partner" : personName}
+          {/* CC-COUPLE-7 — when the bond carries B's name, address it
+              warmly ("How clearly Brad read Michele"); otherwise keep
+              the original second-person phrasing. */}
+          {partnerBName
+            ? `How clearly ${partnerBName} read ${aName === "your partner" ? "your partner" : aName}`
+            : `How clearly you read ${aName === "your partner" ? "your partner" : aName}`}
         </h1>
       </header>
 
-      <WarmTotalCard warmTotal={warmTotal} personName={personName} />
+      <WarmTotalCard warmTotal={warmTotal} personName={aName} />
 
       <section className="flex flex-col" style={{ gap: 16 }}>
         {items.map((it) => (
@@ -540,9 +550,110 @@ function RevealScreen({ data }: { data: RevealPayload }) {
         ))}
       </section>
 
+      {/* CC-COUPLE-7 — Mode 2 seam. Renders only when the bond ties two
+          real sessions (both assessed); the actual comparative game is
+          CC-COUPLE-8. Disabled until that lands. */}
+      {bond.hasPartnerB ? <Mode2Seam aName={aName} bName={partnerBName} /> : null}
+
       <PartnerTrajectoryNudge />
     </>
   );
+}
+
+// CC-COUPLE-7 — Visible-but-disabled entry point for Mode 2.
+function Mode2Seam({
+  aName,
+  bName,
+}: {
+  aName: string;
+  bName: string | null;
+}) {
+  const aLabel = aName === "your partner" ? "your partner" : aName;
+  const bLabel = bName ?? "you";
+  return (
+    <div
+      className="flex flex-col"
+      style={{
+        gap: 8,
+        padding: "16px 18px",
+        borderRadius: 8,
+        background: "var(--paper)",
+        border: "1px dashed var(--rule)",
+        marginTop: 12,
+      }}
+      aria-disabled="true"
+    >
+      <p
+        className="font-mono uppercase"
+        style={{
+          fontSize: 10,
+          letterSpacing: "0.14em",
+          color: "var(--ink-mute)",
+          margin: 0,
+        }}
+      >
+        Coming soon
+      </p>
+      <p
+        className="font-serif"
+        style={{
+          fontSize: 15,
+          color: "var(--ink)",
+          margin: 0,
+          lineHeight: 1.4,
+        }}
+      >
+        Compare the two of you →
+      </p>
+      <p
+        className="font-serif italic"
+        style={{
+          fontSize: 13,
+          color: "var(--ink-soft)",
+          margin: 0,
+          lineHeight: 1.5,
+        }}
+      >
+        Who&apos;s more likely to{" "}
+        {bLabel === "you" ? `… you or ${aLabel}` : `… ${bLabel} or ${aLabel}`}?
+        A different game, both of you assessed.
+      </p>
+    </div>
+  );
+}
+
+// CC-COUPLE-6.2 — score-tier "brand" by total points (owner legend,
+// 2026-05-24). Decade bands + a perfect-sweep easter egg at 40/40.
+// NOTE: thresholds assume a full 40-pt round (8 items × 5). If the round
+// selector ever ships materially shorter rounds, switch to maxPoints-relative
+// banding so a short round can't cap out as "stranger" (and so a clean sweep
+// of a short round can still hit the top tier).
+interface RevealBrand {
+  label: string;
+  copy: string;
+}
+function revealBrand(points: number): RevealBrand {
+  if (points >= 40)
+    return { label: "You formed them with your hands", copy: "" };
+  if (points >= 30)
+    return {
+      label: "Unofficial Biographer",
+      copy: "You may know them better than they know themselves. Use this power gently.",
+    };
+  if (points >= 20)
+    return {
+      label: "Dedicated Partner",
+      copy: "You know the patterns, the tells, and the emotional weather.",
+    };
+  if (points >= 10)
+    return {
+      label: "It's Obvious You Know Them",
+      copy: "You're paying attention. The evidence is encouraging.",
+    };
+  return {
+    label: "Oblivious Stranger",
+    copy: "You may have met them once. Possibly near a cheese tray.",
+  };
 }
 
 function WarmTotalCard({
@@ -553,25 +664,27 @@ function WarmTotalCard({
   personName: string;
 }) {
   const name = personName === "your partner" ? "your partner" : personName;
-  const headline =
-    warmTotal.clearlyOf === 0
-      ? `No strong reads to score on this round.`
-      : `You read ${name} clearly on ${warmTotal.clearlyRead} of ${warmTotal.clearlyOf}.`;
+  const noScore = warmTotal.maxPoints === 0 || warmTotal.clearlyOf === 0;
+  const headline = noScore
+    ? `No strong reads to score on this round.`
+    : `You read ${name} clearly on ${warmTotal.clearlyRead} of ${warmTotal.clearlyOf}.`;
   const secondLine =
     `${warmTotal.clean} read clean · ${warmTotal.close} close · ` +
     `${warmTotal.adjacent} adjacent · ${warmTotal.off} confidently off` +
     (warmTotal.unscored > 0
       ? ` · ${warmTotal.unscored} skipped (no strong read)`
       : "");
+  const brand = revealBrand(warmTotal.totalPoints);
   return (
     <section
-      className="flex flex-col"
+      className="flex flex-col items-center"
       style={{
-        gap: 6,
-        padding: "16px 18px",
+        gap: 4,
+        padding: "24px 18px",
         borderRadius: 8,
         background: "var(--paper-warm)",
         border: "1px solid var(--rule-soft)",
+        textAlign: "center",
       }}
     >
       <p
@@ -585,38 +698,80 @@ function WarmTotalCard({
       >
         How it landed
       </p>
+      {!noScore ? (
+        <>
+          <div
+            className="flex items-baseline justify-center"
+            style={{ gap: 8, marginTop: 6 }}
+          >
+            <span
+              className="font-serif"
+              style={{
+                fontSize: 92,
+                fontWeight: 600,
+                lineHeight: 1,
+                color: "var(--umber)",
+              }}
+            >
+              {warmTotal.totalPoints}
+            </span>
+            <span
+              className="font-mono"
+              style={{ fontSize: 16, color: "var(--ink-mute)" }}
+            >
+              / {warmTotal.maxPoints} pts
+            </span>
+          </div>
+          <p
+            className="font-serif"
+            style={{
+              fontSize: 26,
+              fontWeight: 500,
+              color: "var(--ink)",
+              margin: "8px 0 0",
+              lineHeight: 1.2,
+            }}
+          >
+            {brand.label}
+          </p>
+          {brand.copy ? (
+            <p
+              className="font-serif italic"
+              style={{
+                fontSize: 15,
+                color: "var(--ink-soft)",
+                margin: "4px 0 0",
+                lineHeight: 1.45,
+                maxWidth: 380,
+              }}
+            >
+              {brand.copy}
+            </p>
+          ) : null}
+        </>
+      ) : null}
       <p
-        className="font-serif"
+        className="font-serif italic"
         style={{
-          fontSize: 22,
-          color: "var(--ink)",
-          margin: 0,
-          lineHeight: 1.25,
+          fontSize: 14,
+          color: "var(--ink-soft)",
+          margin: noScore ? "4px 0 0" : "10px 0 0",
+          lineHeight: 1.45,
         }}
       >
         {headline}
       </p>
-      <p
-        className="font-serif italic"
-        style={{
-          fontSize: 13,
-          color: "var(--ink-soft)",
-          margin: 0,
-          lineHeight: 1.5,
-        }}
-      >
-        {secondLine}
-      </p>
-      {warmTotal.maxPoints > 0 ? (
+      {!noScore ? (
         <p
-          className="font-mono"
+          className="font-serif italic"
           style={{
-            fontSize: 11,
-            color: "var(--ink-mute)",
+            fontSize: 13,
+            color: "var(--ink-soft)",
             margin: 0,
+            lineHeight: 1.5,
           }}
         >
-          {warmTotal.totalPoints} / {warmTotal.maxPoints} pts
+          {secondLine}
         </p>
       ) : null}
     </section>

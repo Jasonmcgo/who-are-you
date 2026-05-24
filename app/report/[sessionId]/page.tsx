@@ -16,10 +16,14 @@
 // silently when the fetch resolves.
 
 import Link from "next/link";
-import { eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 
 import { getDb } from "../../../db";
-import { sessions as sessionsTable, demographics as demographicsTable } from "../../../db/schema";
+import {
+  sessions as sessionsTable,
+  demographics as demographicsTable,
+  attachments as attachmentsTable,
+} from "../../../db/schema";
 import type {
   Answer,
   DemographicAnswer,
@@ -107,6 +111,19 @@ function rowToDemographicSet(row: DemographicsRow | null): DemographicSet | null
   return { answers };
 }
 
+// CC-165 — minimal projection of attachment metadata for the public
+// report surface. `storage_path` is intentionally absent: the page never
+// needs the disk path, and exposing it would leak the on-disk layout.
+// `notes` and the share flag itself are also withheld — those are
+// admin-only surfaces.
+export type SharedAttachmentSummary = {
+  id: string;
+  filename: string;
+  mime_type: string;
+  size_bytes: number;
+  label: string | null;
+};
+
 type FetchedSession = {
   sessionId: string;
   constitution: InnerConstitution;
@@ -117,6 +134,9 @@ type FetchedSession = {
   // CC-STALE-SHAPE-DETECTOR — populated when the detector falls into
   // the re-derivable branch. NULL in the fresh branch.
   staleShapeBranch: "fresh" | "re-derivable";
+  // CC-165 — files the admin/guide flipped "Share with individual"
+  // on. Empty list when no shared attachments exist.
+  sharedAttachments: SharedAttachmentSummary[];
 };
 
 // CC-STALE-SHAPE-DETECTOR — branch-3 verdict surfaced to the page.
@@ -197,6 +217,35 @@ async function fetchSession(
     } else {
       return { kind: "un-rerenderable", reason: verdict.reason };
     }
+    // CC-165 — fetch attachments flagged shared-with-individual. SQL
+    // gate is the only thing keeping non-shared rows off this surface,
+    // so the WHERE must include `shared_with_individual = true`.
+    // Projected to the minimum the page needs — never select
+    // storage_path / notes / the share flag itself.
+    let sharedAttachments: SharedAttachmentSummary[] = [];
+    try {
+      const rows = await db
+        .select({
+          id: attachmentsTable.id,
+          filename: attachmentsTable.filename,
+          mime_type: attachmentsTable.mime_type,
+          size_bytes: attachmentsTable.size_bytes,
+          label: attachmentsTable.label,
+        })
+        .from(attachmentsTable)
+        .where(
+          and(
+            eq(attachmentsTable.session_id, sessionId),
+            eq(attachmentsTable.shared_with_individual, true)
+          )
+        )
+        .orderBy(asc(attachmentsTable.uploaded_at));
+      sharedAttachments = rows;
+    } catch {
+      // Soft-fail: a query error on the attachments table must not block
+      // the report from rendering. Treat as "no shared files."
+      sharedAttachments = [];
+    }
     return {
       sessionId,
       constitution,
@@ -205,6 +254,7 @@ async function fetchSession(
       metaSignals: (row.meta_signals ?? []) as MetaSignal[],
       createdAt: row.created_at,
       staleShapeBranch: branch,
+      sharedAttachments,
     };
   } catch {
     // Query failed (DB unreachable, malformed JSONB). Treat as not-
@@ -369,6 +419,7 @@ export default async function ReportPermalinkPage({
       answers={session.answers}
       demographics={session.demographics}
       sessionDate={session.createdAt}
+      sharedAttachments={session.sharedAttachments}
     />
   );
 }

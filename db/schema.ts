@@ -15,6 +15,7 @@ import {
   jsonb,
   pgEnum,
   integer,
+  boolean,
 } from "drizzle-orm/pg-core";
 
 // 3-state enum capturing the user's relationship to each demographic field.
@@ -249,6 +250,14 @@ export const coupleSessions = pgTable("couple_sessions", {
     () => sessions.id,
     { onDelete: "set null" }
   ),
+  // CC-COUPLE-7 — bond display names, set by the sender at bond
+  // creation (prefilled from each profile's demographics, editable).
+  // Stored on the bond so prompts/reveals read right even when the
+  // underlying profile left the name blank. Both nullable: legacy
+  // one-sided invited rows have neither, a one-sided invited row
+  // created with just A's name still works.
+  partner_a_name: text("partner_a_name"),
+  partner_b_name: text("partner_b_name"),
   status: text("status").notNull().default("invited"),
   game_results: jsonb("game_results"),
   created_at: timestamp("created_at", { withTimezone: true })
@@ -279,4 +288,9 @@ export const attachments = pgTable("attachments", {
   storage_path: text("storage_path").notNull(),
   label: text("label"),
   notes: text("notes"),
+  // CC-165 — when true, the individual can download this file from their
+  // own report permalink (/report/[session_id]). Default false: admin-only.
+  shared_with_individual: boolean("shared_with_individual")
+    .notNull()
+    .default(false),
 });

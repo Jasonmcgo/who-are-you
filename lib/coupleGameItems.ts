@@ -424,6 +424,7 @@ export const COUPLE_GAME_ITEMS: readonly CoupleGameItemSpec[] = [
   {
     itemId: "under_pressure_become",
     prompt: "When you are under pressure, you usually become:",
+    promptAboutPartner: "When {S} is under pressure, {S_pron} usually becomes:",
     sourceSignal: "stress_posture",
     options: [
       { id: "more_logical", label: "more logical" },
@@ -445,6 +446,8 @@ export const COUPLE_GAME_ITEMS: readonly CoupleGameItemSpec[] = [
     itemId: "need_but_dont_say",
     prompt:
       "When you are struggling, what you most want but may not ask for is:",
+    promptAboutPartner:
+      "When {S} is struggling, what {S_pron} most wants but may not ask for is:",
     sourceSignal: "hidden_need",
     options: [
       { id: "reassurance", label: "reassurance" },
@@ -466,6 +469,8 @@ export const COUPLE_GAME_ITEMS: readonly CoupleGameItemSpec[] = [
     itemId: "grip_costs_you",
     prompt:
       "When your fear takes over, you probably cost your partner:",
+    promptAboutPartner:
+      "When {S_poss} fear takes over, {S_pron} probably costs you:",
     sourceSignal: "grip_pattern",
     options: [
       { id: "peace", label: "peace", valence: "critical" },
@@ -486,6 +491,7 @@ export const COUPLE_GAME_ITEMS: readonly CoupleGameItemSpec[] = [
   {
     itemId: "aim_gives_you",
     prompt: "When you are at your best, you give your partner:",
+    promptAboutPartner: "When {S} is at {S_poss} best, {S_pron} gives you:",
     sourceSignal: "aim",
     options: [
       { id: "stability", label: "stability", valence: "generous" },
@@ -511,6 +517,8 @@ export const COUPLE_GAME_ITEMS: readonly CoupleGameItemSpec[] = [
     itemId: "the_thing_i_call_helping",
     prompt:
       "When you say you are helping, you may actually be:",
+    promptAboutPartner:
+      "When {S} says {S_pron} is helping, {S_pron} may actually be:",
     sourceSignal: "grip_pattern",
     options: [
       { id: "calming_yourself", label: "calming yourself", valence: "critical" },
@@ -531,6 +539,8 @@ export const COUPLE_GAME_ITEMS: readonly CoupleGameItemSpec[] = [
   {
     itemId: "under_pressure_most_need",
     prompt: "When you are under pressure, you most need:",
+    promptAboutPartner:
+      "When {S} is under pressure, what {S_pron} most needs is:",
     sourceSignal: "hidden_need",
     options: [
       { id: "space", label: "space" },
@@ -552,6 +562,9 @@ export const COUPLE_GAME_ITEMS: readonly CoupleGameItemSpec[] = [
   {
     itemId: "you_know_partner_loves_you_when",
     prompt: "You know your partner loves you when they:",
+    // {S_obj} (object pronoun: her / him / them) — distinct from {S_pron}
+    // (subject pronoun: she / he / they) because "love she" is broken English.
+    promptAboutPartner: "{S} knows you love {S_obj} when you:",
     sourceSignal: "love_register",
     options: [
       { id: "remember_small_things", label: "remember small things", signalTag: "witnessing_recognition" },
@@ -568,6 +581,7 @@ export const COUPLE_GAME_ITEMS: readonly CoupleGameItemSpec[] = [
   {
     itemId: "how_you_show_love",
     prompt: "When love is steady in you, it shows up as you:",
+    promptAboutPartner: "When love is steady in {S}, it shows up as {S_obj}:",
     sourceSignal: "love_register",
     options: [
       { id: "staying", label: "staying", signalTag: "commitment_loyalty" },
@@ -585,6 +599,8 @@ export const COUPLE_GAME_ITEMS: readonly CoupleGameItemSpec[] = [
   {
     itemId: "what_they_protect_in_argument",
     prompt: "When you are in an argument, what you most protect is:",
+    promptAboutPartner:
+      "When {S} is in an argument, what {S_pron} most protects is:",
     sourceSignal: "lens_protection",
     options: [
       { id: "accuracy", label: "accuracy" },
@@ -601,6 +617,7 @@ export const COUPLE_GAME_ITEMS: readonly CoupleGameItemSpec[] = [
   {
     itemId: "default_question_they_ask",
     prompt: "The question your mind most often asks first is:",
+    promptAboutPartner: "The question {S_poss} mind most often asks first is:",
     sourceSignal: "lens_default_question",
     options: [
       { id: "is_this_true", label: "is this true?" },
@@ -617,6 +634,8 @@ export const COUPLE_GAME_ITEMS: readonly CoupleGameItemSpec[] = [
   {
     itemId: "what_im_fine_means",
     prompt: "When you say \"I'm fine,\" what you usually mean is:",
+    promptAboutPartner:
+      "When {S} says \"I'm fine,\" what {S_pron} usually means is:",
     sourceSignal: "grip_register",
     options: [
       { id: "processing", label: "processing" },
@@ -637,6 +656,7 @@ export const COUPLE_GAME_ITEMS: readonly CoupleGameItemSpec[] = [
   {
     itemId: "love_distortion_when_fear",
     prompt: "When fear is loud in you, your love turns into:",
+    promptAboutPartner: "When fear is loud in {S}, {S_poss} love turns into:",
     sourceSignal: "grip_pattern",
     options: [
       { id: "controlling", label: "controlling", valence: "critical" },
@@ -657,6 +677,7 @@ export const COUPLE_GAME_ITEMS: readonly CoupleGameItemSpec[] = [
   {
     itemId: "first_move_when_conflict_opens",
     prompt: "When a real conflict opens, your first move is to:",
+    promptAboutPartner: "When a real conflict opens, {S_poss} first move is to:",
     sourceSignal: "lens_conflict_move",
     options: [
       { id: "argue_the_logic", label: "argue the logic" },
@@ -673,6 +694,8 @@ export const COUPLE_GAME_ITEMS: readonly CoupleGameItemSpec[] = [
   {
     itemId: "compliment_secretly_needed",
     prompt: "The compliment that secretly lands hardest for you is:",
+    promptAboutPartner:
+      "The compliment that secretly lands hardest for {S} is:",
     sourceSignal: "grip_pattern",
     options: [
       { id: "you_belong_here", label: "\"You belong here.\"" },

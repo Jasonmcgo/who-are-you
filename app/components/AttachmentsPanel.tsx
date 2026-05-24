@@ -46,6 +46,9 @@ export default function AttachmentsPanel({
   const [file, setFile] = useState<File | null>(null);
   const [label, setLabel] = useState("");
   const [notes, setNotes] = useState("");
+  // CC-165 — upload-time "share with individual" flag. Defaults false
+  // (admin-only); the admin can also flip it later per-card.
+  const [sharedWithIndividual, setSharedWithIndividual] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [statusFlash, setStatusFlash] = useState<{
     kind: "ok" | "err";
@@ -89,6 +92,7 @@ export default function AttachmentsPanel({
       fd.append("file", file);
       if (label.trim()) fd.append("label", label.trim());
       if (notes.trim()) fd.append("notes", notes.trim());
+      if (sharedWithIndividual) fd.append("shared_with_individual", "true");
       const res = await fetch(
         `/api/admin/sessions/${sessionId}/attachments`,
         { method: "POST", body: fd }
@@ -107,6 +111,7 @@ export default function AttachmentsPanel({
       setFile(null);
       setLabel("");
       setNotes("");
+      setSharedWithIndividual(false);
       // CC-021c — clear the file input's DOM value so the same file can
       // be re-picked if the user wants to. (Native file inputs don't fire
       // onChange when the same file is reselected unless the value is
@@ -152,6 +157,47 @@ export default function AttachmentsPanel({
         kind: "err",
         text: err instanceof Error ? err.message : "Delete failed.",
       });
+    }
+  }
+
+  // CC-165 — flip the per-card share flag. Same PATCH endpoint and same
+  // commit pattern as `handleSaveNotes`; the resulting row carries the
+  // updated `shared_with_individual` value, so the UI re-renders the
+  // badge + button without an extra round-trip.
+  async function handleToggleShare(att: Attachment, next: boolean): Promise<boolean> {
+    try {
+      const res = await fetch(
+        `/api/admin/sessions/${sessionId}/attachments/${att.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ shared_with_individual: next }),
+        }
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setStatusFlash({
+          kind: "err",
+          text:
+            typeof body?.error === "string"
+              ? body.error
+              : `Update failed (${res.status})`,
+        });
+        return false;
+      }
+      const updated: Attachment = await res.json();
+      commit(attachments.map((a) => (a.id === att.id ? updated : a)));
+      setStatusFlash({
+        kind: "ok",
+        text: next ? "Shared with individual." : "Unshared.",
+      });
+      return true;
+    } catch (err) {
+      setStatusFlash({
+        kind: "err",
+        text: err instanceof Error ? err.message : "Update failed.",
+      });
+      return false;
     }
   }
 
@@ -337,6 +383,27 @@ export default function AttachmentsPanel({
             }}
           />
         </label>
+        {/* CC-165 — opt-in flag exposing the upload on the individual's
+            /report/[sessionId] permalink. Default off; admin/guide
+            decision. */}
+        <label className="flex flex-row items-center" style={{ gap: 8 }}>
+          <input
+            type="checkbox"
+            checked={sharedWithIndividual}
+            onChange={(e) => setSharedWithIndividual(e.target.checked)}
+            data-focus-ring
+          />
+          <span
+            className="font-mono uppercase"
+            style={{
+              fontSize: 10,
+              letterSpacing: "0.12em",
+              color: "var(--ink-mute)",
+            }}
+          >
+            Share with individual
+          </span>
+        </label>
         <button
           type="submit"
           disabled={uploading || !file}
@@ -398,6 +465,7 @@ export default function AttachmentsPanel({
               att={att}
               onDelete={() => handleDelete(att)}
               onSaveNotes={(n) => handleSaveNotes(att, n)}
+              onToggleShare={(next) => handleToggleShare(att, next)}
             />
           ))}
         </div>
@@ -434,17 +502,26 @@ function AttachmentCard({
   att,
   onDelete,
   onSaveNotes,
+  onToggleShare,
 }: {
   sessionId: string;
   att: Attachment;
   onDelete: () => void;
   onSaveNotes: (next: string) => Promise<boolean>;
+  onToggleShare: (next: boolean) => Promise<boolean>;
 }) {
   const [editingNotes, setEditingNotes] = useState(false);
   const [draftNotes, setDraftNotes] = useState(att.notes ?? "");
   const [saving, setSaving] = useState(false);
+  const [togglingShare, setTogglingShare] = useState(false);
 
   const downloadHref = `/api/admin/sessions/${sessionId}/attachments/${att.id}/download`;
+
+  async function handleShareClick() {
+    setTogglingShare(true);
+    await onToggleShare(!att.shared_with_individual);
+    setTogglingShare(false);
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -492,6 +569,24 @@ function AttachmentCard({
             }}
           >
             {att.label}
+          </span>
+        ) : null}
+        {/* CC-165 — visible "Shared ✓" pill mirroring the label-pill style
+            so an admin can see at a glance which files are exposed to
+            the individual on their report. */}
+        {att.shared_with_individual ? (
+          <span
+            className="font-mono uppercase"
+            style={{
+              fontSize: 10,
+              letterSpacing: "0.08em",
+              padding: "2px 8px",
+              background: "var(--umber-wash)",
+              color: "var(--umber)",
+              borderRadius: 999,
+            }}
+          >
+            Shared ✓
           </span>
         ) : null}
       </div>
@@ -623,6 +718,32 @@ function AttachmentCard({
             Edit notes
           </button>
         ) : null}
+        {/* CC-165 — per-card toggle. Reads "Share with individual" when
+            currently unshared, "Unshare" when shared. Same trust model
+            as Delete: admin-only surface. */}
+        <button
+          type="button"
+          onClick={handleShareClick}
+          disabled={togglingShare}
+          data-focus-ring
+          className="font-mono uppercase"
+          style={{
+            fontSize: 10,
+            letterSpacing: "0.08em",
+            background: "transparent",
+            color: togglingShare ? "var(--ink-faint)" : "var(--ink)",
+            border: "1px solid var(--rule)",
+            padding: "5px 10px",
+            borderRadius: 4,
+            cursor: togglingShare ? "not-allowed" : "pointer",
+          }}
+        >
+          {togglingShare
+            ? "…"
+            : att.shared_with_individual
+            ? "Unshare"
+            : "Share with individual"}
+        </button>
         <button
           type="button"
           onClick={onDelete}

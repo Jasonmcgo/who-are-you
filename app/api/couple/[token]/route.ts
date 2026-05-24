@@ -108,9 +108,21 @@ interface WarmTotalPayload {
   clearlyOf: number;
 }
 
+interface BondInfo {
+  /** CC-COUPLE-7 — true when the row has both partner session ids. */
+  hasPartnerB: boolean;
+}
+
 interface RevealPayload {
   status: "completed";
+  /** Subject (Partner A) display name. Alias of `partnerAName` for back-compat. */
   personName: string;
+  /** CC-COUPLE-7 — bond-resolved subject name (was `personName`). */
+  partnerAName: string;
+  /** CC-COUPLE-7 — bond-resolved guesser name; null on legacy one-sided invites. */
+  partnerBName: string | null;
+  /** CC-COUPLE-7 — bond shape; the page uses this to show the Mode 2 seam. */
+  bond: BondInfo;
   warmTotal: WarmTotalPayload;
   items: ResolvedItem[];
 }
@@ -118,6 +130,9 @@ interface RevealPayload {
 interface IntroPayload {
   status: "invited" | "b_joined";
   personName: string;
+  partnerAName: string;
+  partnerBName: string | null;
+  bond: BondInfo;
   items: ItemPayload[];
 }
 
@@ -175,13 +190,138 @@ function rowToDemographicSet(row: DemoRow | undefined): DemographicSet | null {
   return { answers };
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// CC-COUPLE-7 — Name-precedence resolution for bond display names.
+//
+// Precedence:
+//   1. Bond-stored name (`couple_sessions.partner_X_name`) — sender's
+//      confirmed value at bond creation, wins because it was edited
+//      with intent.
+//   2. Demographics first name (via `firstNameOf`) — falls back when
+//      the sender left the bond name blank.
+//   3. Hard fallback — never returned empty.
+// ─────────────────────────────────────────────────────────────────────
+
+function resolveBondName(
+  bondName: string | null,
+  demoRow: DemoRow | undefined,
+  fallback: string
+): string {
+  if (typeof bondName === "string" && bondName.trim().length > 0) {
+    return bondName.trim();
+  }
+  const fromDemo = firstNameOf(demoRow);
+  if (fromDemo !== "your partner") return fromDemo;
+  return fallback;
+}
+
 function firstNameOf(demoRow: DemoRow | undefined): string {
   if (!demoRow || demoRow.name_state !== "specified" || !demoRow.name_value) {
     return "your partner";
   }
   const trimmed = demoRow.name_value.trim();
   if (!trimmed) return "your partner";
-  return trimmed.split(/\s+/)[0];
+  // CC-COUPLE-6.1 — capitalize the leading character for display (names are
+  // often typed lowercase). Only the first char is touched, so mixed-case
+  // names like "McDonald" survive intact.
+  const first = trimmed.split(/\s+/)[0];
+  return first.charAt(0).toUpperCase() + first.slice(1);
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// CC-COUPLE-6 — Server-side prompt-template resolution.
+//
+// Each item carries a `promptAboutPartner` template with role tokens
+// ({S} / {S_pron} / {S_poss} / {S_refl}). Guesser references stay
+// literal "you" / "your" — never substituted. Pronouns default to
+// singular they/their when the subject didn't share a binary gender;
+// we never guess a gendered pronoun from an ambiguous value.
+// ─────────────────────────────────────────────────────────────────────
+
+interface SubjectPronouns {
+  /** subject pronoun — she / he / they */
+  pron: string;
+  /** object pronoun — her / him / them */
+  obj: string;
+  /** possessive — her / his / their */
+  poss: string;
+  /** reflexive — herself / himself / themselves */
+  refl: string;
+}
+
+const PRONOUNS_THEY: SubjectPronouns = {
+  pron: "they",
+  obj: "them",
+  poss: "their",
+  refl: "themselves",
+};
+const PRONOUNS_SHE: SubjectPronouns = {
+  pron: "she",
+  obj: "her",
+  poss: "her",
+  refl: "herself",
+};
+const PRONOUNS_HE: SubjectPronouns = {
+  pron: "he",
+  obj: "him",
+  poss: "his",
+  refl: "himself",
+};
+
+function subjectPronouns(
+  genderValue: string | null | undefined
+): SubjectPronouns {
+  if (typeof genderValue !== "string") return PRONOUNS_THEY;
+  const normalized = genderValue.trim().toLowerCase();
+  if (!normalized) return PRONOUNS_THEY;
+  if (normalized === "woman" || normalized === "female" || normalized === "f") {
+    return PRONOUNS_SHE;
+  }
+  if (normalized === "man" || normalized === "male" || normalized === "m") {
+    return PRONOUNS_HE;
+  }
+  return PRONOUNS_THEY;
+}
+
+function capitalizeFirstLetter(s: string): string {
+  if (s.length === 0) return s;
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function resolvePromptAboutPartner(
+  template: string,
+  personName: string,
+  pronouns: SubjectPronouns
+): string {
+  // Sentence-leading-fallback capitalization: when the template starts
+  // with `{S}` AND the name fell back to "your partner", lift the case
+  // so the rendered sentence begins with "Your partner …" not "your".
+  const startsWithSubjectToken = template.startsWith("{S}");
+  const subject =
+    startsWithSubjectToken && personName === "your partner"
+      ? capitalizeFirstLetter(personName)
+      : personName;
+  // No-name case: substitute the noun "your partner" for the subject
+  // and object pronoun slots too. Avoids singular-they verb-agreement
+  // awkwardness ("they gives you" / "they becomes") and matches the
+  // CC-COUPLE-6 acceptance example for `aim_gives_you`:
+  //   "When your partner is at their best, your partner gives you:".
+  // Possessive + reflexive stay as singular "their" / "themselves",
+  // which read naturally when the unknown subject is referenced by
+  // pronoun rather than noun.
+  const subjectPron =
+    personName === "your partner" ? "your partner" : pronouns.pron;
+  const objectPron =
+    personName === "your partner" ? "your partner" : pronouns.obj;
+  // Substitute longest tokens first so `{S_pron}` / `{S_poss}` /
+  // `{S_refl}` / `{S_obj}` never alias against the single-character
+  // `{S}` token.
+  return template
+    .replace(/\{S_pron\}/g, subjectPron)
+    .replace(/\{S_poss\}/g, pronouns.poss)
+    .replace(/\{S_refl\}/g, pronouns.refl)
+    .replace(/\{S_obj\}/g, objectPron)
+    .replace(/\{S\}/g, subject);
 }
 
 function deckMetaFor(itemId: string): { deck: CoupleDeck | null; deckLabel: string } {
@@ -189,15 +329,26 @@ function deckMetaFor(itemId: string): { deck: CoupleDeck | null; deckLabel: stri
   return { deck, deckLabel: deck ? COUPLE_DECK_LABEL[deck] : "" };
 }
 
-function itemsForIntro(token: string): ItemPayload[] {
+function itemsForIntro(
+  token: string,
+  personName: string,
+  pronouns: SubjectPronouns
+): ItemPayload[] {
   // CC-COUPLE-5 — round selector draws a balanced spread (≤8 items,
   // one per deck minimum). Determinism per token: reload returns the
   // same round; different couples get different rounds.
+  // CC-COUPLE-6 — `prompt` ships pre-resolved from the item's
+  // `promptAboutPartner` template (server-side substitution of subject
+  // name + pronouns). Client renders it as-is.
   return selectRound(token).map((item) => {
     const meta = deckMetaFor(item.itemId);
     return {
       itemId: item.itemId,
-      prompt: item.prompt,
+      prompt: resolvePromptAboutPartner(
+        item.promptAboutPartner,
+        personName,
+        pronouns
+      ),
       sourceSignal: item.sourceSignal,
       deck: meta.deck,
       deckLabel: meta.deckLabel,
@@ -243,10 +394,18 @@ async function loadPartnerASession(
   return { ic, demoRow };
 }
 
+interface RevealBuildContext {
+  partnerAName: string;
+  partnerBName: string | null;
+  pronouns: SubjectPronouns;
+  bond: BondInfo;
+}
+
 function buildRevealPayload(
   results: CoupleGameResults,
-  personName: string
+  ctx: RevealBuildContext
 ): RevealPayload {
+  const { partnerAName: personName, pronouns } = ctx;
   const resolvedItems: ResolvedItem[] = [];
   const tierResults: { tier: RankedRevealTier; points: number }[] = [];
 
@@ -264,9 +423,19 @@ function buildRevealPayload(
     });
     tierResults.push(scored);
     const meta = deckMetaFor(stored.itemId);
+    // CC-COUPLE-6 — echo the resolved guess-form prompt on the reveal,
+    // matching what the player saw during the rank step. Falls back to
+    // empty string when the item id is no longer in the bank.
+    const resolvedPrompt = item
+      ? resolvePromptAboutPartner(
+          item.promptAboutPartner,
+          personName,
+          pronouns
+        )
+      : "";
     resolvedItems.push({
       itemId: stored.itemId,
-      prompt: item?.prompt ?? "",
+      prompt: resolvedPrompt,
       sourceSignal: stored.sourceSignal,
       deck: meta.deck,
       deckLabel: meta.deckLabel,
@@ -286,29 +455,82 @@ function buildRevealPayload(
   return {
     status: "completed",
     personName,
+    partnerAName: ctx.partnerAName,
+    partnerBName: ctx.partnerBName,
+    bond: ctx.bond,
     warmTotal: warm,
     items: resolvedItems,
   };
+}
+
+async function loadBondNames(
+  db: ReturnType<typeof getDb>,
+  couple: CoupleSessionRow
+): Promise<{
+  partnerAName: string;
+  partnerBName: string | null;
+  pronouns: SubjectPronouns;
+  bond: BondInfo;
+}> {
+  const aDemoRows = await db
+    .select()
+    .from(demographicsTable)
+    .where(eq(demographicsTable.session_id, couple.partner_a_session_id))
+    .limit(1);
+  // CC-COUPLE-7 — name precedence: bond name > demographics first name >
+  // hard fallback. A is always present, so the hard fallback is the
+  // legacy `"your partner"`.
+  const partnerAName = resolveBondName(
+    couple.partner_a_name,
+    aDemoRows[0],
+    "your partner"
+  );
+  // CC-COUPLE-6 — derive subject pronouns from A's demographics gender
+  // (the bond stores names, not gender). Defaults to singular they/their.
+  const pronouns = subjectPronouns(aDemoRows[0]?.gender_value ?? null);
+
+  let partnerBName: string | null = null;
+  if (couple.partner_b_session_id) {
+    const bDemoRows = await db
+      .select()
+      .from(demographicsTable)
+      .where(eq(demographicsTable.session_id, couple.partner_b_session_id))
+      .limit(1);
+    partnerBName = resolveBondName(
+      couple.partner_b_name,
+      bDemoRows[0],
+      "Partner B"
+    );
+  } else if (couple.partner_b_name && couple.partner_b_name.trim().length > 0) {
+    // Edge case: bond row has a B name but the B session id was
+    // dropped (ON DELETE SET NULL). Preserve the sender's confirmed
+    // name even though the session is gone.
+    partnerBName = couple.partner_b_name.trim();
+  }
+
+  const bond: BondInfo = {
+    hasPartnerB: Boolean(couple.partner_b_session_id),
+  };
+
+  return { partnerAName, partnerBName, pronouns, bond };
 }
 
 async function buildIntroOrReveal(
   db: ReturnType<typeof getDb>,
   couple: CoupleSessionRow
 ): Promise<IntroPayload | RevealPayload> {
-  const demoRows = await db
-    .select()
-    .from(demographicsTable)
-    .where(eq(demographicsTable.session_id, couple.partner_a_session_id))
-    .limit(1);
-  const personName = firstNameOf(demoRows[0]);
+  const ctx = await loadBondNames(db, couple);
 
   if (couple.status === "completed" && couple.game_results) {
-    return buildRevealPayload(couple.game_results, personName);
+    return buildRevealPayload(couple.game_results, ctx);
   }
   return {
     status: couple.status === "b_joined" ? "b_joined" : "invited",
-    personName,
-    items: itemsForIntro(couple.invite_token),
+    personName: ctx.partnerAName,
+    partnerAName: ctx.partnerAName,
+    partnerBName: ctx.partnerBName,
+    bond: ctx.bond,
+    items: itemsForIntro(couple.invite_token, ctx.partnerAName, ctx.pronouns),
   };
 }
 
@@ -376,14 +598,8 @@ export async function POST(
 
   // Idempotent on a completed session.
   if (couple.status === "completed" && couple.game_results) {
-    const demoRows = await db
-      .select()
-      .from(demographicsTable)
-      .where(eq(demographicsTable.session_id, couple.partner_a_session_id))
-      .limit(1);
-    return NextResponse.json(
-      buildRevealPayload(couple.game_results, firstNameOf(demoRows[0]))
-    );
+    const ctx = await loadBondNames(db, couple);
+    return NextResponse.json(buildRevealPayload(couple.game_results, ctx));
   }
 
   let body: PostBody;
@@ -407,8 +623,11 @@ export async function POST(
       { status: 404 }
     );
   }
-  const { ic: icA, demoRow } = loaded;
-  const personName = firstNameOf(demoRow);
+  const { ic: icA } = loaded;
+  // CC-COUPLE-7 — bond-aware name + pronoun resolution for the reveal.
+  // Loads B's demo row when bonded so the reveal payload carries both
+  // names + the Mode 2 seam signal.
+  const ctx = await loadBondNames(db, couple);
 
   // CC-COUPLE-5 — score against the round selector's items (the same
   // set the page rendered to B). We trust the round derived from the
@@ -446,5 +665,5 @@ export async function POST(
     );
   }
 
-  return NextResponse.json(buildRevealPayload(results, personName));
+  return NextResponse.json(buildRevealPayload(results, ctx));
 }
