@@ -378,6 +378,15 @@ export type LensStack = {
   //      `high`.
   // Empty / undefined when `confidence === "high"`.
   confidenceLowReasons?: ConfidenceLowReason[];
+  // CC-159 — when `confidenceLowReasons` includes `aux-ambiguous`, the
+  // two close-margin candidates for the auxiliary slot: the chosen
+  // auxiliary (matches `auxiliary` above) plus its within-margin
+  // runner-up. The follow-up generator reads this to fire the right
+  // head-to-head clarifier (judging vs perceiving) — without it, the
+  // INTJ↔INFJ class of ambiguities (Te vs Fe auxiliary) detected the
+  // uncertainty but asked nothing to resolve it. Only populated when
+  // `aux-ambiguous` is among the reasons; absent otherwise.
+  auxAmbiguousPair?: [CognitiveFunctionId, CognitiveFunctionId];
 };
 
 // CC-141 + CC-138 — reason flags for `LensStack.confidenceLowReasons`.

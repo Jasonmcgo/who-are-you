@@ -49,7 +49,15 @@ export type FollowUpInput = {
     // `nsLeaderS` head-to-head.
     nsLeaderN?: CognitiveFunctionId;
     nsLeaderS?: CognitiveFunctionId;
-    nsHeadToHeadTrigger?: "low_confidence" | "ns_split_suspect";
+    // CC-159 — `aux_ambiguous_perceiving` fires when LensStack flags
+    // `aux-ambiguous` AND the close pair is a perceiving pair
+    // (one of {ni, ne} + one of {si, se}). The pre-CC-159 N/S
+    // clarifier never fired on aux-ambiguous, so e.g. an Fi-dom with
+    // Ne/Se aux close went unasked.
+    nsHeadToHeadTrigger?:
+      | "low_confidence"
+      | "ns_split_suspect"
+      | "aux_ambiguous_perceiving";
     // CC-134.1 §Task 3 — judging-axis head-to-head. Fires when both
     // members of an impossible same-attitude judging pair (Ti & Fi, or
     // Te & Fe) accumulate ≥ JUDGING_COOCCURRENCE_THRESHOLD top-picks —
@@ -57,9 +65,18 @@ export type FollowUpInput = {
     // pulls-Fi (or warm-Te-pulls-Fe) contamination. The clarifier pits
     // the two head-to-head so the perceiving call is resolved by
     // explicit pick.
+    //
+    // CC-159 — also fires on `aux_ambiguous_judging`: LensStack flags
+    // `aux-ambiguous` AND the close pair is a judging pair (one of
+    // {ti, te} + one of {fi, fe}). This is the INTJ↔INFJ class
+    // (Te vs Fe auxiliary) that pre-CC-159 detected ambiguity but
+    // asked nothing to resolve it.
     judgingHeadToHeadA?: CognitiveFunctionId;
     judgingHeadToHeadB?: CognitiveFunctionId;
-    judgingHeadToHeadTrigger?: "ti_fi_cooccurrence" | "te_fe_cooccurrence";
+    judgingHeadToHeadTrigger?:
+      | "ti_fi_cooccurrence"
+      | "te_fe_cooccurrence"
+      | "aux_ambiguous_judging";
   };
   // CC-134 Part D §D.2 — large-gap blind spots whose underlying input
   // is suspect (untouched ranking heuristic or low-confidence Lens).
@@ -518,7 +535,13 @@ export function buildFollowUpInput(
   // function id to keep the resolver deterministic.
   let nsLeaderN: CognitiveFunctionId | undefined;
   let nsLeaderS: CognitiveFunctionId | undefined;
-  let nsHeadToHeadTrigger: "low_confidence" | "ns_split_suspect" | undefined;
+  // CC-159 — `aux_ambiguous_perceiving` added so a perceiving-aux
+  // ambiguity (e.g. Fi-dom with Ne/Se aux within margin) routes here.
+  let nsHeadToHeadTrigger:
+    | "low_confidence"
+    | "ns_split_suspect"
+    | "aux_ambiguous_perceiving"
+    | undefined;
   if (nsClarifierEligible) {
     const nCandidates: CognitiveFunctionId[] = ["ni", "ne"];
     const sCandidates: CognitiveFunctionId[] = ["si", "se"];
@@ -550,9 +573,12 @@ export function buildFollowUpInput(
   // lift raised display confidence.
   let judgingHeadToHeadA: CognitiveFunctionId | undefined;
   let judgingHeadToHeadB: CognitiveFunctionId | undefined;
+  // CC-159 — `aux_ambiguous_judging` added so an INTJ↔INFJ (Te/Fe aux)
+  // / INTP↔INFP (Ti/Fi aux) etc. ambiguity routes here.
   let judgingHeadToHeadTrigger:
     | "ti_fi_cooccurrence"
     | "te_fe_cooccurrence"
+    | "aux_ambiguous_judging"
     | undefined;
   if (judgingClarifierEligible) {
     const tiTop = topPickCountFor(constitution.signals, "ti");
@@ -573,6 +599,52 @@ export function buildFollowUpInput(
       judgingHeadToHeadA = "te";
       judgingHeadToHeadB = "fe";
       judgingHeadToHeadTrigger = "te_fe_cooccurrence";
+    }
+  }
+
+  // CC-159 — aux-ambiguous routing. Same-dominant/different-aux
+  // ambiguities (INTJ↔INFJ via Te/Fe aux, INTP↔INFP via Ti/Fi aux,
+  // ENTJ↔ENFJ, ENTP↔ENFP, and perceiving-aux analogues) detected
+  // uncertainty (`aux-ambiguous` flag) but pre-CC-159 fired no
+  // resolving clarifier — the report hedged to "low confidence" and
+  // the respondent fell through to generic grip-family questions.
+  // (Nat's INFJ-reading-as-low-confidence-INTJ minted a follow-up link
+  // nearly identical to her father's confident-INTJ link — the bug
+  // owner found.) When the within-margin aux pair is exposed by
+  // `aggregateLensStack` (see jungianStack.ts CC-159), route it here:
+  //   - judging pair ({ti|te}+{fi|fe})       → judging head-to-head
+  //   - perceiving pair ({ni|ne}+{si|se})    → N/S head-to-head
+  // No-double-emit: skip the aux-ambiguous routing when the existing
+  // cooccurrence/binary path already populated that slot. The pre-
+  // existing trigger keeps its semantic; aux-ambiguous fills in only
+  // where the slot was empty.
+  const auxAmbiguousReason = reasons.includes("aux-ambiguous");
+  const auxPair = ls?.auxAmbiguousPair;
+  if (auxAmbiguousReason && auxPair) {
+    const [a, b] = auxPair;
+    const JUDGING_FNS = new Set<CognitiveFunctionId>(["ti", "te", "fi", "fe"]);
+    const PERCEIVING_FNS = new Set<CognitiveFunctionId>(["ni", "ne", "si", "se"]);
+    const N_SET = new Set<CognitiveFunctionId>(["ni", "ne"]);
+    const S_SET = new Set<CognitiveFunctionId>(["si", "se"]);
+    const isJudgingPair = JUDGING_FNS.has(a) && JUDGING_FNS.has(b);
+    const isPerceivingPair =
+      PERCEIVING_FNS.has(a) && PERCEIVING_FNS.has(b);
+    if (isJudgingPair && judgingHeadToHeadA === undefined) {
+      judgingHeadToHeadA = a;
+      judgingHeadToHeadB = b;
+      judgingHeadToHeadTrigger = "aux_ambiguous_judging";
+    } else if (isPerceivingPair && nsLeaderN === undefined && nsLeaderS === undefined) {
+      // Map the pair to the (N, S) slots so the resolver builds the
+      // right voice pairing. If both happen to be N-side or both
+      // S-side (shouldn't happen — the aux pool is single-axis), skip
+      // routing rather than mis-pair.
+      const nMember = [a, b].find((fn) => N_SET.has(fn));
+      const sMember = [a, b].find((fn) => S_SET.has(fn));
+      if (nMember && sMember) {
+        nsLeaderN = nMember;
+        nsLeaderS = sMember;
+        nsHeadToHeadTrigger = "aux_ambiguous_perceiving";
+      }
     }
   }
 

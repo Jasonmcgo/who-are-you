@@ -788,6 +788,20 @@ export function aggregateLensStack(signals: Signal[]): LensStack {
 
   const confidence: "high" | "low" = reasons.length > 0 ? "low" : "high";
 
+  // CC-159 — surface the within-margin aux pair (chosen + runner-up)
+  // so the follow-up generator can route to the right head-to-head
+  // clarifier. The Nat case (low-confidence INTJ with Te/Fe within
+  // margin) detected ambiguity but asked nothing to resolve it; with
+  // this field, `buildFollowUpInput` can build a Te-vs-Fe judging
+  // clarifier on the spot. Only populated when `aux-ambiguous`
+  // actually fired; the field is undefined otherwise.
+  const auxAmbiguousPair:
+    | [CognitiveFunctionId, CognitiveFunctionId]
+    | undefined =
+    auxConvergenceWeak && auxRunnerUp !== undefined
+      ? [auxiliary.fn, auxRunnerUp.fn]
+      : undefined;
+
   return {
     dominant: stackTuple[0],
     auxiliary: stackTuple[1],
@@ -796,6 +810,7 @@ export function aggregateLensStack(signals: Signal[]): LensStack {
     mbtiCode,
     confidence,
     confidenceLowReasons: reasons.length > 0 ? reasons : undefined,
+    auxAmbiguousPair,
   };
 }
 
