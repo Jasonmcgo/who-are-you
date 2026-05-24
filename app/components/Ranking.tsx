@@ -81,7 +81,42 @@ export default function Ranking({
     // CC-134 Part A — commitOrder is the keyboard-mediated reorder path
     // (Spacebar pick → Arrow move → Spacebar drop). Every commitOrder
     // call represents a deliberate user action.
+    // CC-157 — also the path used by the new ▲▼ tap-arrows; their
+    // handler calls `moveItem` which funnels through here so a single
+    // arrow tap fires `onTouched` exactly like a drag or keyboard
+    // pick-and-move does.
     fireTouched();
+  }
+
+  // CC-157 — move an item by one slot (up = -1, down = +1) via the
+  // tap-arrow buttons. Touch-friendly reorder path that doesn't depend
+  // on Pointer drag working through the browser's scroll-vs-drag
+  // heuristic. Returns the new index focus target so the caller can
+  // restore focus after the React re-render (so a screen-reader user
+  // doesn't lose their place after a move).
+  function moveItem(id: string, direction: -1 | 1) {
+    const idx = orderRef.current.indexOf(id);
+    if (idx < 0) return;
+    const target = idx + direction;
+    if (target < 0 || target >= orderRef.current.length) return;
+    const next = [...orderRef.current];
+    [next[idx], next[target]] = [next[target], next[idx]];
+    commitOrder(next);
+    setAnnounce(
+      `Moved ${findItem(id)?.label ?? "item"} to position ${target + 1} of ${
+        next.length
+      }.`
+    );
+    // Re-focus the moved item's arrow button matching the direction so
+    // tap-tap-tap to move several slots stays focused on the same row.
+    // Defer until after React commits the new order.
+    requestAnimationFrame(() => {
+      const li = liRefs.current[id];
+      const selector =
+        direction === -1 ? "[data-move-up]" : "[data-move-down]";
+      const btn = li?.querySelector<HTMLButtonElement>(selector);
+      btn?.focus();
+    });
   }
 
   function onPointerDown(e: React.PointerEvent<HTMLButtonElement>, id: string) {
@@ -199,7 +234,7 @@ export default function Ranking({
           borderRadius: 12,
           background: "var(--paper)",
         }}
-        aria-label="Ranking. Drag to reorder, or focus a grip and press space to pick up an item."
+        aria-label="Ranking. Use the up and down arrow buttons next to each row to reorder, drag the grip, or focus a grip and press space to pick up an item."
       >
         {order.map((id, idx) => {
           const item = findItem(id);
@@ -328,12 +363,72 @@ export default function Ranking({
                   </span>
                 </div>
               )}
+              {/* CC-157 — tap-arrow reorder controls. Always-available
+                  parallel path to the drag grip; primary affordance on
+                  touch (where the Pointer drag fails because the
+                  browser claims the first move as a scroll). Min 44px
+                  tap targets, real buttons (keyboard + screen reader
+                  workable). Disabled at the ends. */}
+              <div
+                className="flex flex-col"
+                style={{
+                  borderLeft: "1px solid var(--rule-soft)",
+                }}
+              >
+                <button
+                  data-move-up
+                  data-focus-ring
+                  type="button"
+                  aria-label={`Move ${item.label} up`}
+                  disabled={idx === 0}
+                  onClick={() => moveItem(id, -1)}
+                  className="flex items-center justify-center select-none"
+                  style={{
+                    minWidth: 44,
+                    minHeight: 36,
+                    background: "transparent",
+                    border: "none",
+                    color: idx === 0 ? "var(--ink-faint)" : "var(--umber)",
+                    fontSize: 16,
+                    cursor: idx === 0 ? "default" : "pointer",
+                    opacity: idx === 0 ? 0.4 : 1,
+                    touchAction: "manipulation",
+                    WebkitTapHighlightColor: "transparent",
+                    borderBottom: "1px solid var(--rule-soft)",
+                  }}
+                >
+                  <span aria-hidden="true">▲</span>
+                </button>
+                <button
+                  data-move-down
+                  data-focus-ring
+                  type="button"
+                  aria-label={`Move ${item.label} down`}
+                  disabled={isLast}
+                  onClick={() => moveItem(id, 1)}
+                  className="flex items-center justify-center select-none"
+                  style={{
+                    minWidth: 44,
+                    minHeight: 36,
+                    background: "transparent",
+                    border: "none",
+                    color: isLast ? "var(--ink-faint)" : "var(--umber)",
+                    fontSize: 16,
+                    cursor: isLast ? "default" : "pointer",
+                    opacity: isLast ? 0.4 : 1,
+                    touchAction: "manipulation",
+                    WebkitTapHighlightColor: "transparent",
+                  }}
+                >
+                  <span aria-hidden="true">▼</span>
+                </button>
+              </div>
               <button
                 data-grip
                 data-focus-ring
                 aria-label={`Item ${idx + 1} of ${order.length}: ${
                   item.label
-                }. Press space to reorder.`}
+                }. Press space to reorder, or use the arrow buttons.`}
                 aria-pressed={isPicked}
                 onPointerDown={(e) => onPointerDown(e, id)}
                 onPointerMove={(e) => onPointerMove(e, id)}
@@ -349,10 +444,17 @@ export default function Ranking({
                   color: isActive ? "var(--umber)" : "var(--ink-mute)",
                   fontSize: 20,
                   cursor: isDragging ? "grabbing" : "grab",
-                  touchAction: dragId === id ? "none" : "manipulation",
+                  // CC-157 — `touch-action: none` was set reactively on
+                  // dragId, but on touch the browser claims the first
+                  // move as a scroll BEFORE JS sets dragId — so the
+                  // drag never engaged on mobile. The reliable mobile
+                  // path is the ▲▼ arrows above; the grip stays as the
+                  // desktop drag affordance with `touch-action:
+                  // manipulation` so the browser can still scroll on
+                  // touch (no harm — arrows handle reorder on touch).
+                  touchAction: "manipulation",
                   WebkitTapHighlightColor: "transparent",
                 }}
-                type="button"
               >
                 <span aria-hidden="true">≡</span>
               </button>

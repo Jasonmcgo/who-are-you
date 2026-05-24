@@ -174,12 +174,10 @@ const CARD_KICKER_NAME: Record<CardId, string> = {
   contradiction: "CONTRADICTION",
 };
 
-// CC-134 Part A — ceiling on how many NON-high-signal untouched
-// rankings can be routed to the second pass. A fully passive
-// respondent could otherwise generate a 20+ question second pass; the
-// cap keeps the re-ask budget bounded. High-signal rankings
-// (Q-S1 / Q-S2 / Q-T1–8) ALWAYS route regardless of the cap.
-const UNTOUCHED_SECOND_PASS_CAP = 4;
+// CC-157 — `UNTOUCHED_SECOND_PASS_CAP` removed; the second-pass
+// routing for untouched rankings was retired (see handleContinue's
+// ranking branch). Accepted-order is a valid answer; the ▲▼ arrows in
+// Ranking.tsx make engagement tap-trivial on touch.
 
 export default function Home() {
   const [current, setCurrent] = useState(0);
@@ -237,14 +235,14 @@ export default function Home() {
   const [multiSelectState, setMultiSelectState] = useState<
     Record<string, { selectedIds: string[]; otherText: string }>
   >({});
-  // CC-134 Part A — per-ranking touched flag. A ranking is "touched"
-  // only after the user performs a deliberate reorder (drag or
-  // keyboard). Untouched rankings are routed to the single-pick
-  // second pass on advance rather than being saved as deliberate
-  // default-order rankings (pre-CC-134 silent-default bug).
-  const [touchedRankings, setTouchedRankings] = useState<Set<string>>(
-    new Set()
-  );
+  // CC-157 — CC-134 Part A's `touchedRankings` state was removed
+  // alongside the untouched→second-pass routing in handleContinue.
+  // Ranking.tsx still emits `onTouched` for downstream consumers; the
+  // assessment page no longer needs to track which rankings were
+  // engaged because accepted-order is now a valid answer (the ▲▼
+  // arrows make engagement tap-trivial on touch). The
+  // `rankingUntouchedHeuristic` diagnostic audit still flags
+  // "saved == default" rankings via its own server-side heuristic.
 
   const question = questions[current];
 
@@ -554,46 +552,24 @@ export default function Home() {
 
   function handleContinue() {
     if (question.type === "ranking" && Array.isArray(draft)) {
-      // CC-134 Part A — untouched-ranking routing. If the user
-      // advanced past a ranking without ever deliberately reordering
-      // it (no drag, no keyboard pick-and-move), the `touched` flag
-      // is false; we route the question to the single-pick second
-      // pass instead of saving the default order as a deliberate
-      // answer. The high-signal set (Q-S1 / Q-S2 / Q-T1–8) always
-      // routes; the rest routes up to UNTOUCHED_SECOND_PASS_CAP so a
-      // fully passive respondent doesn't trigger a long second pass.
-      if (!touchedRankings.has(question.question_id)) {
-        const qid = question.question_id;
-        const isHighSignal =
-          qid === "Q-S1" ||
-          qid === "Q-S2" ||
-          (qid.startsWith("Q-T") && /^Q-T[1-9]\d*$/.test(qid));
-        const alreadyRoutedCount = skippedQuestionIds.filter(
-          (id) => !(id === "Q-S1" || id === "Q-S2" || (id.startsWith("Q-T") && /^Q-T[1-9]\d*$/.test(id)))
-        ).length;
-        const shouldRoute =
-          isHighSignal || alreadyRoutedCount < UNTOUCHED_SECOND_PASS_CAP;
-        if (shouldRoute) {
-          const meta: MetaSignal = {
-            type: "question_skipped",
-            question_id: qid,
-            card_id: question.card_id,
-            recorded_at: Date.now(),
-          };
-          setMetaSignals((prev) => [...prev, meta]);
-          setSkippedQuestionIds((prev) =>
-            prev.includes(qid) ? prev : [...prev, qid]
-          );
-          setAnswers((prev) => prev.filter((a) => a.question_id !== qid));
-          setDrafts((prev) => {
-            const next = { ...prev };
-            delete next[qid];
-            return next;
-          });
-          advanceFromIndex(current);
-          return;
-        }
-      }
+      // CC-157 — Reaching + advancing past a ranking is itself an
+      // answer (the user accepted the presented order). The
+      // pre-CC-157 CC-134 path routed every untouched ranking to a
+      // single-pick second pass and stamped `question_skipped` +
+      // `skippedQuestionIds`, which (a) told a real first-time user
+      // she had "skipped" a question she'd engaged with, and (b)
+      // forced a long second pass for any passive respondent. Now
+      // the ▲▼ arrows in Ranking.tsx make engagement tap-trivial on
+      // touch; users who *still* don't reorder are taken at their
+      // word that the default order is fine.
+      //
+      // The deliberate-vs-untouched distinction stays load-bearing
+      // client-side via `touchedRankings`, and the
+      // `rankingUntouchedHeuristic` diagnostic audit
+      // (tests/audit/rankingUntouchedHeuristic.audit.ts) still
+      // flags "saved == default" rankings for clinical review.
+      // No engine math reads `question_skipped` — verified by grep —
+      // so dropping the second-pass routing is purely a UX cleanup.
       const a = toRankingAnswer(question.question_id, draft);
       if (!a) return;
       // CC-016 — attach overlay if this is an allocation parent ranking.
@@ -991,15 +967,6 @@ export default function Home() {
           items={question.items}
           initialOrder={Array.isArray(draft) ? draft : undefined}
           onChange={(order) => updateDraft(order)}
-          onTouched={() => {
-            const qid = question.question_id;
-            setTouchedRankings((prev) => {
-              if (prev.has(qid)) return prev;
-              const next = new Set(prev);
-              next.add(qid);
-              return next;
-            });
-          }}
           overlay={
             ALLOCATION_PARENT_RANKINGS.has(question.question_id)
               ? overlays[question.question_id]
@@ -1034,15 +1001,6 @@ export default function Home() {
           items={derivedItems.items}
           initialOrder={Array.isArray(draft) ? draft : undefined}
           onChange={(order) => updateDraft(order)}
-          onTouched={() => {
-            const qid = question.question_id;
-            setTouchedRankings((prev) => {
-              if (prev.has(qid)) return prev;
-              const next = new Set(prev);
-              next.add(qid);
-              return next;
-            });
-          }}
         />
       ) : question.type === "binary_pick" ? (
         // CC-138 — same-dimension attitude binary. SinglePickPicker
