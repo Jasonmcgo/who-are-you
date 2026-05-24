@@ -31,6 +31,9 @@ import { DEMOGRAPHIC_FIELDS } from "../../../data/demographics";
 import CopySessionLinkButton from "./CopySessionLinkButton";
 // CC-129 Part B — client component sibling: Copy report URL button.
 import CopyReportLinkButton from "./CopyReportLinkButton";
+// CC-155 — client component sibling: Delete-session control (hard
+// delete; FK cascades clean child rows).
+import DeleteSessionButton from "./DeleteSessionButton";
 
 const ALLOCATION_TENSION_IDS = new Set(["T-013", "T-014", "T-015"]);
 
@@ -819,7 +822,7 @@ export default async function SessionsPage({
                             </a>
                             <CopyReportLinkButton sessionId={s.id} />
                           </span>
-                          {/* Row 2: follow-up link mint + copy */}
+                          {/* Row 2: follow-up link mint + copy + delete */}
                           <span
                             style={{
                               display: "inline-flex",
@@ -831,6 +834,16 @@ export default async function SessionsPage({
                             {/* CC-127 — Copy follow-up link. Mints a
                                 tokenized public URL. */}
                             <CopySessionLinkButton sessionId={s.id} />
+                            {/* CC-155 — destructive: hard-delete this
+                                session + cascade all child rows.
+                                `personLabel` matches the name cell so
+                                the confirmation prompt names the right
+                                person (handles "Anonymous" /
+                                "Prefer not to say" italic states too). */}
+                            <DeleteSessionButton
+                              sessionId={s.id}
+                              personLabel={name.text}
+                            />
                           </span>
                           {/* Row 3: selectable session UUID (mono, muted) */}
                           <span

@@ -3,8 +3,20 @@
 // included demographics), and the attachments list. The detail page reads
 // this and renders the existing InnerConstitutionPage with the saved
 // constitution.
+//
+// CC-155 — DELETE /api/admin/sessions/[id] — hard delete of a session
+// and all its child rows. Owner need: remove duplicate/erroneous
+// imports. Relies on `ON DELETE CASCADE` defined on every FK that
+// references `sessions.id` (demographics / follow_up_links /
+// answer_history / attachments / couple_sessions.partner_a) plus the
+// `SET NULL` on `couple_sessions.partner_b`. No application-level
+// cascade logic is added — Postgres does the work. Disk cleanup of
+// `attachments/<sessionId>/` is best-effort and never fails the
+// delete.
 
 import { NextResponse } from "next/server";
+import { promises as fs } from "node:fs";
+import path from "node:path";
 import { eq, asc } from "drizzle-orm";
 import { getDb } from "../../../../../db";
 import {
@@ -108,4 +120,82 @@ export async function GET(
   };
 
   return NextResponse.json(detail);
+}
+
+// ── CC-155 — DELETE /api/admin/sessions/[id] ────────────────────────────
+//
+// Hard delete. Postgres FK cascades handle every child table; we run a
+// single DELETE on `sessions` and then best-effort-clean the
+// `attachments/<id>/` directory off disk (the row metadata is gone via
+// cascade; the file bytes are the only thing the DB doesn't know about).
+//
+// Middleware-guarded by the `/api/admin/*` cookie gate.
+//
+// Returns:
+//   200 { ok: true }                            on success
+//   404 { error: "Session not found" }          when no row matches
+//   500 { error: "<message>" }                  on DB or other failure
+//   disk-cleanup failures are SWALLOWED — the delete is the source of
+//   truth and an ephemeral filesystem (Vercel) routinely has nothing
+//   to clean.
+
+const ATTACHMENTS_ROOT = path.join(process.cwd(), "attachments");
+
+export async function DELETE(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
+  let db;
+  try {
+    db = getDb();
+  } catch (e) {
+    return NextResponse.json(
+      {
+        error:
+          e instanceof Error ? e.message : "Database connection failed.",
+      },
+      { status: 500 }
+    );
+  }
+
+  // Single DELETE — cascades on every FK clean demographics /
+  // follow_up_links / answer_history / attachments / partner_a, and
+  // SET NULL on couple_sessions.partner_b.
+  let deletedCount: number;
+  try {
+    const deleted = await db
+      .delete(sessionsTable)
+      .where(eq(sessionsTable.id, id))
+      .returning({ id: sessionsTable.id });
+    deletedCount = deleted.length;
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "delete failed" },
+      { status: 500 }
+    );
+  }
+
+  if (deletedCount === 0) {
+    return NextResponse.json({ error: "Session not found" }, { status: 404 });
+  }
+
+  // Best-effort: remove the session's attachment directory. `rm -rf`
+  // semantics via `recursive: true, force: true` — missing dir is fine,
+  // permission errors are swallowed (logged only). Never fails the
+  // delete: the DB row is the source of truth and the FS is ephemeral
+  // on Vercel.
+  try {
+    const dir = path.join(ATTACHMENTS_ROOT, id);
+    await fs.rm(dir, { recursive: true, force: true });
+  } catch (e) {
+    // Intentionally swallowed — see comment above.
+    console.warn(
+      `[admin/delete-session] best-effort disk cleanup for ${id} failed:`,
+      e instanceof Error ? e.message : e
+    );
+  }
+
+  return NextResponse.json({ ok: true });
 }

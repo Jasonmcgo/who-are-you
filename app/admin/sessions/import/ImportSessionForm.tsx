@@ -6,7 +6,7 @@
 // renders the server response — success (new sessionId + derivation
 // status) or a specific error from the validator.
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 
 interface ImportResult {
@@ -25,8 +25,18 @@ export default function ImportSessionForm() {
   const [pending, setPending] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // CC-155 Part B — synchronous in-flight latch. React's `setPending(true)`
+  // re-renders on the next tick, so a fast double-click (the bug that
+  // created Madison ×2 / LaCinda ×2) can fire two handlers before the
+  // `disabled={pending}` attribute updates. A ref-backed latch flips
+  // immediately and is checked at handler entry — second click is dropped
+  // before the fetch.
+  const inFlightRef = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function postJson(text: string) {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     setPending(true);
     setError(null);
     setResult(null);
@@ -48,6 +58,11 @@ export default function ImportSessionForm() {
       setError(`network error: ${(e as Error).message}`);
     } finally {
       setPending(false);
+      inFlightRef.current = false;
+      // Reset the file input so re-selecting the same file after one
+      // import (deliberate or undo) actually fires another `change`
+      // event — without this, the browser sees no change and ignores.
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
 
@@ -95,6 +110,7 @@ export default function ImportSessionForm() {
           Option A — upload a .json file
         </p>
         <input
+          ref={fileInputRef}
           type="file"
           accept="application/json,.json"
           onChange={handleFileChange}
