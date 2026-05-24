@@ -90,12 +90,33 @@ type CtaState =
   | { kind: "idle" }
   | { kind: "minting" }
   | { kind: "ready"; url: string; copied: boolean }
-  | { kind: "error"; message: string };
+  | { kind: "error" };
 
-function CoupleInviteCTA({ sessionId }: { sessionId: string }) {
+// CC-154 — mirror the Share-block gate in InnerConstitutionPage
+// (`!sessionId ? null : …` at L1406). A "real" saved session has a
+// non-empty UUID id from the DB; anything else is the draft path
+// and must not offer a live mint button.
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// User-facing failure copy. Generic on purpose — covers transient
+// network failure, the missing-table case, the partner-A-not-found
+// case, and any future server error. The real cause is logged
+// server-side in app/api/couple/mint/route.ts.
+const GENERIC_MINT_ERROR =
+  "We couldn't create your invite link just now. Please try again in a moment.";
+
+function CoupleInviteCTA({ sessionId }: { sessionId: string | null | undefined }) {
   const [state, setState] = useState<CtaState>({ kind: "idle" });
 
+  // CC-154 T1 — gate the mint on a real saved session id. In any
+  // non-saved/draft context this renders the warm "save first" hint and
+  // never offers a clickable mint button.
+  const hasSavedSession =
+    typeof sessionId === "string" && UUID_RE.test(sessionId);
+
   async function handleMint() {
+    if (!hasSavedSession) return;
     setState({ kind: "minting" });
     try {
       const res = await fetch("/api/couple/mint", {
@@ -104,16 +125,16 @@ function CoupleInviteCTA({ sessionId }: { sessionId: string }) {
         body: JSON.stringify({ sessionId }),
       });
       if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error ?? `mint failed (${res.status})`);
+        // Drain the body to avoid leaks; never echo it back to the UI.
+        await res.json().catch(() => ({}));
+        throw new Error("mint failed");
       }
       const data = (await res.json()) as { token: string; url: string };
       setState({ kind: "ready", url: data.url, copied: false });
-    } catch (e) {
-      setState({
-        kind: "error",
-        message: e instanceof Error ? e.message : "mint failed",
-      });
+    } catch {
+      // CC-154 T2 — never display the underlying error message to the
+      // user. The server-side log carries the real cause for diagnosis.
+      setState({ kind: "error" });
     }
   }
 
@@ -182,7 +203,21 @@ function CoupleInviteCTA({ sessionId }: { sessionId: string }) {
         you both see how well they read you. Their answers never touch your
         report.
       </p>
-      {state.kind === "idle" ? (
+      {!hasSavedSession ? (
+        // CC-154 T1 — draft / unsaved state. No live mint button; warm
+        // hint instead so the affordance reads as deferred, not broken.
+        <p
+          className="font-serif italic"
+          style={{
+            fontSize: 13,
+            color: "var(--ink-soft)",
+            margin: 0,
+            lineHeight: 1.5,
+          }}
+        >
+          Save your report first, then you can invite your partner.
+        </p>
+      ) : state.kind === "idle" ? (
         <button
           type="button"
           onClick={handleMint}
@@ -248,17 +283,39 @@ function CoupleInviteCTA({ sessionId }: { sessionId: string }) {
           </button>
         </div>
       ) : (
-        <p
-          className="font-serif italic"
-          style={{
-            fontSize: 13,
-            color: "var(--ink-soft)",
-            margin: 0,
-            lineHeight: 1.5,
-          }}
-        >
-          Couldn&apos;t mint a link: {state.message}
-        </p>
+        // CC-154 T2/T3 — generic, reassuring failure copy. The "in a
+        // moment" framing covers the transient/missing-table case
+        // without exposing why.
+        <div className="flex flex-col" style={{ gap: 8 }}>
+          <p
+            className="font-serif italic"
+            style={{
+              fontSize: 13,
+              color: "var(--ink-soft)",
+              margin: 0,
+              lineHeight: 1.5,
+            }}
+          >
+            {GENERIC_MINT_ERROR}
+          </p>
+          <button
+            type="button"
+            onClick={handleMint}
+            className="font-mono uppercase"
+            style={{
+              fontSize: 11,
+              letterSpacing: "0.12em",
+              color: "var(--umber)",
+              background: "transparent",
+              border: "1px solid var(--rule)",
+              padding: "6px 10px",
+              cursor: "pointer",
+              alignSelf: "flex-start",
+            }}
+          >
+            try again
+          </button>
+        </div>
       )}
     </aside>
   );

@@ -11,6 +11,12 @@ interface PostBody {
   sessionId?: string;
 }
 
+// CC-154 T2 — single generic user-facing failure copy. The real cause
+// is logged server-side (console.error with context) and never echoed
+// back to the client.
+const GENERIC_MINT_ERROR =
+  "We couldn't create your invite link just now. Please try again in a moment.";
+
 export async function POST(req: NextRequest) {
   let body: PostBody;
   try {
@@ -34,12 +40,19 @@ export async function POST(req: NextRequest) {
     const minted = await mintCoupleInviteLink(sessionId, { baseUrl });
     return NextResponse.json(minted);
   } catch (e) {
-    const message = e instanceof Error ? e.message : "mint failed";
-    // The mint helper's "session not found" message is the only thrown
-    // case in MVP; route it as 404 so the caller can react.
-    if (message.includes("not found")) {
-      return NextResponse.json({ error: message }, { status: 404 });
-    }
-    return NextResponse.json({ error: message }, { status: 500 });
+    // CC-154 T2 — log the real cause server-side with context for
+    // diagnosis; return only the generic copy to the client. The
+    // raw error (e.g. `relation "couple_sessions" does not exist`,
+    // or `mintCoupleInviteLink: partner A session ... not found`)
+    // must never leak through the JSON body.
+    const rawMessage = e instanceof Error ? e.message : String(e);
+    console.error("[api/couple/mint] mint failed", {
+      sessionId,
+      error: rawMessage,
+    });
+    // Preserve the 404 status distinction so the client/network layer
+    // can react meaningfully, but the body stays generic.
+    const status = rawMessage.includes("not found") ? 404 : 500;
+    return NextResponse.json({ error: GENERIC_MINT_ERROR }, { status });
   }
 }
