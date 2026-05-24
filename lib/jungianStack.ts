@@ -76,6 +76,147 @@ const PERCEIVING: CognitiveFunctionId[] = ["ni", "ne", "si", "se"];
 const JUDGING: CognitiveFunctionId[] = ["ti", "te", "fi", "fe"];
 export const MBTI_TIE_MARGIN = 0.5;
 
+// ── CC-134 Part C — top-pick convergence ────────────────────────────────
+//
+// Replaces flat avg-rank with rank-1 frequency for dominant selection.
+// Owner principle: the top pick carries the signal; ranks 2–4 are noisy
+// and weak-vs-weak comparisons are non-data. So we count how often each
+// function is the rank-1 pick across the Q-T blocks it appears in;
+// dominant/aux are selected from the per-pool top-pick leaders.
+//
+// `TOP_PICK_CONVERGENCE_MARGIN` is the BASELINE minimum top-pick lead
+// the in-pool leader must clear over the runner-up. CC-134.1 makes the
+// effective margin data-relative (`dynamicMargin` below); this constant
+// is the floor that the data-relative formula uses as its `max`.
+// Owner-tunable; default 2 = the leader must out-pick the runner-up by
+// at least 2 top-picks even when data is abundant. With full 8-block
+// Q-T data the dynamic formula may raise this; the floor protects the
+// thin-data case.
+//
+// `NS_VALENCE_GUARD_MARGIN` is the perceiving-axis (N vs S) margin per
+// §C.6 of CC-134: warm-N items over-attract, so when an N leads the S
+// runner-up by < this margin, the call is suspect — we drop to `low`
+// confidence and route to Part D's head-to-head clarifier instead of
+// committing to N. CC-134.1 makes this reuse the same data-relative
+// `dynamicMargin` formula so guard tightens with full data.
+export const TOP_PICK_CONVERGENCE_MARGIN = 2;
+export const NS_VALENCE_GUARD_MARGIN = 2;
+
+// CC-134.1 — minimum-data floor for `high` confidence. CC-134's
+// margin-only check granted `high` whenever the leader cleared the
+// runner-up by 2 top-picks, with no minimum-observation floor. A thin
+// fixture (2 top-picks vs 0, ≤2 scored blocks) trivially clears the
+// flat margin and gets stamped `high` — the inverse of what CC-134
+// aimed at, and most dangerous for the untouched-ranking population
+// CC-134 targets. These constants close that gap:
+//   - `MIN_DOMINANT_TOP_PICKS`: the dominant must accumulate ≥ this
+//     many rank-1 picks before `high` is even eligible (3 = the
+//     dominant must lead in 3 of 4 blocks at minimum).
+//   - `MIN_QT_BLOCKS_WITH_DATA`: the dominant's pool (perceiving or
+//     judging) must have ≥ this many distinct Q-T blocks scored
+//     (default 3 of 4 = strict enough to block 2-vs-0 thin cases
+//     while not requiring every block).
+// Below either floor → `confidence = "low"` regardless of margin. Low
+// already routes to the §D head-to-head clarifier from CC-134.
+export const MIN_DOMINANT_TOP_PICKS = 3;
+export const MIN_QT_BLOCKS_WITH_DATA = 3;
+
+// CC-134.1 — judging-axis co-occurrence guard (Ti+Fi / Te+Fe). A
+// canonical Jungian stack never holds two same-attitude judging
+// functions; meaningful top-picks on BOTH Ti & Fi (or Te & Fe) is the
+// warm-Ti-pulls-Fi (or symmetric warm-Te-pulls-Fe) fingerprint, not a
+// real shape. When both members of an impossible same-attitude pair
+// exceed this threshold, confidence drops to `low` and the §D judging
+// head-to-head clarifier disambiguates. Parallel to §C.6's N/S
+// valence guard. **CC-138 supersedes this guard for binary-format
+// sessions** via the opposite-attitude constraint built into the new
+// item flow; this guard fixes the LEGACY ranking format that ships
+// today.
+export const JUDGING_COOCCURRENCE_THRESHOLD = 2;
+
+/**
+ * Data-relative convergence margin (CC-134.1 §Task 2). Returns the
+ * minimum top-pick lead the in-pool leader must clear to count as
+ * convergent. Scales modestly with the number of scored blocks so
+ * full-Q-T data doesn't trivialise the comparison; bounded below by
+ * `TOP_PICK_CONVERGENCE_MARGIN`.
+ *
+ * Formula: `max(TOP_PICK_CONVERGENCE_MARGIN, ceil(0.25 × scoredBlocks))`.
+ * With 4 scored blocks (a single pool's worth): margin = 2.
+ * With 8 scored blocks (total Q-T): margin = 2.
+ * With 12 scored blocks (hypothetical expanded bank): margin = 3.
+ *
+ * The thin-data case (≤2 scored blocks) is handled by the
+ * `MIN_QT_BLOCKS_WITH_DATA` floor, not by the margin — so the formula
+ * doesn't need to inflate when blocks are scarce.
+ */
+export function dynamicMargin(scoredBlocks: number): number {
+  return Math.max(TOP_PICK_CONVERGENCE_MARGIN, Math.ceil(0.25 * scoredBlocks));
+}
+
+/**
+ * Count of distinct Q-T blocks that produced AT LEAST ONE signal in
+ * the given pool. Used by the min-data floor and the dynamic margin.
+ * A Q-T block contributes to its pool's count when any of its items
+ * was ranked (regardless of which function ended up #1).
+ */
+export function scoredBlocksFor(
+  signals: Signal[],
+  pool: CognitiveFunctionId[]
+): number {
+  const poolSet = new Set<string>(pool);
+  const blocks = new Set<string>();
+  for (const s of signals) {
+    if (!poolSet.has(s.signal_id)) continue;
+    for (const qid of s.source_question_ids ?? []) {
+      if (qid.startsWith("Q-T")) blocks.add(qid);
+    }
+  }
+  return blocks.size;
+}
+
+const N_FUNCTIONS = new Set<CognitiveFunctionId>(["ni", "ne"]);
+const S_FUNCTIONS = new Set<CognitiveFunctionId>(["si", "se"]);
+
+/**
+ * Count the rank-1 picks for `fn` across the signal pool. A "top pick"
+ * is any signal whose `rank === 1` — i.e. the user's #1 selection in
+ * the originating Q-T (or other rank-bearing) question. This is the
+ * canonical convergence metric per CC-134's owner principle.
+ */
+export function topPickCountFor(
+  signals: Signal[],
+  fn: CognitiveFunctionId
+): number {
+  let n = 0;
+  for (const s of signals) {
+    if (s.signal_id === fn && s.rank === 1) n++;
+  }
+  return n;
+}
+
+/**
+ * For a given function pool (perceiving or judging), build the per-
+ * function top-pick counts sorted desc with a deterministic tiebreak
+ * (averageRank asc, then fn name asc).
+ */
+function poolTopPickRanking(
+  signals: Signal[],
+  pool: CognitiveFunctionId[]
+): Array<{ fn: CognitiveFunctionId; topPicks: number; avg: number }> {
+  return pool
+    .map((fn) => ({
+      fn,
+      topPicks: topPickCountFor(signals, fn),
+      avg: averageRank(signals, fn),
+    }))
+    .sort((a, b) => {
+      if (b.topPicks !== a.topPicks) return b.topPicks - a.topPicks;
+      if (a.avg !== b.avg) return a.avg - b.avg;
+      return a.fn.localeCompare(b.fn);
+    });
+}
+
 // CC-097-CONFIDENCE-FIX — same-dimension opposite-attitude pairs.
 // dominantTooTight previously compared the dominant function's avg
 // rank against the next-best function in the same POOL (perceiving
@@ -123,16 +264,10 @@ const ALL_FUNCTIONS: CognitiveFunctionId[] = [
   "fi",
 ];
 
-function dominantSort(
-  a: { fn: CognitiveFunctionId; avg: number },
-  b: { fn: CognitiveFunctionId; avg: number }
-): number {
-  if (a.avg !== b.avg) return a.avg - b.avg;
-  const aPerceiving = PERCEIVING.includes(a.fn);
-  const bPerceiving = PERCEIVING.includes(b.fn);
-  if (aPerceiving !== bPerceiving) return aPerceiving ? -1 : 1;
-  return a.fn.localeCompare(b.fn);
-}
+// dominantSort — legacy avgRank tiebreak preserved as a void reference
+// so the export surface is unchanged; CC-134 Part C no longer uses it
+// (top-pick convergence supersedes avgRank-based dominant selection).
+void PERCEIVING; // keep PERCEIVING reachable for future re-use; reference is in poolTopPickRanking.
 
 const STACK_TABLE: Record<
   string,
@@ -239,24 +374,27 @@ function averageRank(signals: Signal[], fn: CognitiveFunctionId): number {
 // re-exports it for backward-compat with import sites.
 
 export function aggregateLensStack(signals: Signal[]): LensStack {
-  const allRanks = ALL_FUNCTIONS.map((fn) => ({
-    fn,
-    avg: averageRank(signals, fn),
-  }));
-  allRanks.sort(dominantSort);
-  const perceivingRanks = PERCEIVING.map((fn) => ({
-    fn,
-    avg: averageRank(signals, fn),
-  })).sort((a, b) => a.avg - b.avg || a.fn.localeCompare(b.fn));
-  const judgingRanks = JUDGING.map((fn) => ({
-    fn,
-    avg: averageRank(signals, fn),
-  })).sort((a, b) => a.avg - b.avg || a.fn.localeCompare(b.fn));
+  // CC-134 Part C — Lens stack resolution is now driven by top-pick
+  // convergence (rank-1 frequency per pool) instead of flat
+  // averageRank. averageRank is retained as a deterministic
+  // tiebreaker only. See TOP_PICK_CONVERGENCE_MARGIN +
+  // NS_VALENCE_GUARD_MARGIN above for the threshold canon. Movement
+  // numerics do NOT depend on the lens stack (verified via the CC-134
+  // numeric-invariant check), so this change is type-only.
+  const perceivingByTopPick = poolTopPickRanking(signals, PERCEIVING);
+  const judgingByTopPick = poolTopPickRanking(signals, JUDGING);
 
-  const dominantPerceiving = perceivingRanks[0];
-  const dominantJudging = judgingRanks[0];
+  const dominantPerceiving = perceivingByTopPick[0];
+  const dominantJudging = judgingByTopPick[0];
+
+  // Degenerate / thin-signal fixture — no top-picks landed in either
+  // pool AND averageRank is non-finite (no ranks at all). Fall through
+  // to the legacy default (preserves backward-compat with pre-CC-134
+  // empty-signal fixtures).
   if (
-    !isFinite(dominantPerceiving.avg) ||
+    dominantPerceiving.topPicks === 0 &&
+    dominantJudging.topPicks === 0 &&
+    !isFinite(dominantPerceiving.avg) &&
     !isFinite(dominantJudging.avg)
   ) {
     return {
@@ -268,15 +406,33 @@ export function aggregateLensStack(signals: Signal[]): LensStack {
     };
   }
 
-  const dominant =
-    dominantPerceiving.avg <= dominantJudging.avg
-      ? dominantPerceiving
-      : dominantJudging;
+  // CC-134 §C.2 — between perceiving and judging dominants, the one
+  // with MORE top-picks leads. Ties: prefer perceiving (matches the
+  // pre-CC-134 `dominantSort` convention so canonical Ni/Si/etc.
+  // drivers don't suddenly demote on a tie). The legacy avgRank-
+  // based "lower is better" comparison flipped here to "more top
+  // picks is better."
+  const perceivingLeads =
+    dominantPerceiving.topPicks > dominantJudging.topPicks ||
+    (dominantPerceiving.topPicks === dominantJudging.topPicks &&
+      dominantPerceiving.topPicks > 0);
+  const dominant = perceivingLeads ? dominantPerceiving : dominantJudging;
+
+  // Aux selection: within the VALID_AUX_BY_DOMINANT constraints,
+  // pick the highest top-pick count. Tiebreak on averageRank asc.
   const validAuxCandidates = VALID_AUX_BY_DOMINANT[dominant.fn];
-  const auxCandidatesWithAvgs = validAuxCandidates
-    .map((fn) => ({ fn, avg: averageRank(signals, fn) }))
-    .sort((a, b) => a.avg - b.avg || a.fn.localeCompare(b.fn));
-  const auxiliary = auxCandidatesWithAvgs[0];
+  const auxByTopPick = validAuxCandidates
+    .map((fn) => ({
+      fn,
+      topPicks: topPickCountFor(signals, fn),
+      avg: averageRank(signals, fn),
+    }))
+    .sort((a, b) => {
+      if (b.topPicks !== a.topPicks) return b.topPicks - a.topPicks;
+      if (a.avg !== b.avg) return a.avg - b.avg;
+      return a.fn.localeCompare(b.fn);
+    });
+  const auxiliary = auxByTopPick[0];
   const key = `${dominant.fn}|${auxiliary.fn}`;
   const stackTuple = STACK_TABLE[key];
   const mbtiCode = MBTI_LOOKUP[key];
@@ -285,30 +441,111 @@ export function aggregateLensStack(signals: Signal[]): LensStack {
     throw new Error(`Non-canonical Jungian stack resolved: ${key}`);
   }
 
-  // CC-097-CONFIDENCE-FIX — dominantTooTight now reads the SAME-
-  // DIMENSION OPPOSITE-ATTITUDE mirror's avg rank rather than the
-  // next-best function in the same pool. See SAME_DIMENSION_MIRROR
-  // comment above for the rationale (legacy logic flagged developed
-  // Si-driver shapes with Ne tertiary as ⚠ low when they were
-  // canon-healthy). The previous `dominantPool` + `dominantRunnerUp`
-  // computation is retained as `dominantPool` below for the unused-
-  // var lint cleanup, but the tooTight check no longer reads it.
+  // Confidence from convergence (CC-134 §C.3 + CC-134.1 calibration).
+  // The leader must clear the in-pool runner-up by `dynamicMargin`
+  // (data-relative, floored at TOP_PICK_CONVERGENCE_MARGIN). Scattered
+  // #1s with no clear leader → low → triggers Part D head-to-head
+  // clarifier. The auxiliary follows the same rule against its in-pool
+  // runner-up.
+  //
+  // CC-134.1 additions:
+  //   - Min-data floor: dominant pool must have ≥ MIN_QT_BLOCKS_WITH_DATA
+  //     scored blocks AND the dominant must have ≥ MIN_DOMINANT_TOP_PICKS
+  //     top-picks; otherwise `low` regardless of margin.
+  //   - Data-relative margin via `dynamicMargin(scoredBlocks)`.
+  //   - Judging co-occurrence guard (Ti+Fi / Te+Fe).
   const dominantPool = PERCEIVING.includes(dominant.fn)
+    ? perceivingByTopPick
+    : judgingByTopPick;
+  const dominantPoolFunctions = PERCEIVING.includes(dominant.fn)
     ? PERCEIVING
     : JUDGING;
-  void dominantPool;
+  const dominantPoolScoredBlocks = scoredBlocksFor(signals, dominantPoolFunctions);
+  const auxPoolFunctions = PERCEIVING.includes(auxiliary.fn)
+    ? PERCEIVING
+    : JUDGING;
+  const auxPoolScoredBlocks = scoredBlocksFor(signals, auxPoolFunctions);
+
+  const dominantMargin = dynamicMargin(dominantPoolScoredBlocks);
+  const auxMargin = dynamicMargin(auxPoolScoredBlocks);
+
+  const dominantRunnerUp = dominantPool[1];
+  const auxRunnerUp = auxByTopPick[1];
+
+  const dominantConvergenceWeak =
+    dominantRunnerUp !== undefined &&
+    dominant.topPicks - dominantRunnerUp.topPicks < dominantMargin;
+  const auxConvergenceWeak =
+    auxRunnerUp !== undefined &&
+    auxiliary.topPicks - auxRunnerUp.topPicks < auxMargin;
+
+  // CC-097-CONFIDENCE-FIX intuition preserved: the same-dimension
+  // mirror (Si↔Se, Ni↔Ne, Ti↔Te, Fi↔Fe) is the disambiguation axis.
+  // Under top-pick semantics, if the dominant's mirror has nearly the
+  // same top-pick count, the attitude (introverted vs extraverted) is
+  // genuinely ambiguous. CC-134.1 — reuses `dynamicMargin` so the
+  // mirror tightness check scales with data.
   const dominantMirror = SAME_DIMENSION_MIRROR[dominant.fn];
-  const dominantMirrorAvg = averageRank(signals, dominantMirror);
-  const auxRunnerUp = auxCandidatesWithAvgs[1];
-  const dominantTooTight =
-    isFinite(dominantMirrorAvg) &&
-    dominantMirrorAvg - dominant.avg < MBTI_TIE_MARGIN;
-  const auxTooTight =
-    !isFinite(auxiliary.avg) ||
-    (auxRunnerUp !== undefined &&
-      auxRunnerUp.avg - auxiliary.avg < MBTI_TIE_MARGIN);
+  const dominantMirrorTopPicks = topPickCountFor(signals, dominantMirror);
+  const dominantMirrorTooTight =
+    dominant.topPicks - dominantMirrorTopPicks < dominantMargin;
+
+  // CC-134 §C.6 — N/S valence guard. CC-134.1 — reuse `dynamicMargin`
+  // (perceiving pool) so the guard tightens with full perceiving Q-T
+  // data and stays at 2 when data is thin.
+  let nsValenceSuspect = false;
+  if (N_FUNCTIONS.has(dominantPerceiving.fn)) {
+    const sLeader = perceivingByTopPick.find((r) => S_FUNCTIONS.has(r.fn));
+    const nsMargin = dynamicMargin(
+      scoredBlocksFor(signals, PERCEIVING)
+    );
+    if (
+      sLeader &&
+      dominantPerceiving.topPicks - sLeader.topPicks < nsMargin
+    ) {
+      nsValenceSuspect = true;
+    }
+  }
+
+  // CC-134.1 §Task 3 — judging-axis co-occurrence guard. A canonical
+  // stack never holds two same-attitude judging functions, so
+  // meaningful top-picks on BOTH Ti & Fi (or Te & Fe) is impossible —
+  // it's the warm-Ti-pulls-Fi (or warm-Te-pulls-Fe) fingerprint. When
+  // both members of an impossible pair exceed the threshold, force
+  // `low` and trigger the §D judging head-to-head clarifier.
+  // **CC-138 supersedes this for binary-format sessions** via the
+  // opposite-attitude constraint built into the new item flow.
+  const tiTop = topPickCountFor(signals, "ti");
+  const fiTop = topPickCountFor(signals, "fi");
+  const teTop = topPickCountFor(signals, "te");
+  const feTop = topPickCountFor(signals, "fe");
+  const judgingCoOccurrenceSuspect =
+    (tiTop >= JUDGING_COOCCURRENCE_THRESHOLD &&
+      fiTop >= JUDGING_COOCCURRENCE_THRESHOLD) ||
+    (teTop >= JUDGING_COOCCURRENCE_THRESHOLD &&
+      feTop >= JUDGING_COOCCURRENCE_THRESHOLD);
+
+  // CC-134.1 §Task 1 — minimum-data floor. The dominant pool must
+  // carry enough observed signal for `high` to be earned at all.
+  // Below the floor → `low` regardless of how cleanly the margin
+  // clears (since with thin data a 2-vs-0 lead is near-random, not
+  // convergent). The floor applies to the dominant's pool only —
+  // the aux pool is allowed to be thinner since aux is less load-
+  // bearing for the type label.
+  const belowMinDominantPicks = dominant.topPicks < MIN_DOMINANT_TOP_PICKS;
+  const belowMinScoredBlocks =
+    dominantPoolScoredBlocks < MIN_QT_BLOCKS_WITH_DATA;
+  const belowMinDataFloor = belowMinDominantPicks || belowMinScoredBlocks;
+
   const confidence: "high" | "low" =
-    dominantTooTight || auxTooTight ? "low" : "high";
+    belowMinDataFloor ||
+    dominantConvergenceWeak ||
+    auxConvergenceWeak ||
+    dominantMirrorTooTight ||
+    nsValenceSuspect ||
+    judgingCoOccurrenceSuspect
+      ? "low"
+      : "high";
 
   return {
     dominant: stackTuple[0],

@@ -50,6 +50,13 @@
       "when": 1779497239000,
       "tag": "0006_follow_up_links",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1779581629335,
+      "tag": "0007_chief_gateway",
+      "breakpoints": true
     }
   ]
 }

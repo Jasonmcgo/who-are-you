@@ -18,6 +18,9 @@ import {
   ghostMappingAudit,
 } from "../db/schema";
 import { ENGINE_SHAPE_VERSION } from "./staleShape";
+// CC-136 — answer-history archive helper (Part A).
+import { archiveAnswers, type ArchiveReason } from "./answerHistory";
+import { questions as allQuestions } from "../data/questions";
 import type {
   Answer,
   BeliefUnderTension,
@@ -199,6 +202,100 @@ export async function updateSessionAnswer(
     .where(eq(sessions.id, sessionId));
 
   return { ok: true };
+}
+
+// CC-136 Part A — `resetSessionAnswer`
+//
+// Admin "Reset" action: clears a single live answer (and any derived
+// children whose parent went away) AND archives the prior value(s) to
+// `answer_history` so a subsequent re-ask doesn't lose data.
+//
+// Cascade rule: derived questions (ranking_derived / multiselect_
+// derived) depend on parent rankings via `derived_from`. When a parent
+// answer is reset, its derived children become stale — `missing
+// Questions` would hide them anyway until the parent is re-answered,
+// but leaving them on `sessions.answers` would silently re-seed
+// derivation with a value that no longer corresponds to a live parent.
+// So the cascade archives + removes those children at the same time.
+//
+// Atomic via a single drizzle transaction: archive INSERTs happen
+// BEFORE the sessions.answers update, so a crash between them leaves
+// the archive populated and the live row unchanged (re-running the
+// reset is then idempotent — it just re-archives a record that
+// already exists, which is acceptable append-only behavior).
+//
+// Returns the count of archived entries (1 + N derived children) so
+// the caller can confirm what was cleared. A reset on a question that
+// was already unanswered is a no-op — no archive, no error.
+export interface ResetSessionAnswerResult {
+  ok: true;
+  archivedCount: number;
+  archivedQuestionIds: string[];
+}
+
+export async function resetSessionAnswer(
+  sessionId: string,
+  questionId: string,
+  reason: "admin_reset" | "cascade_reset" | "rebalance_recollect" | "periodic_remeasure" = "admin_reset"
+): Promise<ResetSessionAnswerResult> {
+  const db = getDb();
+  return await db.transaction(async (tx) => {
+    const rows = await tx
+      .select({ answers: sessions.answers })
+      .from(sessions)
+      .where(eq(sessions.id, sessionId))
+      .limit(1);
+    if (rows.length === 0) {
+      throw new Error(`Session ${sessionId} not found`);
+    }
+    const existing = (rows[0].answers ?? []) as Answer[];
+    const target = existing.find((a) => a.question_id === questionId);
+    if (!target) {
+      // Idempotent no-op: question already unanswered. Don't throw —
+      // the admin click is meaningful only if the answer existed; a
+      // no-op here just confirms there's nothing to clear.
+      return { ok: true, archivedCount: 0, archivedQuestionIds: [] };
+    }
+
+    // Cascade: identify derived children that depend on `questionId`.
+    // `data/questions.ts` is the source of truth for parent edges.
+    const childIds = new Set<string>();
+    for (const q of allQuestions) {
+      if (q.type !== "ranking_derived" && q.type !== "multiselect_derived") continue;
+      const parents = q.derived_from ?? [];
+      if (parents.includes(questionId)) childIds.add(q.question_id);
+    }
+
+    // Collect everything to archive: the target + every derived child
+    // that currently has a live answer.
+    const toArchive: Array<{ questionId: string; answer: Answer; reason: ArchiveReason }> = [];
+    toArchive.push({ questionId, answer: target, reason });
+    for (const childId of childIds) {
+      const childAns = existing.find((a) => a.question_id === childId);
+      if (childAns) {
+        toArchive.push({ questionId: childId, answer: childAns, reason: "cascade_reset" });
+      }
+    }
+
+    // Archive first — never lose data even if the subsequent update
+    // crashes mid-flight (append-only history is the safety net).
+    await archiveAnswers(tx, sessionId, toArchive);
+
+    // Remove the target + cascaded children from the live answers list.
+    const removalIds = new Set<string>([questionId, ...childIds]);
+    const updated = existing.filter((a) => !removalIds.has(a.question_id));
+
+    await tx
+      .update(sessions)
+      .set({ answers: updated, updated_at: new Date() })
+      .where(eq(sessions.id, sessionId));
+
+    return {
+      ok: true,
+      archivedCount: toArchive.length,
+      archivedQuestionIds: toArchive.map((e) => e.questionId),
+    };
+  });
 }
 
 // CC-DEMOGRAPHICS-SAVE-WIRING — ghost-mapping admin action. Upserts the

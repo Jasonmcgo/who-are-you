@@ -193,6 +193,38 @@ export const followUpLinks = pgTable("follow_up_links", {
   used_at: timestamp("used_at", { withTimezone: true }),
 });
 
+// CC-136 — Answer history archive. One row per `resetSessionAnswer` call.
+// Append-only: a Reset on an already-answered question snapshots the prior
+// value here BEFORE the live answer is removed from `sessions.answers`. The
+// archive avoids data loss when re-asking already-answered questions (e.g.
+// re-collecting CC-135's rebalanced N/S items, re-measuring under movement)
+// and serves as the groundwork for the CC-137 versioned-"passes" /
+// longitudinal-delta system. CC-136 itself does NOT read this table in
+// derivation; the archive is purely a safety net + future-pass anchor.
+//
+// Cascade-deletes when the underlying session is deleted; orphaned history
+// is meaningless without the row it pertains to.
+export const answerHistory = pgTable("answer_history", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  session_id: uuid("session_id")
+    .notNull()
+    .references(() => sessions.id, { onDelete: "cascade" }),
+  // Source question id — references a `data/questions.ts` row by question_id.
+  // Stored as text (not FK) because question_ids live in code, not DB.
+  question_id: text("question_id").notNull(),
+  // Full Answer JSON at the moment of archive. Stored as JSONB so the
+  // ranking/freeform/single-pick/multiselect-derived variants all
+  // round-trip cleanly.
+  answer: jsonb("answer").notNull(),
+  archived_at: timestamp("archived_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  // Reason tag — defaults to "admin_reset" but is open-ended so future
+  // callers (cohort re-measure, periodic re-ask campaigns) can record
+  // their own causal label.
+  reason: text("reason").notNull().default("admin_reset"),
+});
+
 // CC-021a — Attachments table. One row per uploaded file associated with a
 // session. The file bytes live on disk under attachments/<session_id>/; only
 // the metadata + relative path live in Postgres. Cascade-deletes on session

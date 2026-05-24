@@ -172,6 +172,13 @@ const CARD_KICKER_NAME: Record<CardId, string> = {
   contradiction: "CONTRADICTION",
 };
 
+// CC-134 Part A — ceiling on how many NON-high-signal untouched
+// rankings can be routed to the second pass. A fully passive
+// respondent could otherwise generate a 20+ question second pass; the
+// cap keeps the re-ask budget bounded. High-signal rankings
+// (Q-S1 / Q-S2 / Q-T1–8) ALWAYS route regardless of the cap.
+const UNTOUCHED_SECOND_PASS_CAP = 4;
+
 export default function Home() {
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<Answer[]>([]);
@@ -228,6 +235,14 @@ export default function Home() {
   const [multiSelectState, setMultiSelectState] = useState<
     Record<string, { selectedIds: string[]; otherText: string }>
   >({});
+  // CC-134 Part A — per-ranking touched flag. A ranking is "touched"
+  // only after the user performs a deliberate reorder (drag or
+  // keyboard). Untouched rankings are routed to the single-pick
+  // second pass on advance rather than being saved as deliberate
+  // default-order rankings (pre-CC-134 silent-default bug).
+  const [touchedRankings, setTouchedRankings] = useState<Set<string>>(
+    new Set()
+  );
 
   const question = questions[current];
 
@@ -461,6 +476,46 @@ export default function Home() {
 
   function handleContinue() {
     if (question.type === "ranking" && Array.isArray(draft)) {
+      // CC-134 Part A — untouched-ranking routing. If the user
+      // advanced past a ranking without ever deliberately reordering
+      // it (no drag, no keyboard pick-and-move), the `touched` flag
+      // is false; we route the question to the single-pick second
+      // pass instead of saving the default order as a deliberate
+      // answer. The high-signal set (Q-S1 / Q-S2 / Q-T1–8) always
+      // routes; the rest routes up to UNTOUCHED_SECOND_PASS_CAP so a
+      // fully passive respondent doesn't trigger a long second pass.
+      if (!touchedRankings.has(question.question_id)) {
+        const qid = question.question_id;
+        const isHighSignal =
+          qid === "Q-S1" ||
+          qid === "Q-S2" ||
+          (qid.startsWith("Q-T") && /^Q-T[1-9]\d*$/.test(qid));
+        const alreadyRoutedCount = skippedQuestionIds.filter(
+          (id) => !(id === "Q-S1" || id === "Q-S2" || (id.startsWith("Q-T") && /^Q-T[1-9]\d*$/.test(id)))
+        ).length;
+        const shouldRoute =
+          isHighSignal || alreadyRoutedCount < UNTOUCHED_SECOND_PASS_CAP;
+        if (shouldRoute) {
+          const meta: MetaSignal = {
+            type: "question_skipped",
+            question_id: qid,
+            card_id: question.card_id,
+            recorded_at: Date.now(),
+          };
+          setMetaSignals((prev) => [...prev, meta]);
+          setSkippedQuestionIds((prev) =>
+            prev.includes(qid) ? prev : [...prev, qid]
+          );
+          setAnswers((prev) => prev.filter((a) => a.question_id !== qid));
+          setDrafts((prev) => {
+            const next = { ...prev };
+            delete next[qid];
+            return next;
+          });
+          advanceFromIndex(current);
+          return;
+        }
+      }
       const a = toRankingAnswer(question.question_id, draft);
       if (!a) return;
       // CC-016 — attach overlay if this is an allocation parent ranking.
@@ -799,6 +854,15 @@ export default function Home() {
           items={question.items}
           initialOrder={Array.isArray(draft) ? draft : undefined}
           onChange={(order) => updateDraft(order)}
+          onTouched={() => {
+            const qid = question.question_id;
+            setTouchedRankings((prev) => {
+              if (prev.has(qid)) return prev;
+              const next = new Set(prev);
+              next.add(qid);
+              return next;
+            });
+          }}
           overlay={
             ALLOCATION_PARENT_RANKINGS.has(question.question_id)
               ? overlays[question.question_id]
@@ -833,6 +897,15 @@ export default function Home() {
           items={derivedItems.items}
           initialOrder={Array.isArray(draft) ? draft : undefined}
           onChange={(order) => updateDraft(order)}
+          onTouched={() => {
+            const qid = question.question_id;
+            setTouchedRankings((prev) => {
+              if (prev.has(qid)) return prev;
+              const next = new Set(prev);
+              next.add(qid);
+              return next;
+            });
+          }}
         />
       ) : question.type === "multiselect_derived" &&
         multiSelectDerivedItems &&

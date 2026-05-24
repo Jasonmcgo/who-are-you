@@ -21,8 +21,13 @@
 // `(constitution, answers)` to read state-load + currentMode. The constitution
 // alone is insufficient for `weather.load`. Flagged in the CC report.
 
-import type { Answer, InnerConstitution } from "./types";
+import type { Answer, CognitiveFunctionId, InnerConstitution } from "./types";
 import { computeStateLoad } from "./nextMovesRouter";
+import {
+  topPickCountFor,
+  TOP_PICK_CONVERGENCE_MARGIN,
+  JUDGING_COOCCURRENCE_THRESHOLD,
+} from "./jungianStack";
 
 // ─────────────────────────────────────────────────────────────────────
 // Types — verbatim from CC-125 task A
@@ -36,7 +41,40 @@ export type FollowUpInput = {
     aux?: string;
     confidence?: "low" | "medium" | "high";
     ambiguityNotes?: string[];
+    // CC-134 Part D §D.1 — top-pick leaders per perceiving sub-axis,
+    // resolved from Q-T signals. Populated when an N/S head-to-head
+    // clarifier should fire (Lens confidence is `low` OR the N/S split
+    // is suspect per the §C.6 valence guard). When set, the generator
+    // appends a `type_clarity` question that pairs `nsLeaderN` against
+    // `nsLeaderS` head-to-head.
+    nsLeaderN?: CognitiveFunctionId;
+    nsLeaderS?: CognitiveFunctionId;
+    nsHeadToHeadTrigger?: "low_confidence" | "ns_split_suspect";
+    // CC-134.1 §Task 3 — judging-axis head-to-head. Fires when both
+    // members of an impossible same-attitude judging pair (Ti & Fi, or
+    // Te & Fe) accumulate ≥ JUDGING_COOCCURRENCE_THRESHOLD top-picks —
+    // a canonical stack can't hold both, so the picks are warm-Ti-
+    // pulls-Fi (or warm-Te-pulls-Fe) contamination. The clarifier pits
+    // the two head-to-head so the perceiving call is resolved by
+    // explicit pick.
+    judgingHeadToHeadA?: CognitiveFunctionId;
+    judgingHeadToHeadB?: CognitiveFunctionId;
+    judgingHeadToHeadTrigger?: "ti_fi_cooccurrence" | "te_fe_cooccurrence";
   };
+  // CC-134 Part D §D.2 — large-gap blind spots whose underlying input
+  // is suspect (untouched ranking heuristic or low-confidence Lens).
+  // When non-empty, the generator emits one `blindspot_confirm`
+  // question per entry instead of letting the engine assert the gap
+  // as a hypocrisy finding. Capped to two clarifiers to respect the
+  // second-pass budget.
+  blindspotsToConfirm?: Array<{
+    /** Compass value label (e.g. "Honor"). Surfaced verbatim in the
+     *  clarifier prompt as "you named X highest." */
+    valueLabel: string;
+    /** Short engine read of what the week pays for instead — surfaced
+     *  in the second half of the clarifier ("…your week reads Y"). */
+    weekReadsAs: string;
+  }>;
   movement: {
     goal: number;
     soul: number;
@@ -405,6 +443,91 @@ export function buildFollowUpInput(
       ? "moderate"
       : "low";
 
+  // CC-134 Part D §D.1 — when Lens confidence is low (post-Part C
+  // top-pick + N/S valence guard), pull the per-pool top-pick leaders
+  // so the generator can build an N-vs-S head-to-head clarifier. The
+  // leaders are the function with the most rank-1 picks in each sub-
+  // axis (Ni/Ne for N; Si/Se for S). Ties resolve alphabetically by
+  // function id to keep the resolver deterministic.
+  let nsLeaderN: CognitiveFunctionId | undefined;
+  let nsLeaderS: CognitiveFunctionId | undefined;
+  let nsHeadToHeadTrigger: "low_confidence" | "ns_split_suspect" | undefined;
+  if (ls?.confidence === "low") {
+    const nCandidates: CognitiveFunctionId[] = ["ni", "ne"];
+    const sCandidates: CognitiveFunctionId[] = ["si", "se"];
+    const pickLeader = (
+      pool: CognitiveFunctionId[]
+    ): CognitiveFunctionId | undefined => {
+      const ranked = pool
+        .map((fn) => ({ fn, topPicks: topPickCountFor(constitution.signals, fn) }))
+        .sort((a, b) => b.topPicks - a.topPicks || a.fn.localeCompare(b.fn));
+      if (ranked[0].topPicks === 0) return undefined;
+      return ranked[0].fn;
+    };
+    nsLeaderN = pickLeader(nCandidates);
+    nsLeaderS = pickLeader(sCandidates);
+    if (nsLeaderN && nsLeaderS) {
+      const nTop = topPickCountFor(constitution.signals, nsLeaderN);
+      const sTop = topPickCountFor(constitution.signals, nsLeaderS);
+      nsHeadToHeadTrigger =
+        Math.abs(nTop - sTop) < TOP_PICK_CONVERGENCE_MARGIN
+          ? "ns_split_suspect"
+          : "low_confidence";
+    }
+  }
+
+  // CC-134.1 §Task 3 — judging-axis head-to-head detection. When both
+  // members of an impossible same-attitude judging pair carry meaningful
+  // top-picks (≥ JUDGING_COOCCURRENCE_THRESHOLD each), surface a
+  // clarifier so the user explicitly picks one. The §C.6 guard already
+  // flipped confidence to `low` for this case in jungianStack; this
+  // pulls the leaders forward for the clarifier builder.
+  let judgingHeadToHeadA: CognitiveFunctionId | undefined;
+  let judgingHeadToHeadB: CognitiveFunctionId | undefined;
+  let judgingHeadToHeadTrigger:
+    | "ti_fi_cooccurrence"
+    | "te_fe_cooccurrence"
+    | undefined;
+  if (ls?.confidence === "low") {
+    const tiTop = topPickCountFor(constitution.signals, "ti");
+    const fiTop = topPickCountFor(constitution.signals, "fi");
+    const teTop = topPickCountFor(constitution.signals, "te");
+    const feTop = topPickCountFor(constitution.signals, "fe");
+    if (
+      tiTop >= JUDGING_COOCCURRENCE_THRESHOLD &&
+      fiTop >= JUDGING_COOCCURRENCE_THRESHOLD
+    ) {
+      judgingHeadToHeadA = "ti";
+      judgingHeadToHeadB = "fi";
+      judgingHeadToHeadTrigger = "ti_fi_cooccurrence";
+    } else if (
+      teTop >= JUDGING_COOCCURRENCE_THRESHOLD &&
+      feTop >= JUDGING_COOCCURRENCE_THRESHOLD
+    ) {
+      judgingHeadToHeadA = "te";
+      judgingHeadToHeadB = "fe";
+      judgingHeadToHeadTrigger = "te_fe_cooccurrence";
+    }
+  }
+
+  // CC-134 Part D §D.2 — blind-spots-to-confirm. The CC's principle:
+  // if a large-gap blind spot is detected AND its input was untouched
+  // or low-confidence, surface a confirm clarifier instead of
+  // asserting hypocrisy. Without per-question touched flags on
+  // historical sessions, the proxy here is: a `large_gap` blind spot
+  // is enough to warrant a confirm clarifier (the gap is by
+  // definition large enough that the user should be asked rather than
+  // told). Capped to 2 to respect the second-pass budget.
+  const blindspotsToConfirm: NonNullable<FollowUpInput["blindspotsToConfirm"]> = [];
+  for (const b of constitution.blindSpots ?? []) {
+    if (b.magnitude !== "large_gap") continue;
+    if (blindspotsToConfirm.length >= 2) break;
+    blindspotsToConfirm.push({
+      valueLabel: b.compass_label,
+      weekReadsAs: firstSentenceOf(b.prose) ?? "your week reads differently",
+    });
+  }
+
   return {
     personName,
     lens: {
@@ -415,7 +538,14 @@ export function buildFollowUpInput(
       // through unchanged. The FollowUpInput type accepts "medium" for
       // fixture flexibility but the adapter never emits it.
       confidence: ls?.confidence,
+      nsLeaderN,
+      nsLeaderS,
+      nsHeadToHeadTrigger,
+      judgingHeadToHeadA,
+      judgingHeadToHeadB,
+      judgingHeadToHeadTrigger,
     },
+    blindspotsToConfirm: blindspotsToConfirm.length > 0 ? blindspotsToConfirm : undefined,
     movement: {
       goal: dash?.goalScore ?? 0,
       soul: dash?.soulScore ?? 0,
@@ -679,6 +809,45 @@ export function generateFollowUpQuestions(input: FollowUpInput): FollowUpQuestio
     options: rankAndPick(bank.aimReplacement, boostPool, 6),
   };
 
+  // CC-134 Part D §D.1 — append a head-to-head `type_clarity`
+  // clarifier when Lens confidence is low AND we have an N-vs-S
+  // top-pick pair to compare. The clarifier pits the two leading
+  // voices head-to-head so the perceiving dominant resolves by
+  // explicit pick rather than warm-N-vs-blunt-S item valence noise.
+  // Always second-pass-capped (single extra question).
+  const extras: FollowUpQuestion[] = [];
+  if (input.lens?.nsLeaderN && input.lens?.nsLeaderS) {
+    extras.push(
+      buildTypeClarityHeadToHead(input.lens.nsLeaderN, input.lens.nsLeaderS)
+    );
+  }
+
+  // CC-134.1 §Task 3 — judging-axis head-to-head. Fires when the
+  // jungianStack co-occurrence guard detected Ti+Fi or Te+Fe both
+  // exceeding the threshold. The clarifier pits the two head-to-head
+  // (deliberately equal warmth) so the judging dominant resolves by
+  // explicit pick.
+  if (input.lens?.judgingHeadToHeadA && input.lens?.judgingHeadToHeadB) {
+    extras.push(
+      buildJudgingClarityHeadToHead(
+        input.lens.judgingHeadToHeadA,
+        input.lens.judgingHeadToHeadB
+      )
+    );
+  }
+
+  // CC-134 Part D §D.2 — append `blindspot_confirm` clarifiers for
+  // any large-gap blind spots whose input is suspect (current proxy:
+  // the gap was large enough to mark `large_gap`). Each clarifier
+  // converts an assertion ("Honor is a blind spot") into a confirm
+  // question ("you named Honor highest; your week reads … — which is
+  // truer right now?"). Capped at 2 in buildFollowUpInput already.
+  if (input.blindspotsToConfirm) {
+    for (const b of input.blindspotsToConfirm) {
+      extras.push(buildBlindspotConfirm(b));
+    }
+  }
+
   // Hard invariant — if Slot 2 swapped away from release_condition, the
   // swap-probe options carry a folded release intent (see swap pools).
   // We still attest the three core purposes are covered: grip_object via
@@ -689,6 +858,131 @@ export function generateFollowUpQuestions(input: FollowUpInput): FollowUpQuestio
     personName: input.personName,
     selectedFamilies: [family],
     reasonForQuestions: reason,
-    questions: [slot1, slot2, slot3],
+    questions: [slot1, slot2, slot3, ...extras],
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// CC-134 Part D — clarifier builders
+// ─────────────────────────────────────────────────────────────────────
+
+const PERCEIVING_VOICE: Record<CognitiveFunctionId, { framing: string; texture: string }> = {
+  ni: { framing: "the long arc lands first", texture: "I notice patterns forming before they finish — the trajectory is what I read first, even when the data is incomplete." },
+  ne: { framing: "possibilities branch first", texture: "I see the openings before they're named — a single input fans out into adjacent ideas I want to chase." },
+  si: { framing: "the precedent lands first", texture: "I notice what's different from how it has gone before — the felt continuity is the anchor, and any deviation registers immediately." },
+  se: { framing: "what's right here lands first", texture: "I notice what's actually in the room — the texture, the tempo, the move available now. The present is more vivid than the projection." },
+  // Judging functions included to keep the record exhaustive; never
+  // emitted by the N/S head-to-head clarifier.
+  ti: { framing: "the logic lands first", texture: "I work out whether the pieces hold together internally before I commit." },
+  te: { framing: "the structure lands first", texture: "I look for the most efficient ordering and run the plan." },
+  fi: { framing: "the value lands first", texture: "I check whether this aligns with what I most deeply care about." },
+  fe: { framing: "the room lands first", texture: "I read what the people present need and respond to it." },
+};
+
+function buildTypeClarityHeadToHead(
+  nLeader: CognitiveFunctionId,
+  sLeader: CognitiveFunctionId
+): FollowUpQuestion {
+  const nVoice = PERCEIVING_VOICE[nLeader];
+  const sVoice = PERCEIVING_VOICE[sLeader];
+  return {
+    id: "fq4_type_clarity_ns",
+    purpose: "type_clarity",
+    question:
+      "On a Tuesday afternoon, the first read you make of a situation lands more like which of these?",
+    responseMode: "choose_one",
+    options: [
+      {
+        label: nLeader.toUpperCase(),
+        text: `${nVoice.framing} — ${nVoice.texture}`,
+        tags: [nLeader, "perceiving", "type_clarity"],
+        interpretation: `Confirms ${nLeader.toUpperCase()}-led perceiving (intuitive).`,
+      },
+      {
+        label: sLeader.toUpperCase(),
+        text: `${sVoice.framing} — ${sVoice.texture}`,
+        tags: [sLeader, "perceiving", "type_clarity"],
+        interpretation: `Confirms ${sLeader.toUpperCase()}-led perceiving (sensing). Note: written with equal warmth to the N option per the §C.6 valence guard — so the pick is the choice, not the temperature.`,
+      },
+    ],
+  };
+}
+
+/**
+ * CC-134.1 §Task 3 — judging-axis head-to-head clarifier. Mirrors
+ * `buildTypeClarityHeadToHead` for the Ti vs Fi (or Te vs Fe)
+ * disambiguation. Same equal-warmth principle as §C.6: the framings
+ * are written with parallel affect so the pick reflects which
+ * judgment-process actually leads — not which option reads warmer.
+ */
+function buildJudgingClarityHeadToHead(
+  aLeader: CognitiveFunctionId,
+  bLeader: CognitiveFunctionId
+): FollowUpQuestion {
+  const aVoice = PERCEIVING_VOICE[aLeader];
+  const bVoice = PERCEIVING_VOICE[bLeader];
+  return {
+    id: "fq5_type_clarity_judging",
+    purpose: "type_clarity",
+    question:
+      "When you have to make a hard call, which of these is closer to how the decision actually settles inside you?",
+    responseMode: "choose_one",
+    options: [
+      {
+        label: aLeader.toUpperCase(),
+        text: `${aVoice.framing} — ${aVoice.texture}`,
+        tags: [aLeader, "judging", "type_clarity"],
+        interpretation: `Confirms ${aLeader.toUpperCase()}-led judging.`,
+      },
+      {
+        label: bLeader.toUpperCase(),
+        text: `${bVoice.framing} — ${bVoice.texture}`,
+        tags: [bLeader, "judging", "type_clarity"],
+        interpretation: `Confirms ${bLeader.toUpperCase()}-led judging. (CC-134.1 §Task 3: pair surfaced because both ${aLeader.toUpperCase()} & ${bLeader.toUpperCase()} accumulated significant top-picks — a canonical stack cannot hold both, so this pick resolves the contamination.)`,
+      },
+    ],
+  };
+}
+
+function buildBlindspotConfirm(b: {
+  valueLabel: string;
+  weekReadsAs: string;
+}): FollowUpQuestion {
+  return {
+    id: `fq_blindspot_confirm_${b.valueLabel.toLowerCase().replace(/\s+/g, "_")}`,
+    purpose: "type_clarity",
+    question: `You named ${b.valueLabel} highest, but your week reads as protecting ${b.weekReadsAs} — which is truer right now?`,
+    responseMode: "choose_one",
+    options: [
+      {
+        label: "Named version is truer",
+        text: `${b.valueLabel} really is what I'd protect when it counts — my week just hasn't caught up to it yet.`,
+        tags: ["blindspot_confirm", "named_truer"],
+        interpretation:
+          "User confirms the stated value; the gap is execution drag, not a hidden priority.",
+      },
+      {
+        label: "Week reading is truer",
+        text: `Honestly, what my week reads as ranks higher in practice — I named ${b.valueLabel} because it sounded right, not because it's what I actually protect.`,
+        tags: ["blindspot_confirm", "week_truer"],
+        interpretation:
+          "User confirms the gap; the named value was aspirational. Treat as a re-ranking signal, not a hypocrisy assertion.",
+      },
+      {
+        label: "Both are partially true",
+        text: `Both are true in different contexts — I protect ${b.valueLabel} in one register and the other thing in another.`,
+        tags: ["blindspot_confirm", "context_dependent"],
+        interpretation:
+          "User reports a context-dependent split; the engine should NOT collapse this into a single hypocrisy.",
+      },
+    ],
+  };
+}
+
+/** Helper — first sentence of a string, used by buildFollowUpInput to
+ *  trim blind-spot prose into a one-line clarifier hook. */
+function firstSentenceOf(s: string | undefined): string | undefined {
+  if (!s) return undefined;
+  const idx = s.search(/[.!?](\s|$)/);
+  return idx < 0 ? s.trim() : s.slice(0, idx + 1).trim();
 }

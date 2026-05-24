@@ -7,6 +7,14 @@ type Props = {
   items: RankingItem[];
   initialOrder?: string[];
   onChange: (order: string[]) => void;
+  // CC-134 Part A — fires the first time the user performs a deliberate
+  // reorder (pointer drag with movement, or keyboard pick-and-move). The
+  // parent uses this to distinguish a "deliberately ranked" answer from
+  // an "untouched / default order" answer; untouched rankings are
+  // routed to the single-pick second pass instead of being saved as
+  // pseudo-deliberate. Optional for back-compat — callers that don't
+  // thread it lose the routing but the visible behavior is unchanged.
+  onTouched?: () => void;
   // CC-016 — when present, render the per-item three-state aspirational
   // overlay (wish less / right / wish more). Only used on the four
   // allocation parent rankings (Q-S3-close, Q-S3-wider, Q-E1-outward,
@@ -21,9 +29,19 @@ export default function Ranking({
   items,
   initialOrder,
   onChange,
+  onTouched,
   overlay,
   onOverlayChange,
 }: Props) {
+  // CC-134 Part A — fire `onTouched` exactly once per Ranking mount, the
+  // first time the user performs a deliberate reorder. The ref keeps
+  // the dedupe gate stable across re-renders.
+  const touchedFiredRef = useRef(false);
+  const fireTouched = () => {
+    if (touchedFiredRef.current) return;
+    touchedFiredRef.current = true;
+    onTouched?.();
+  };
   const overlayEnabled = !!onOverlayChange;
   function setOverlayFor(itemId: string, value: AspirationalOverlay) {
     if (!onOverlayChange) return;
@@ -60,6 +78,10 @@ export default function Ranking({
   function commitOrder(next: string[]) {
     setOrder(next);
     onChange(next);
+    // CC-134 Part A — commitOrder is the keyboard-mediated reorder path
+    // (Spacebar pick → Arrow move → Spacebar drop). Every commitOrder
+    // call represents a deliberate user action.
+    fireTouched();
   }
 
   function onPointerDown(e: React.PointerEvent<HTMLButtonElement>, id: string) {
@@ -111,6 +133,9 @@ export default function Ranking({
     setDragOffset(0);
     if (dragged) {
       onChange(orderRef.current);
+      // CC-134 Part A — a completed pointer drag (DRAG_THRESHOLD met +
+      // pointer-up) is a deliberate reorder; mark the ranking touched.
+      fireTouched();
     }
   }
 

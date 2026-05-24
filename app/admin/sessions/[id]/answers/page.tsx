@@ -17,7 +17,13 @@
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { questions as allQuestions } from "../../../../../data/questions";
-import { updateSessionAnswer } from "../../../../../lib/saveSession";
+import {
+  updateSessionAnswer,
+  resetSessionAnswer,
+} from "../../../../../lib/saveSession";
+// CC-136 Part C — reuse the existing list-page button. It mints via
+// POST /api/admin/sessions/[id]/follow-up-link and copies the URL.
+import CopySessionLinkButton from "../../CopySessionLinkButton";
 import type {
   Answer,
   ForcedFreeformAnswer,
@@ -49,6 +55,11 @@ export default function AnswerReviewPage({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<LastUpdate | null>(null);
+  // CC-136 Part B — set of question_ids freshly reset in this session.
+  // Drives the "pending re-ask" badge on each section so the admin can
+  // see at a glance which questions will surface on the next gap-fill
+  // link without re-scanning the whole page.
+  const [pendingReask, setPendingReask] = useState<Set<string>>(new Set());
 
   async function fetchSession() {
     const res = await fetch(`/api/admin/sessions/${id}`, { cache: "no-store" });
@@ -107,6 +118,40 @@ export default function AnswerReviewPage({
 
   function handleCancel() {
     setEditingId(null);
+  }
+
+  // CC-136 Part B — Reset handler. Confirms (browser native — keeps the
+  // surface dependency-free), then calls the server action and refetches.
+  // The just-reset question_id is tracked so the section can render a
+  // subtle "pending re-ask" badge instead of just snapping back to the
+  // "no saved answer" empty state. Cascade-reset children also surface
+  // briefly via the same badge mechanism.
+  async function handleReset(questionId: string, questionText: string) {
+    const ok = window.confirm(
+      `Reset clears the saved answer for "${questionText}" and re-asks it on the next gap-fill link. The prior value is archived. Continue?`
+    );
+    if (!ok) return;
+    try {
+      const result = await resetSessionAnswer(id, questionId, "admin_reset");
+      const refreshed = await fetchSession();
+      // Use Date constructor (rather than Date.now()) — react-compiler's
+      // purity check flags Date.now() in a state-update path here even
+      // though the value is consumed only for display.
+      const at = new Date().getTime();
+      setData(refreshed);
+      // Mark every archived question as just-reset so the badge fires
+      // for the target AND any cascaded derived children.
+      setPendingReask((prev) => {
+        const next = new Set(prev);
+        for (const qid of result.archivedQuestionIds) next.add(qid);
+        return next;
+      });
+      setLastUpdate({ questionId, at });
+      setEditingId(null);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Reset failed.";
+      window.alert(`Reset failed: ${msg}`);
+    }
   }
 
   if (loadError) {
@@ -224,18 +269,40 @@ export default function AnswerReviewPage({
             report re-derivation on the detail view
           </p>
         </div>
-        <Link
-          href={`/admin/sessions/${id}`}
-          className="font-mono uppercase"
-          style={{
-            fontSize: 11,
-            letterSpacing: "0.12em",
-            color: "var(--ink-mute)",
-            textDecoration: "underline",
-          }}
-        >
-          ← back to session detail
-        </Link>
+        <div className="flex flex-row items-center" style={{ gap: 12 }}>
+          {pendingReask.size > 0 ? (
+            <p
+              className="font-mono uppercase"
+              style={{
+                fontSize: 10,
+                letterSpacing: "0.10em",
+                color: "var(--umber, #8a6f3a)",
+                margin: 0,
+                fontStyle: "italic",
+              }}
+            >
+              {pendingReask.size} pending re-ask
+            </p>
+          ) : null}
+          {/* CC-136 Part C — Generate gap-fill link from the answers
+              page itself. The button mints via the admin API route
+              `POST /api/admin/sessions/[id]/follow-up-link` (CC-127)
+              which accepts ANY session id — including manually-
+              uploaded cohorts whose gaps the admin wants to collect. */}
+          <CopySessionLinkButton sessionId={id} />
+          <Link
+            href={`/admin/sessions/${id}`}
+            className="font-mono uppercase"
+            style={{
+              fontSize: 11,
+              letterSpacing: "0.12em",
+              color: "var(--ink-mute)",
+              textDecoration: "underline",
+            }}
+          >
+            ← back to session detail
+          </Link>
+        </div>
       </header>
 
       <div
@@ -299,23 +366,48 @@ export default function AnswerReviewPage({
                   </p>
                 </div>
                 {!isEditing ? (
-                  <button
-                    type="button"
-                    onClick={() => setEditingId(q.question_id)}
-                    className="font-mono uppercase"
-                    style={{
-                      fontSize: 11,
-                      letterSpacing: "0.10em",
-                      padding: "4px 12px",
-                      border: "1px solid var(--rule, #d4c8a8)",
-                      background: "transparent",
-                      color: "var(--ink, #2b2417)",
-                      cursor: "pointer",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    Edit
-                  </button>
+                  <div className="flex flex-row" style={{ gap: 6 }}>
+                    <button
+                      type="button"
+                      onClick={() => setEditingId(q.question_id)}
+                      className="font-mono uppercase"
+                      style={{
+                        fontSize: 11,
+                        letterSpacing: "0.10em",
+                        padding: "4px 12px",
+                        border: "1px solid var(--rule, #d4c8a8)",
+                        background: "transparent",
+                        color: "var(--ink, #2b2417)",
+                        cursor: "pointer",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      Edit
+                    </button>
+                    {/* CC-136 Part B — Reset visible only when there is
+                        a live answer to clear. Derived ranking children
+                        (Q-S3-cross / Q-E1-cross) intentionally hide
+                        Reset — admins reset the PARENT, which cascades. */}
+                    {answer && q.type !== "ranking_derived" ? (
+                      <button
+                        type="button"
+                        onClick={() => handleReset(q.question_id, q.text)}
+                        className="font-mono uppercase"
+                        style={{
+                          fontSize: 11,
+                          letterSpacing: "0.10em",
+                          padding: "4px 12px",
+                          border: "1px solid var(--rule, #d4c8a8)",
+                          background: "transparent",
+                          color: "var(--umber, #8a6f3a)",
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        Reset
+                      </button>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
 
@@ -341,6 +433,23 @@ export default function AnswerReviewPage({
                   }}
                 >
                   Updated {new Date(lastUpdate!.at).toLocaleTimeString()}
+                </p>
+              ) : null}
+              {/* CC-136 Part B — pending re-ask badge. Surfaces on
+                  questions reset in this session so the admin sees
+                  what the next gap-fill link will surface. */}
+              {pendingReask.has(q.question_id) ? (
+                <p
+                  className="font-mono uppercase"
+                  style={{
+                    fontSize: 10,
+                    letterSpacing: "0.10em",
+                    color: "var(--umber, #8a6f3a)",
+                    margin: 0,
+                    fontStyle: "italic",
+                  }}
+                >
+                  pending re-ask · will surface on next gap-fill link
                 </p>
               ) : null}
             </section>
