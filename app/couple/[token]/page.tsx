@@ -1,16 +1,18 @@
-// CC-COUPLE-3 — Partner B's "Obvious or Oblivious?" guessing page.
+// CC-COUPLE-3 + CC-COUPLE-4 — Partner B's "Obvious or Oblivious?" page.
 //
 // Path: `/couple/[token]` — public (the unguessable token is the auth).
-// Mirrors the structure of `app/follow-up/[token]/page.tsx`: GET-on-mount
-// to fetch intro state, render single-pick guesses over the
-// `coupleGameItems` bank, POST on submit, render the reveal screen.
+//
+// CC-COUPLE-4: replaces the binary single-pick with a rank-your-top-3
+// input (reusing app/components/Ranking.tsx — CC-157 ▲▼ arrows give
+// mobile + a11y for free) and a warm partial-credit reveal per
+// docs/obvious-oblivious-game-spec.md.
 
 "use client";
 
 import { use, useEffect, useState } from "react";
-import SinglePickPicker from "../../components/SinglePickPicker";
+import Ranking from "../../components/Ranking";
 import type { RankingItem } from "../../../lib/types";
-import type { RevealType } from "../../../lib/coupleTypes";
+import type { RankedRevealTier } from "../../../lib/coupleReveal";
 
 // ─────────────────────────────────────────────────────────────────────
 // Wire types — must match `app/api/couple/[token]/route.ts`.
@@ -20,6 +22,9 @@ interface ItemPayload {
   itemId: string;
   prompt: string;
   sourceSignal: string;
+  /** CC-COUPLE-5 — deck tag + display label (e.g. "Fight Weather"). */
+  deck: string | null;
+  deckLabel: string;
   options: { id: string; label: string }[];
 }
 
@@ -31,23 +36,35 @@ interface IntroPayload {
 
 interface ResolvedItem {
   itemId: string;
+  prompt: string;
   sourceSignal: string;
-  partnerGuess: string;
+  deck: string | null;
+  deckLabel: string;
+  rankedGuess: string[];
+  rankedGuessLabels: string[];
   enginePredicted: string;
-  revealType: RevealType;
-  scored: boolean;
+  enginePredictedLabel: string;
+  tier: RankedRevealTier;
+  points: number;
+  translation: string;
+}
+
+interface WarmTotalPayload {
+  clean: number;
+  close: number;
+  adjacent: number;
+  off: number;
+  unscored: number;
+  totalPoints: number;
+  maxPoints: number;
+  clearlyRead: number;
+  clearlyOf: number;
 }
 
 interface RevealPayload {
   status: "completed";
   personName: string;
-  legibility: {
-    matches: number;
-    scored: number;
-    percent: number | null;
-    breakdown: Record<RevealType, number>;
-  };
-  unscoredCount: number;
+  warmTotal: WarmTotalPayload;
   items: ResolvedItem[];
 }
 
@@ -77,7 +94,9 @@ export default function CoupleGamePage({
 
   const [load, setLoad] = useState<LoadState>({ status: "loading" });
   const [submitState, setSubmitState] = useState<SubmitState>({ status: "idle" });
-  const [guesses, setGuesses] = useState<Record<string, string>>({});
+  // Per-item full ranked order (option ids). Top-3 is what gets scored;
+  // we send the full order so the API can take slice(0, 3) deterministically.
+  const [rankings, setRankings] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -121,10 +140,18 @@ export default function CoupleGamePage({
     if (load.status !== "intro") return;
     setSubmitState({ status: "submitting" });
     try {
+      // Build the ranked-top-3 map. For any item B didn't touch, fall back
+      // to the option order as presented (an undeliberate ranking) — the
+      // resolver will score it the same way as any other guess.
+      const rankedGuesses: Record<string, string[]> = {};
+      for (const item of load.data.items) {
+        const order = rankings[item.itemId] ?? item.options.map((o) => o.id);
+        rankedGuesses[item.itemId] = order.slice(0, 3);
+      }
       const res = await fetch(`/api/couple/${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ guesses }),
+        body: JSON.stringify({ rankedGuesses }),
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
@@ -161,10 +188,10 @@ export default function CoupleGamePage({
         ) : load.status === "reveal" ? (
           <RevealScreen data={load.data} />
         ) : (
-          <GuessForm
+          <RankForm
             data={load.data}
-            guesses={guesses}
-            setGuesses={setGuesses}
+            rankings={rankings}
+            setRankings={setRankings}
             submitState={submitState}
             onSubmit={handleSubmit}
           />
@@ -234,28 +261,27 @@ function InactiveLinkState({ detail }: { detail: string }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Guess form (B's pass)
+// Rank-your-top-3 form (B's pass)
 // ─────────────────────────────────────────────────────────────────────
 
-interface GuessFormProps {
+interface RankFormProps {
   data: IntroPayload;
-  guesses: Record<string, string>;
-  setGuesses: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  rankings: Record<string, string[]>;
+  setRankings: React.Dispatch<React.SetStateAction<Record<string, string[]>>>;
   submitState: SubmitState;
   onSubmit: () => void;
 }
 
-function GuessForm({
+function RankForm({
   data,
-  guesses,
-  setGuesses,
+  rankings,
+  setRankings,
   submitState,
   onSubmit,
-}: GuessFormProps) {
+}: RankFormProps) {
   const canSubmit = submitState.status !== "submitting";
-  const answered = data.items.filter((it) => guesses[it.itemId]).length;
-  const total = data.items.length;
-  const allAnswered = answered === total;
+  const touchedCount = Object.keys(rankings).length;
+  const totalCount = data.items.length;
 
   return (
     <>
@@ -282,8 +308,8 @@ function GuessForm({
           }}
         >
           {data.personName === "your partner"
-            ? "Your partner wants to know how well you read them."
-            : `${data.personName} wants to know how well you read them.`}
+            ? "Your partner already knows this about you. You may or may not."
+            : `${data.personName} already knows this about you. You may or may not.`}
         </h1>
         <p
           className="font-serif italic"
@@ -294,21 +320,21 @@ function GuessForm({
             lineHeight: 1.55,
           }}
         >
-          For each prompt, pick the answer you think{" "}
-          {data.personName === "your partner" ? "they" : data.personName} would
-          give. There&apos;s no scoring against you — only against the read.
+          For each prompt, rank your top three answers — your #1 guess
+          earns the most, and a close-adjacent in your top 3 still counts.
+          No wrong reads, only close-enoughs.
         </p>
       </header>
 
       <section className="flex flex-col" style={{ gap: 20 }}>
         {data.items.map((item) => (
-          <GuessBlock
+          <RankBlock
             key={item.itemId}
             item={item}
             personName={data.personName}
-            selectedId={guesses[item.itemId] ?? null}
-            onChange={(optionId) =>
-              setGuesses((prev) => ({ ...prev, [item.itemId]: optionId }))
+            order={rankings[item.itemId]}
+            onChange={(order) =>
+              setRankings((prev) => ({ ...prev, [item.itemId]: order }))
             }
           />
         ))}
@@ -318,7 +344,7 @@ function GuessForm({
         <button
           type="button"
           onClick={onSubmit}
-          disabled={!canSubmit || !allAnswered}
+          disabled={!canSubmit}
           className="font-mono uppercase"
           style={{
             fontSize: 12,
@@ -327,15 +353,26 @@ function GuessForm({
             color: "var(--paper, #fff)",
             border: "1px solid var(--umber)",
             padding: "12px 18px",
-            cursor: canSubmit && allAnswered ? "pointer" : "not-allowed",
-            opacity: canSubmit && allAnswered ? 1 : 0.5,
+            cursor: canSubmit ? "pointer" : "not-allowed",
+            opacity: canSubmit ? 1 : 0.5,
             alignSelf: "flex-start",
           }}
         >
           {submitState.status === "submitting"
             ? "submitting…"
-            : `submit (${answered}/${total})`}
+            : `submit (${touchedCount}/${totalCount} ranked)`}
         </button>
+        <p
+          className="font-mono"
+          style={{
+            fontSize: 10,
+            color: "var(--ink-faint)",
+            margin: 0,
+          }}
+        >
+          Untouched items submit in default order — only your top 3 are
+          scored.
+        </p>
         {submitState.status === "error" ? (
           <p
             className="font-serif italic"
@@ -353,43 +390,37 @@ function GuessForm({
   );
 }
 
-function GuessBlock({
+function RankBlock({
   item,
   personName,
-  selectedId,
+  order,
   onChange,
 }: {
   item: ItemPayload;
   personName: string;
-  selectedId: string | null;
-  onChange: (optionId: string) => void;
+  order: string[] | undefined;
+  onChange: (order: string[]) => void;
 }) {
   // Rephrase the item prompt from first-person ("you") to guess-about-A
-  // ("{name}"). The bank's prompts are all second-person; we substitute
-  // "you" / "your" generically so this works across every item.
-  const subject =
-    personName === "your partner" ? "they" : personName;
-  const possessive =
-    personName === "your partner" ? "their" : `${personName}'s`;
+  // ("{name}"). Mirrors the CC-COUPLE-3 substitution chain.
+  const subject = personName === "your partner" ? "they" : personName;
+  const possessive = personName === "your partner" ? "their" : `${personName}'s`;
   const asGuessPrompt = item.prompt
-    // "you usually become" → "{subject} usually becomes"
     .replace(/\byou are\b/gi, `${subject} is`)
     .replace(/\byou usually become\b/gi, `${subject} usually becomes`)
     .replace(/\byou say you are helping\b/gi, `${subject} says they are helping`)
     .replace(/\byou most need\b/gi, `${subject} most needs`)
     .replace(/\byou most want\b/gi, `${subject} most wants`)
-    .replace(/\bmay not ask for\b/gi, "may not ask for")
     .replace(/\byou are at your best\b/gi, `${subject} is at their best`)
     .replace(/\byour fear takes over\b/gi, `${subject}'s fear takes over`)
     .replace(/\byou give your partner\b/gi, `${subject} gives you`)
     .replace(/\byou\b/gi, subject)
     .replace(/\byour\b/gi, possessive);
 
-  // SinglePickPicker expects RankingItem; map our option shape onto it.
+  // Map our flat option shape onto RankingItem.
   const items: RankingItem[] = item.options.map((o) => ({
     id: o.id,
     label: o.label,
-    // `signal` is required by the type; the picker never reads it.
     signal: `__couple_${item.itemId}_${o.id}` as never,
   }));
 
@@ -404,6 +435,19 @@ function GuessBlock({
         border: "1px solid var(--rule-soft)",
       }}
     >
+      {item.deckLabel ? (
+        <p
+          className="font-mono uppercase"
+          style={{
+            fontSize: 10,
+            letterSpacing: "0.14em",
+            color: "var(--umber)",
+            margin: 0,
+          }}
+        >
+          {item.deckLabel}
+        </p>
+      ) : null}
       <h2
         className="font-serif"
         style={{
@@ -416,58 +460,49 @@ function GuessBlock({
       >
         {asGuessPrompt}
       </h2>
-      <SinglePickPicker
-        items={items}
-        selectedId={selectedId}
-        onChange={(pickedId) => onChange(pickedId)}
-      />
+      <p
+        className="font-mono uppercase"
+        style={{
+          fontSize: 10,
+          letterSpacing: "0.12em",
+          color: "var(--ink-mute)",
+          margin: 0,
+        }}
+      >
+        Rank your top three. (▲▼ arrows reorder.)
+      </p>
+      <Ranking items={items} initialOrder={order} onChange={onChange} />
     </section>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Reveal screen
+// Reveal screen (warm, partial-credit)
 // ─────────────────────────────────────────────────────────────────────
 
-// All five reveal-language blocks are kept here so the symmetric Phase-2
-// pass needs no copy work. Only obvious / oblivious / loving_misread can
-// fire in the asymmetric MVP (selfKnows is undefined; selfAnswer ==
-// enginePredicted by construction → Mirror Blind + Hidden Pattern are
-// structurally unreachable from this surface).
-//
-// Tone discipline (spec §5): gift-under-fear, "engine can't see the
-// room" — name a tension and invite the conversation, never assert what
-// IS happening between them.
-const REVEAL_BLOCKS: Record<RevealType, { label: string; body: string }> = {
-  obvious: {
-    label: "Obvious",
-    body:
-      "You read them clean on this one. Whatever they show you about this, you've been receiving it accurately.",
-  },
-  loving_misread: {
-    label: "Loving Misread",
-    body:
-      "You guessed something more generous than they'd say of themselves. That's a kindness, and it's worth asking whether they'd let themselves see it.",
-  },
-  oblivious: {
-    label: "Oblivious",
-    body:
-      "Different read on this one. The signal is there if you go looking — worth asking them what they'd actually say, in their own words.",
-  },
-  mirror_blind: {
-    label: "Mirror Blind",
-    body:
-      "You named what the read sees too — but it's not how they'd describe themselves. Worth a soft conversation about whether they know it shows.",
-  },
-  hidden_pattern: {
-    label: "Hidden Pattern",
-    body:
-      "Neither of you named what the read sees here. Less a miss than a quiet pattern neither of you has put words to yet.",
-  },
+const TIER_LABELS: Record<RankedRevealTier, string> = {
+  clean: "Read clean",
+  close: "Close read",
+  adjacent: "Strong adjacent",
+  off: "Confidently off",
+  unscored: "No strong read",
+};
+
+const TIER_BLURB: Record<RankedRevealTier, string> = {
+  clean:
+    "Your #1 guess matched the engine's read — you saw what they show.",
+  close:
+    "Your guess landed in your top three. Close enough that the read is recognizable to you.",
+  adjacent:
+    "You picked a nearby pattern. The engine saw a different inner driver, but the shape is familiar.",
+  off:
+    "Earned a comic badge. The engine reads something different here — worth a conversation, not a verdict.",
+  unscored:
+    "No strong read on this one — skipped for scoring.",
 };
 
 function RevealScreen({ data }: { data: RevealPayload }) {
-  const { legibility, items, personName, unscoredCount } = data;
+  const { warmTotal, items, personName } = data;
   return (
     <>
       <header className="flex flex-col" style={{ gap: 10 }}>
@@ -497,7 +532,7 @@ function RevealScreen({ data }: { data: RevealPayload }) {
         </h1>
       </header>
 
-      <ScoreHeader legibility={legibility} unscoredCount={unscoredCount} />
+      <WarmTotalCard warmTotal={warmTotal} personName={personName} />
 
       <section className="flex flex-col" style={{ gap: 16 }}>
         {items.map((it) => (
@@ -510,26 +545,24 @@ function RevealScreen({ data }: { data: RevealPayload }) {
   );
 }
 
-function ScoreHeader({
-  legibility,
-  unscoredCount,
+function WarmTotalCard({
+  warmTotal,
+  personName,
 }: {
-  legibility: RevealPayload["legibility"];
-  unscoredCount: number;
+  warmTotal: WarmTotalPayload;
+  personName: string;
 }) {
-  const { matches, scored, percent, breakdown } = legibility;
-  const obvious = breakdown.obvious;
-  const oblivious = breakdown.oblivious;
-  const lovingMisread = breakdown.loving_misread;
-  // Spec §4: Legibility ALWAYS shipped with a second line. No single
-  // verdict number.
+  const name = personName === "your partner" ? "your partner" : personName;
+  const headline =
+    warmTotal.clearlyOf === 0
+      ? `No strong reads to score on this round.`
+      : `You read ${name} clearly on ${warmTotal.clearlyRead} of ${warmTotal.clearlyOf}.`;
   const secondLine =
-    scored === 0
-      ? "No scored items yet — the read had no confident projections on what you played."
-      : `${obvious} Obvious · ${oblivious} Oblivious · ${lovingMisread} Loving Misread` +
-        (unscoredCount > 0
-          ? ` · ${unscoredCount} no-strong-read (skipped for scoring)`
-          : "");
+    `${warmTotal.clean} read clean · ${warmTotal.close} close · ` +
+    `${warmTotal.adjacent} adjacent · ${warmTotal.off} confidently off` +
+    (warmTotal.unscored > 0
+      ? ` · ${warmTotal.unscored} skipped (no strong read)`
+      : "");
   return (
     <section
       className="flex flex-col"
@@ -550,20 +583,18 @@ function ScoreHeader({
           margin: 0,
         }}
       >
-        Legibility
+        How it landed
       </p>
       <p
         className="font-serif"
         style={{
-          fontSize: 24,
+          fontSize: 22,
           color: "var(--ink)",
           margin: 0,
-          lineHeight: 1.2,
+          lineHeight: 1.25,
         }}
       >
-        {percent === null
-          ? "—"
-          : `${matches} of ${scored} read clearly (${percent}%)`}
+        {headline}
       </p>
       <p
         className="font-serif italic"
@@ -576,64 +607,36 @@ function ScoreHeader({
       >
         {secondLine}
       </p>
+      {warmTotal.maxPoints > 0 ? (
+        <p
+          className="font-mono"
+          style={{
+            fontSize: 11,
+            color: "var(--ink-mute)",
+            margin: 0,
+          }}
+        >
+          {warmTotal.totalPoints} / {warmTotal.maxPoints} pts
+        </p>
+      ) : null}
     </section>
   );
 }
 
 function ItemReveal({ item }: { item: ResolvedItem }) {
-  if (!item.scored) {
-    return (
-      <article
-        className="flex flex-col"
-        style={{
-          gap: 6,
-          padding: "14px 18px",
-          borderRadius: 8,
-          background: "var(--paper)",
-          border: "1px dashed var(--rule)",
-        }}
-      >
-        <p
-          className="font-mono uppercase"
-          style={{
-            fontSize: 10,
-            letterSpacing: "0.14em",
-            color: "var(--ink-mute)",
-            margin: 0,
-          }}
-        >
-          {item.itemId.replace(/_/g, " ")}
-        </p>
-        <p
-          className="font-serif italic"
-          style={{
-            fontSize: 13,
-            color: "var(--ink-soft)",
-            margin: 0,
-            lineHeight: 1.5,
-          }}
-        >
-          No strong read on this one — skipped for scoring.
-          {item.partnerGuess ? (
-            <>
-              {" "}
-              Your guess: <strong>{prettify(item.partnerGuess)}</strong>.
-            </>
-          ) : null}
-        </p>
-      </article>
-    );
-  }
-  const block = REVEAL_BLOCKS[item.revealType];
+  const { tier } = item;
+  const isUnscored = tier === "unscored";
   return (
     <article
       className="flex flex-col"
       style={{
-        gap: 8,
+        gap: 10,
         padding: "16px 18px",
         borderRadius: 8,
-        background: "var(--paper-warm)",
-        border: "1px solid var(--rule-soft)",
+        background: isUnscored ? "var(--paper)" : "var(--paper-warm)",
+        border: isUnscored
+          ? "1px dashed var(--rule)"
+          : "1px solid var(--rule-soft)",
       }}
     >
       <p
@@ -641,11 +644,13 @@ function ItemReveal({ item }: { item: ResolvedItem }) {
         style={{
           fontSize: 10,
           letterSpacing: "0.14em",
-          color: "var(--umber)",
+          color: isUnscored ? "var(--ink-mute)" : "var(--umber)",
           margin: 0,
         }}
       >
-        {block.label} · {item.itemId.replace(/_/g, " ")}
+        {TIER_LABELS[tier]}
+        {item.deckLabel ? ` · ${item.deckLabel}` : ""}
+        {!isUnscored && item.points > 0 ? ` · ${item.points} pt${item.points === 1 ? "" : "s"}` : ""}
       </p>
       <p
         className="font-serif"
@@ -656,8 +661,45 @@ function ItemReveal({ item }: { item: ResolvedItem }) {
           lineHeight: 1.5,
         }}
       >
-        Your guess: <strong>{prettify(item.partnerGuess)}</strong>.
+        {item.prompt}
       </p>
+      {/* Three-line warm reveal per spec §"Reveal format":
+              1) Engine read    2) Partner read (Phase-3 slot, hidden)
+              3) Translation */}
+      {!isUnscored ? (
+        <div className="flex flex-col" style={{ gap: 4 }}>
+          <p
+            className="font-mono"
+            style={{
+              fontSize: 12,
+              color: "var(--ink-soft)",
+              margin: 0,
+              lineHeight: 1.5,
+            }}
+          >
+            Engine read: <strong>{item.enginePredictedLabel}</strong>
+          </p>
+          {/* PHASE-3 SLOT — symmetric self-pass: when A has answered
+              themselves, surface "Partner read: …" here. Until then we
+              hide the slot rather than show a stub. */}
+          <p
+            className="font-mono"
+            style={{
+              fontSize: 12,
+              color: "var(--ink-soft)",
+              margin: 0,
+              lineHeight: 1.5,
+            }}
+          >
+            Your top 3:{" "}
+            <strong>
+              {item.rankedGuessLabels.length > 0
+                ? item.rankedGuessLabels.join(" · ")
+                : "—"}
+            </strong>
+          </p>
+        </div>
+      ) : null}
       <p
         className="font-serif italic"
         style={{
@@ -667,8 +709,21 @@ function ItemReveal({ item }: { item: ResolvedItem }) {
           lineHeight: 1.55,
         }}
       >
-        {block.body}
+        {TIER_BLURB[tier]}
       </p>
+      {!isUnscored && item.translation ? (
+        <p
+          className="font-serif italic"
+          style={{
+            fontSize: 12,
+            color: "var(--ink-mute)",
+            margin: 0,
+            lineHeight: 1.55,
+          }}
+        >
+          {item.translation}
+        </p>
+      ) : null}
     </article>
   );
 }
@@ -712,8 +767,4 @@ function PartnerTrajectoryNudge() {
       </p>
     </section>
   );
-}
-
-function prettify(optionId: string): string {
-  return optionId.replace(/_/g, " ");
 }

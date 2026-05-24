@@ -1,4 +1,4 @@
-// CC-COUPLE-3 — Public couple-game GET/POST handler.
+// CC-COUPLE-3 + CC-COUPLE-4 — Public couple-game GET/POST handler.
 //
 // Route: `/api/couple/[token]` (outside /api/admin/**, public; the
 // unguessable token is the auth).
@@ -6,14 +6,20 @@
 // GET  → intro payload (partner-A first name, the item bank, status,
 //        and — when the session is already `completed` — the saved
 //        reveal payload so the page can jump straight to the reveal).
-// POST → resolves B's guesses against A's `InnerConstitution`, stores
-//        the resulting `CoupleGameResults` on `couple_sessions`, and
-//        returns the resolved reveal payload.
+// POST → resolves B's ranked-top-3 guesses against A's
+//        `InnerConstitution`, stores the resulting `CoupleGameResults`
+//        on `couple_sessions`, and returns the resolved reveal payload.
 //
-// Asymmetric, engine-as-truth: the "selfAnswer" for each item is the
-// engine's prediction for A. Items where `predict(icA)` returns null
-// are recorded with `selfAnswer === ""` and surface as `scored: false`
-// in the response — they are never forced into a reveal.
+// Asymmetric, engine-as-truth: the "engine answer" for each item is
+// `item.predict(icA)`. Items where `predict` returns null surface as
+// `tier: "unscored"` ("no strong read") and are not scored.
+//
+// CC-COUPLE-4: scoring is partial-credit per
+// docs/obvious-oblivious-game-spec.md — 5 / 3 / 1 / 0 tiers based on
+// where the engine answer lands in B's top-3, with a "strong adjacent"
+// tier for guesses that name a nearby pattern. The ranked top-3 is
+// pipe-encoded into the existing `CoupleGameItem.partnerGuess` string
+// field (CC-COUPLE-1 data model unchanged).
 
 import { NextResponse, type NextRequest } from "next/server";
 import { eq } from "drizzle-orm";
@@ -29,12 +35,23 @@ import {
   saveGameResults,
   type CoupleSessionRow,
 } from "../../../../lib/coupleSession";
-import { COUPLE_GAME_ITEMS, getCoupleGameItem } from "../../../../lib/coupleGameItems";
-import { resolveReveal } from "../../../../lib/coupleReveal";
+import {
+  getCoupleGameItem,
+  adjacencyFor,
+  ITEM_TRANSLATIONS,
+  selectRound,
+  deckOf,
+  COUPLE_DECK_LABEL,
+  type CoupleDeck,
+} from "../../../../lib/coupleGameItems";
+import {
+  scoreRankedGuess,
+  summarizeWarmTotal,
+  type RankedRevealTier,
+} from "../../../../lib/coupleReveal";
 import type {
   CoupleGameItem,
   CoupleGameResults,
-  RevealType,
 } from "../../../../lib/coupleTypes";
 import type {
   Answer,
@@ -45,40 +62,56 @@ import type {
 } from "../../../../lib/types";
 
 // ─────────────────────────────────────────────────────────────────────
-// Shared types — the JSON shape the page consumes.
+// Wire types — must match `app/couple/[token]/page.tsx`.
 // ─────────────────────────────────────────────────────────────────────
 
 interface ItemPayload {
   itemId: string;
   prompt: string;
   sourceSignal: string;
+  /** CC-COUPLE-5 — which deck this item belongs to (UI label). */
+  deck: CoupleDeck | null;
+  deckLabel: string;
   options: { id: string; label: string }[];
 }
 
 interface ResolvedItem {
   itemId: string;
+  prompt: string;
   sourceSignal: string;
-  partnerGuess: string;
-  // The option id the engine predicted for A, or empty string when the
-  // engine had no confident read (`scored === false`).
+  /** CC-COUPLE-5 — deck tag echoed on the reveal too. */
+  deck: CoupleDeck | null;
+  deckLabel: string;
+  /** B's ranked top-3 guess (option ids in rank order). */
+  rankedGuess: string[];
+  /** Display labels for the ranked guess, in rank order. */
+  rankedGuessLabels: string[];
+  /** Engine-predicted option id, or "" when no defensible projection. */
   enginePredicted: string;
-  revealType: RevealType;
-  // false when the engine had no confident prediction for this item.
-  scored: boolean;
+  /** Display label for the engine prediction, or "" when unscored. */
+  enginePredictedLabel: string;
+  tier: RankedRevealTier;
+  points: number;
+  /** Per-item warm translation copy (the "inner read" sentence). */
+  translation: string;
+}
+
+interface WarmTotalPayload {
+  clean: number;
+  close: number;
+  adjacent: number;
+  off: number;
+  unscored: number;
+  totalPoints: number;
+  maxPoints: number;
+  clearlyRead: number;
+  clearlyOf: number;
 }
 
 interface RevealPayload {
   status: "completed";
   personName: string;
-  // Whole-game header score per spec §4. Two numbers, never one.
-  legibility: {
-    matches: number;
-    scored: number;
-    percent: number | null; // null when scored === 0
-    // Second-line companion — counts by reveal type within scored items.
-    breakdown: Record<RevealType, number>;
-  };
-  unscoredCount: number;
+  warmTotal: WarmTotalPayload;
   items: ResolvedItem[];
 }
 
@@ -86,6 +119,24 @@ interface IntroPayload {
   status: "invited" | "b_joined";
   personName: string;
   items: ItemPayload[];
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Pipe-encoded ranked-guess (CC-COUPLE-4)
+//
+// CoupleGameItem.partnerGuess is `string` per CC-COUPLE-1. We encode
+// the top-3 ranked guess as "opt1|opt2|opt3" so the data model is
+// unchanged. Decode trims empties (e.g. when B only ranked 2 items).
+// ─────────────────────────────────────────────────────────────────────
+
+const RANK_SEP = "|";
+
+function encodeRankedGuess(ranked: readonly string[]): string {
+  return ranked.slice(0, 3).filter((s) => s.length > 0).join(RANK_SEP);
+}
+function decodeRankedGuess(encoded: string): string[] {
+  if (!encoded) return [];
+  return encoded.split(RANK_SEP).filter((s) => s.length > 0);
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -97,11 +148,7 @@ type DemoRow = typeof demographicsTable.$inferSelect;
 function rowToDemographicSet(row: DemoRow | undefined): DemographicSet | null {
   if (!row) return null;
   const answers: DemographicAnswer[] = [];
-  function push(
-    field_id: string,
-    state: string,
-    value: string | null
-  ): void {
+  function push(field_id: string, state: string, value: string | null): void {
     if (state === "specified" && value) {
       answers.push({ field_id, state: "specified", value });
     } else if (state === "prefer_not_to_say") {
@@ -134,28 +181,41 @@ function firstNameOf(demoRow: DemoRow | undefined): string {
   }
   const trimmed = demoRow.name_value.trim();
   if (!trimmed) return "your partner";
-  // Use the first whitespace-separated token as the first name. The
-  // engine never assigns meaning to the surname segment in the report
-  // surface either; this matches the casual register the game needs.
   return trimmed.split(/\s+/)[0];
 }
 
-function itemsForIntro(): ItemPayload[] {
-  return COUPLE_GAME_ITEMS.map((item) => ({
-    itemId: item.itemId,
-    prompt: item.prompt,
-    sourceSignal: item.sourceSignal,
-    options: item.options.map((o) => ({ id: o.id, label: o.label })),
-  }));
+function deckMetaFor(itemId: string): { deck: CoupleDeck | null; deckLabel: string } {
+  const deck = deckOf(itemId);
+  return { deck, deckLabel: deck ? COUPLE_DECK_LABEL[deck] : "" };
+}
+
+function itemsForIntro(token: string): ItemPayload[] {
+  // CC-COUPLE-5 — round selector draws a balanced spread (≤8 items,
+  // one per deck minimum). Determinism per token: reload returns the
+  // same round; different couples get different rounds.
+  return selectRound(token).map((item) => {
+    const meta = deckMetaFor(item.itemId);
+    return {
+      itemId: item.itemId,
+      prompt: item.prompt,
+      sourceSignal: item.sourceSignal,
+      deck: meta.deck,
+      deckLabel: meta.deckLabel,
+      options: item.options.map((o) => ({ id: o.id, label: o.label })),
+    };
+  });
+}
+
+function labelFor(itemId: string, optionId: string): string {
+  if (!optionId) return "";
+  const item = getCoupleGameItem(itemId);
+  return item?.options.find((o) => o.id === optionId)?.label ?? optionId;
 }
 
 async function loadPartnerASession(
   db: ReturnType<typeof getDb>,
   partnerASessionId: string
-): Promise<{
-  ic: InnerConstitution;
-  demoRow: DemoRow | undefined;
-} | null> {
+): Promise<{ ic: InnerConstitution; demoRow: DemoRow | undefined } | null> {
   const sessionRows = await db
     .select()
     .from(sessionsTable)
@@ -171,10 +231,6 @@ async function loadPartnerASession(
     .limit(1);
   const demoRow = demoRows[0];
 
-  // Re-derive A's InnerConstitution from raw answers so the game reads
-  // current-engine projections (mirrors the report-path approach for
-  // shape-drift resilience without importing the full stale-shape
-  // ceremony). Engine is pure — no LLM, no I/O.
   const answers = (row.answers ?? []) as Answer[];
   const metaSignals = (row.meta_signals ?? []) as MetaSignal[];
   const demographics = rowToDemographicSet(demoRow);
@@ -182,9 +238,6 @@ async function loadPartnerASession(
   try {
     ic = buildInnerConstitution(answers, metaSignals, demographics);
   } catch {
-    // Fallback: use the stored constitution if re-derivation throws on
-    // a stale-shape row. Worst case the predict() reads null on missing
-    // fields — which the resolver handles cleanly.
     ic = row.inner_constitution as InnerConstitution;
   }
   return { ic, demoRow };
@@ -194,53 +247,46 @@ function buildRevealPayload(
   results: CoupleGameResults,
   personName: string
 ): RevealPayload {
-  const breakdown: Record<RevealType, number> = {
-    obvious: 0,
-    oblivious: 0,
-    mirror_blind: 0,
-    hidden_pattern: 0,
-    loving_misread: 0,
-  };
   const resolvedItems: ResolvedItem[] = [];
-  let matches = 0;
-  let scored = 0;
-  let unscored = 0;
+  const tierResults: { tier: RankedRevealTier; points: number }[] = [];
+
   for (const stored of results.items) {
     const item = getCoupleGameItem(stored.itemId);
-    const scoredOk = stored.selfAnswer !== "";
-    let revealType: RevealType;
-    if (scoredOk) {
-      revealType = resolveReveal({
-        selfAnswer: stored.selfAnswer,
-        partnerGuess: stored.partnerGuess,
-        enginePredicted: stored.selfAnswer,
-        selfKnows: stored.selfKnows,
-        options: item?.options,
-      });
-      scored += 1;
-      if (revealType === "obvious") matches += 1;
-      breakdown[revealType] += 1;
-    } else {
-      // Sentinel: no engine read → "no strong read" rather than oblivious.
-      revealType = "oblivious"; // unused for unscored items at render time
-      unscored += 1;
-    }
+    const enginePredicted = stored.selfAnswer; // "" when unscored
+    const ranked = decodeRankedGuess(stored.partnerGuess);
+    const adjacency = enginePredicted
+      ? adjacencyFor(stored.itemId, enginePredicted)
+      : [];
+    const scored = scoreRankedGuess({
+      enginePredicted: enginePredicted || null,
+      rankedGuess: ranked,
+      adjacency,
+    });
+    tierResults.push(scored);
+    const meta = deckMetaFor(stored.itemId);
     resolvedItems.push({
       itemId: stored.itemId,
+      prompt: item?.prompt ?? "",
       sourceSignal: stored.sourceSignal,
-      partnerGuess: stored.partnerGuess,
-      enginePredicted: stored.selfAnswer,
-      revealType,
-      scored: scoredOk,
+      deck: meta.deck,
+      deckLabel: meta.deckLabel,
+      rankedGuess: ranked,
+      rankedGuessLabels: ranked.map((id) => labelFor(stored.itemId, id)),
+      enginePredicted,
+      enginePredictedLabel: enginePredicted
+        ? labelFor(stored.itemId, enginePredicted)
+        : "",
+      tier: scored.tier,
+      points: scored.points,
+      translation: ITEM_TRANSLATIONS[stored.itemId] ?? "",
     });
   }
-  const percent =
-    scored === 0 ? null : Math.round((matches / scored) * 100);
+
+  const warm = summarizeWarmTotal(tierResults);
   return {
     status: "completed",
     personName,
-    legibility: { matches, scored, percent, breakdown },
-    unscoredCount: unscored,
+    warmTotal: warm,
     items: resolvedItems,
   };
 }
@@ -248,8 +294,7 @@ function buildRevealPayload(
 async function buildIntroOrReveal(
   db: ReturnType<typeof getDb>,
   couple: CoupleSessionRow
-): Promise<IntroPayload | RevealPayload | { error: string; status: number }> {
-  // Find A's first name. (Demographics-only lookup; cheap.)
+): Promise<IntroPayload | RevealPayload> {
   const demoRows = await db
     .select()
     .from(demographicsTable)
@@ -263,7 +308,7 @@ async function buildIntroOrReveal(
   return {
     status: couple.status === "b_joined" ? "b_joined" : "invited",
     personName,
-    items: itemsForIntro(),
+    items: itemsForIntro(couple.invite_token),
   };
 }
 
@@ -292,14 +337,7 @@ export async function GET(
     return NextResponse.json({ error: "Link not found" }, { status: 404 });
   }
 
-  const payload = await buildIntroOrReveal(db, couple);
-  if ("error" in payload) {
-    return NextResponse.json(
-      { error: payload.error },
-      { status: payload.status }
-    );
-  }
-  return NextResponse.json(payload);
+  return NextResponse.json(await buildIntroOrReveal(db, couple));
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -307,9 +345,12 @@ export async function GET(
 // ─────────────────────────────────────────────────────────────────────
 
 interface PostBody {
-  // Map of itemId → option id B picked. Items not present are skipped
-  // (they're recorded as unscored just like null-predict items).
-  guesses?: Record<string, string>;
+  /**
+   * Map of itemId → B's ranked top-3 option ids (in rank order). Items
+   * not present are recorded with an empty ranked guess (still scored
+   * if the engine has a prediction — the `off` tier handles it).
+   */
+  rankedGuesses?: Record<string, string[]>;
 }
 
 export async function POST(
@@ -333,9 +374,7 @@ export async function POST(
     return NextResponse.json({ error: "Link not found" }, { status: 404 });
   }
 
-  // Idempotent: a completed couple returns its saved reveal — no
-  // replay over a completed result (spec §"Already completed → jump
-  // straight to the saved reveal").
+  // Idempotent on a completed session.
   if (couple.status === "completed" && couple.game_results) {
     const demoRows = await db
       .select()
@@ -353,10 +392,10 @@ export async function POST(
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
-  const guesses = body.guesses ?? {};
-  if (typeof guesses !== "object" || Array.isArray(guesses)) {
+  const ranked = body.rankedGuesses ?? {};
+  if (typeof ranked !== "object" || Array.isArray(ranked)) {
     return NextResponse.json(
-      { error: "guesses must be an object map of itemId → optionId" },
+      { error: "rankedGuesses must be an object map of itemId → option ids" },
       { status: 400 }
     );
   }
@@ -371,38 +410,27 @@ export async function POST(
   const { ic: icA, demoRow } = loaded;
   const personName = firstNameOf(demoRow);
 
-  // Resolve every item in the bank — items B didn't answer are recorded
-  // with partnerGuess="" (unscored). This keeps the stored shape uniform
-  // and gives Phase 2's A-side self-answer pass a complete row to fill in.
-  const storedItems: CoupleGameItem[] = [];
-  for (const item of COUPLE_GAME_ITEMS) {
-    const partnerGuess = guesses[item.itemId];
-    if (typeof partnerGuess !== "string" || partnerGuess === "") {
-      // No guess submitted for this item — record it as unscored
-      // (partnerGuess="") rather than dropping it from the row.
-      storedItems.push({
-        itemId: item.itemId,
-        direction: "b_guesses_a",
-        selfAnswer: item.predict(icA) ?? "",
-        partnerGuess: "",
-        sourceSignal: item.sourceSignal,
-      });
-      continue;
-    }
+  // CC-COUPLE-5 — score against the round selector's items (the same
+  // set the page rendered to B). We trust the round derived from the
+  // token rather than the raw `rankedGuesses` keys — that way an item
+  // B's client never rendered can't be smuggled into the saved row.
+  const round = selectRound(couple.invite_token);
+  const storedItems: CoupleGameItem[] = round.map((item) => {
+    const rankedForItem = Array.isArray(ranked[item.itemId])
+      ? ranked[item.itemId].filter((s) => typeof s === "string")
+      : [];
     const enginePredicted = item.predict(icA);
-    storedItems.push({
+    return {
       itemId: item.itemId,
       direction: "b_guesses_a",
-      // Sentinel "" when engine has no confident read; surfaces as
-      // scored:false in the reveal payload.
+      // Sentinel "" when no engine prediction; surfaces as `unscored`.
       selfAnswer: enginePredicted ?? "",
-      partnerGuess,
-      // selfKnows intentionally omitted — we don't have A's self-report
-      // in the asymmetric MVP (spec note: only Obvious / Oblivious /
-      // Loving Misread can fire as a result).
+      // Pipe-encoded ranked top-3. Empty string when B ranked nothing.
+      partnerGuess: encodeRankedGuess(rankedForItem),
+      // selfKnows intentionally omitted — Phase 3 self-pass arrives later.
       sourceSignal: item.sourceSignal,
-    });
-  }
+    };
+  });
 
   const results: CoupleGameResults = {
     items: storedItems,
