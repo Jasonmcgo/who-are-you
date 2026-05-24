@@ -114,11 +114,25 @@ export default function IdentityAndContextPage({
     }));
   }
 
-  function setOptOut(fieldId: string) {
-    setFieldState((prev) => ({
-      ...prev,
-      [fieldId]: { state: "prefer_not_to_say" },
-    }));
+  // CC-158 — toggle, not one-way. Clicking "Prefer not to say" when
+  // already opted out reverts the field to `not_answered` and lets the
+  // input re-render so the respondent can change their mind without
+  // reloading. A real user hit the one-way bug on first contact —
+  // tapped opt-out, decided to actually answer, and found no path
+  // back. The save mapping in `handleSave` still produces the correct
+  // three-state DemographicAnswer (`prefer_not_to_say` /
+  // `specified` / `not_answered`).
+  function toggleOptOut(fieldId: string) {
+    setFieldState((prev) => {
+      const current = prev[fieldId];
+      if (current?.state === "prefer_not_to_say") {
+        // Revert to not_answered; the input re-appears so the user
+        // can type/pick a value. Specifying a value will flip the
+        // state to "specified" via `setSpecify` as before.
+        return { ...prev, [fieldId]: { state: "not_answered" } };
+      }
+      return { ...prev, [fieldId]: { state: "prefer_not_to_say" } };
+    });
   }
 
   function setLocation(country: string, region: string) {
@@ -240,7 +254,7 @@ export default function IdentityAndContextPage({
               onSpecify={(value, otherText) =>
                 setSpecified(field.field_id, value, otherText)
               }
-              onOptOut={() => setOptOut(field.field_id)}
+              onOptOut={() => toggleOptOut(field.field_id)}
               onLocation={(country, region) => setLocation(country, region)}
             />
           ))}
@@ -573,10 +587,14 @@ function FieldBlock({
         className="flex flex-row items-center"
         style={{ gap: 10, paddingTop: 4 }}
       >
+        {/* CC-158 — toggle, not a one-way radio. `aria-pressed` is the
+            canonical toggle-button pattern (radios don't deselect by
+            re-click). Tapping again reverts to `not_answered` and the
+            input re-appears, so a user who changes their mind after
+            opting out can still answer. */}
         <button
           type="button"
-          role="radio"
-          aria-checked={isOptOut}
+          aria-pressed={isOptOut}
           onClick={onOptOut}
           data-focus-ring
           className="font-mono uppercase"
@@ -602,7 +620,7 @@ function FieldBlock({
             className="font-serif italic"
             style={{ fontSize: 13, color: "var(--ink-soft)" }}
           >
-            opted out — the model treats this as informative.
+            opted out — tap again to change your mind.
           </span>
         ) : null}
       </div>
