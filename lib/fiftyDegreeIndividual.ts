@@ -43,7 +43,7 @@ import {
   bodyGripBlockFor,
 } from "./bodyCardFieldMap";
 import { renderDriveDistributionDonut } from "./driveDistributionChart";
-import { renderOceanDashboardSVG } from "./oceanDashboard";
+import { renderOceanDashboardSVG, composeOceanProse } from "./oceanDashboard";
 import { composeDispositionSummaryLine } from "./renderMirror";
 // CC-146 Part B — claimed-vs-revealed drive prose. The Individual's
 // Work, Love, and Giving section now carries the same Distribution /
@@ -150,7 +150,13 @@ export function composeFiftyDegreeIndividual(
   parts.push(composeEpigraph(inputs));
   parts.push(composeHowToRead(inputs, name));
   parts.push(composeTrajectory(inputs, possessive));
-  parts.push(composePatternAndGrip(inputs, possessive));
+  // CC-166 — Pattern + Grip were one composer pre-CC-166. Split so
+  // Top Gifts can slot BETWEEN them per the CC's ordering spec.
+  parts.push(composePattern(inputs, possessive));
+  parts.push(composeTopGiftsAndGrowthEdges(inputs));
+  parts.push(composeGrip(inputs, possessive));
+  parts.push(composeWhenTheLoadGetsHeavy(inputs));
+  parts.push(composeHowOthersExperienceYou(inputs));
   parts.push(composeBodyCards(inputs));
   parts.push(composeDispositionSignalMix(inputs));
   parts.push(composeWorkLoveGiving(inputs));
@@ -188,6 +194,12 @@ function composeCover(
   lines.push("# The Inner Constitution");
   lines.push("");
   lines.push(`**FOR ${name.toUpperCase()}**`);
+  // CC-166 §B — set the epistemic posture early. The Guide emits this
+  // italic line just under its masthead (renderMirror.ts ~L908). The
+  // Individual previously dropped it; restoring tells the reader the
+  // report is a working hypothesis to test, not a verdict to receive.
+  lines.push("");
+  lines.push("*a possibility, not a verdict*");
 
   return lines.join("\n");
 }
@@ -246,7 +258,27 @@ function composeTrajectory(
   // Replace just the H2 title with the Michele framing; keep everything
   // below the header line verbatim (so all numbers, the chart, and the
   // prose carry over unchanged).
-  const body = movement.replace(/^## Movement\b.*\n?/m, "").trim();
+  let body = movement.replace(/^## Movement\b.*\n?/m, "").trim();
+
+  // CC-166 §E — collapse the raw grip sub-signal bullets into a
+  // <details> drawer with a composed "Pressure Pull" summary line.
+  // The Guide emits these as indented children of the `**Grip:**`
+  // bullet line in clinician mode (see renderMirror.ts ~L1364):
+  //
+  //   - **Grip:** 26 / 100
+  //     - Grips control under pressure
+  //     - Grips money / security under pressure
+  //     - ...
+  //
+  // Inline, they read accusatory/diagnostic in a public report. Strip
+  // them from `body`, compose a one-line summary from the same
+  // `grippingPull.signals` list, and surface the raw bullets inside
+  // a drawer below.
+  const gripSignals =
+    inputs.constitution.goalSoulMovement?.dashboard?.grippingPull?.signals ??
+    [];
+  const collapsed = collapseGripSubSignals(body, gripSignals);
+  body = collapsed.body;
 
   const callouts = composeReportCallouts(inputs.constitution);
   const finalLine = callouts.finalLine;
@@ -255,6 +287,10 @@ function composeTrajectory(
   lines.push(`## ${possessive} Trajectory`);
   lines.push("");
   lines.push(body);
+  if (collapsed.drawer.length > 0) {
+    lines.push("");
+    lines.push(collapsed.drawer);
+  }
   if (finalLine) {
     lines.push("");
     lines.push(`> *${finalLine}*`);
@@ -262,13 +298,87 @@ function composeTrajectory(
   return lines.join("\n");
 }
 
-function composePatternAndGrip(
+// CC-166 §E — strip the raw indented grip-signal bullets from the
+// Movement body and build (a) a one-line "Pressure Pull" summary
+// using the same signal list and (b) a <details> drawer containing
+// the original bullets verbatim. The Movement body's `**Grip:**`
+// bullet itself stays in place — only its indented children move.
+function collapseGripSubSignals(
+  body: string,
+  signals: Array<{ id: string; humanReadable: string }>
+): { body: string; drawer: string } {
+  if (signals.length === 0) {
+    return { body, drawer: "" };
+  }
+  // The Guide emits each child bullet as "  - <humanReadable>" under
+  // the `- **Grip:** ...` line. Match and remove every such line
+  // whose text exactly matches one of the signal humanReadable
+  // strings (defensive — won't accidentally chew a non-grip
+  // indented bullet).
+  const signalTexts = new Set(signals.map((s) => s.humanReadable));
+  const inputLines = body.split("\n");
+  const keptLines: string[] = [];
+  for (const ln of inputLines) {
+    const m = ln.match(/^\s+-\s+(.+?)\s*$/);
+    if (m && signalTexts.has(m[1])) {
+      // drop — moves into drawer
+      continue;
+    }
+    keptLines.push(ln);
+  }
+  const cleaned = keptLines.join("\n");
+  // Compose the summary line: pick first signal as primary, next two
+  // (if present) as background. Lower-cases the engine-string'd "Grip"
+  // prefix for natural-reading prose. Falls back to a single primary
+  // when fewer than three signals.
+  const primary = humanizePressureSignal(signals[0].humanReadable);
+  const secondary = signals[1]
+    ? humanizePressureSignal(signals[1].humanReadable)
+    : null;
+  const tertiary = signals[2]
+    ? humanizePressureSignal(signals[2].humanReadable)
+    : null;
+  let summary: string;
+  if (secondary && tertiary) {
+    summary = `**Pressure Pull:** ${primary} — with ${secondary} and ${tertiary} in the background.`;
+  } else if (secondary) {
+    summary = `**Pressure Pull:** ${primary} — with ${secondary} in the background.`;
+  } else {
+    summary = `**Pressure Pull:** ${primary}.`;
+  }
+  const drawerLines: string[] = [];
+  drawerLines.push(summary);
+  drawerLines.push("");
+  drawerLines.push("<details>");
+  drawerLines.push("<summary>View supporting signals</summary>");
+  drawerLines.push("");
+  for (const s of signals) {
+    drawerLines.push(`- ${s.humanReadable}`);
+  }
+  drawerLines.push("");
+  drawerLines.push("</details>");
+  return { body: cleaned, drawer: drawerLines.join("\n") };
+}
+
+// CC-166 §E — humanize a single signal's humanReadable string into a
+// short prose fragment for the Pressure Pull summary. Drops the
+// engine "Grips " prefix + the " under pressure" suffix so the
+// sentence reads as natural prose rather than a list of flags.
+function humanizePressureSignal(raw: string): string {
+  return raw
+    .replace(/^Grips\s+/i, "")
+    .replace(/\s+under pressure$/i, "")
+    .trim();
+}
+
+// CC-166 — split from `composePatternAndGrip` so Top Gifts can slot
+// between Pattern and Grip per the CC's ordering spec. Carries the
+// MBTI humility drawer (§C) at the end of Pattern.
+function composePattern(
   inputs: ComposeFiftyDegreeInputs,
   possessive: string
 ): string {
   const lines: string[] = [];
-
-  // §4a — Pattern. Use the warm Core Pattern body.
   const core = extractV3Section(inputs.guideMd, V3_HEADERS.corePattern);
   const coreBody = core
     ? core.replace(/^## Your Core Pattern\b.*\n?/m, "").trim()
@@ -286,102 +396,265 @@ function composePatternAndGrip(
     lines.push(coreBody);
   }
 
-  // §4b — Grip. Primal question blockquote + GRIP SAYS / AIM SAYS table.
-  const grip = inputs.constitution.gripPattern;
-  if (grip) {
+  // CC-166 §C — MBTI humility drawer at the end of Pattern. The Guide
+  // emits a `*Possible surface label: <CODE>...*` italic line
+  // (clinician-mode-only in renderMirror.ts ~L944); we extract it
+  // and wrap in a `<details>` so the report answers "what type am I?"
+  // without anchoring on the code. When the Guide didn't emit a
+  // surface label (e.g. non-canonical stack, low confidence), the
+  // drawer is omitted entirely.
+  const mbtiDrawer = composeMbtiHumilityDrawer(inputs.guideMd);
+  if (mbtiDrawer.length > 0) {
     lines.push("");
-    lines.push(`## ${possessive} Grip`);
-    lines.push("");
-    if (grip.underlyingQuestion) {
-      lines.push(`> ${grip.underlyingQuestion}`);
-      lines.push("");
-    }
-
-    const rows: Array<{ grip: string; aim: string }> = [];
-
-    // Row 1 — the base grip → healthy gift pair. Engine-fallback prose
-    // lives in renderMirror.ts:emitGripSection; we re-derive the
-    // essential pair from gripTaxonomy. healthyGift is typically a
-    // short label list (e.g. "humility, craft") — re-frame as a full
-    // AIM SAYS cell so the table reads as a complete contrast.
-    const taxonomy = inputs.constitution.gripTaxonomy;
-    if (taxonomy?.distortedStrategy?.text) {
-      const giftLabel = taxonomy.healthyGift?.trim() ?? "";
-      const aimCell = giftLabel.length > 0
-        ? `Same protection, lighter hand — held as ${giftLabel} rather than as defense.`
-        : "Same protection without the cost — held with a lighter hand.";
-      rows.push({
-        grip: taxonomy.distortedStrategy.text,
-        aim: aimCell,
-      });
-    }
-
-    // Row 2+ — follow-up narrative pairs (CC-129).
-    const fu = inputs.followUpNarrative;
-    if (fu?.gripObject?.text && fu?.releaseCondition?.text) {
-      rows.push({
-        grip: fu.gripObject.text,
-        aim: fu.releaseCondition.text,
-      });
-    }
-    if (fu?.aimReplacement?.text) {
-      // Append as a third row — the aim move itself.
-      const lastRowAim = rows[rows.length - 1]?.aim;
-      rows.push({
-        grip: lastRowAim ? "What you'd do instead:" : "Your next move:",
-        aim: fu.aimReplacement.text,
-      });
-    }
-
-    if (rows.length > 0) {
-      lines.push("| GRIP SAYS | AIM SAYS |");
-      lines.push("| --- | --- |");
-      for (const r of rows) {
-        const g = r.grip.replace(/\|/g, "\\|").replace(/\n/g, " ");
-        const a = r.aim.replace(/\|/g, "\\|").replace(/\n/g, " ");
-        lines.push(`| ${g} | ${a} |`);
-      }
-    }
-
-    // CC-145 — full Grip block from `bodyGripBlockFor`, appended below
-    // the GRIP SAYS / AIM SAYS lead-in. Mirrors the Guide's ## Your Grip
-    // emit (narrative + Surface Grip / Grip Pattern / Underlying Question /
-    // Distorted Strategy / Healthy Gift / Contributing grips / Sub-register
-    // / Confidence), de-duplicated so each field appears once.
-    const block = bodyGripBlockFor(inputs.constitution);
-    if (block) {
-      lines.push("");
-      lines.push(block.narrative);
-      lines.push("");
-      lines.push(`**Surface Grip:** ${block.surfaceGrip}`);
-      lines.push("");
-      lines.push(`**Grip Pattern:** ${block.patternLabel}`);
-      lines.push("");
-      lines.push(`**Underlying Question:** ${block.underlyingQuestion}`);
-      if (block.distortedStrategy.length > 0) {
-        lines.push("");
-        lines.push(`**Distorted Strategy:** ${block.distortedStrategy}`);
-      }
-      if (block.healthyGift.length > 0) {
-        lines.push("");
-        lines.push(`**Healthy Gift:** ${block.healthyGift}`);
-      }
-      if (block.contributingGrips.length > 0) {
-        lines.push("");
-        lines.push(
-          `**Contributing grips:** ${block.contributingGrips.join(", ")}`
-        );
-      }
-      if (block.subRegister) {
-        lines.push("");
-        lines.push(`**Sub-register:** ${block.subRegister}`);
-      }
-      lines.push("");
-      lines.push(`**Confidence:** ${block.confidence}`);
-    }
+    lines.push(mbtiDrawer);
   }
 
   return lines.join("\n");
+}
+
+function composeGrip(
+  inputs: ComposeFiftyDegreeInputs,
+  possessive: string
+): string {
+  const grip = inputs.constitution.gripPattern;
+  if (!grip) return "";
+
+  const lines: string[] = [];
+  lines.push(`## ${possessive} Grip`);
+  lines.push("");
+  if (grip.underlyingQuestion) {
+    lines.push(`> ${grip.underlyingQuestion}`);
+    lines.push("");
+  }
+
+  const rows: Array<{ grip: string; aim: string }> = [];
+
+  // Row 1 — the base grip → healthy gift pair. Engine-fallback prose
+  // lives in renderMirror.ts:emitGripSection; we re-derive the
+  // essential pair from gripTaxonomy. healthyGift is typically a
+  // short label list (e.g. "humility, craft") — re-frame as a full
+  // AIM SAYS cell so the table reads as a complete contrast.
+  const taxonomy = inputs.constitution.gripTaxonomy;
+  if (taxonomy?.distortedStrategy?.text) {
+    const giftLabel = taxonomy.healthyGift?.trim() ?? "";
+    const aimCell = giftLabel.length > 0
+      ? `Same protection, lighter hand — held as ${giftLabel} rather than as defense.`
+      : "Same protection without the cost — held with a lighter hand.";
+    rows.push({
+      grip: taxonomy.distortedStrategy.text,
+      aim: aimCell,
+    });
+  }
+
+  // Row 2+ — follow-up narrative pairs (CC-129).
+  const fu = inputs.followUpNarrative;
+  if (fu?.gripObject?.text && fu?.releaseCondition?.text) {
+    rows.push({
+      grip: fu.gripObject.text,
+      aim: fu.releaseCondition.text,
+    });
+  }
+  if (fu?.aimReplacement?.text) {
+    // Append as a third row — the aim move itself.
+    const lastRowAim = rows[rows.length - 1]?.aim;
+    rows.push({
+      grip: lastRowAim ? "What you'd do instead:" : "Your next move:",
+      aim: fu.aimReplacement.text,
+    });
+  }
+
+  if (rows.length > 0) {
+    lines.push("| GRIP SAYS | AIM SAYS |");
+    lines.push("| --- | --- |");
+    for (const r of rows) {
+      const g = r.grip.replace(/\|/g, "\\|").replace(/\n/g, " ");
+      const a = r.aim.replace(/\|/g, "\\|").replace(/\n/g, " ");
+      lines.push(`| ${g} | ${a} |`);
+    }
+  }
+
+  // CC-145 — full Grip block from `bodyGripBlockFor`, appended below
+  // the GRIP SAYS / AIM SAYS lead-in. Mirrors the Guide's ## Your Grip
+  // emit (narrative + Surface Grip / Grip Pattern / Underlying Question /
+  // Distorted Strategy / Healthy Gift / Contributing grips / Sub-register
+  // / Confidence), de-duplicated so each field appears once.
+  const block = bodyGripBlockFor(inputs.constitution);
+  if (block) {
+    lines.push("");
+    lines.push(block.narrative);
+    lines.push("");
+    lines.push(`**Surface Grip:** ${block.surfaceGrip}`);
+    lines.push("");
+    lines.push(`**Grip Pattern:** ${block.patternLabel}`);
+    lines.push("");
+    lines.push(`**Underlying Question:** ${block.underlyingQuestion}`);
+    if (block.distortedStrategy.length > 0) {
+      lines.push("");
+      lines.push(`**Distorted Strategy:** ${block.distortedStrategy}`);
+    }
+    if (block.healthyGift.length > 0) {
+      lines.push("");
+      lines.push(`**Healthy Gift:** ${block.healthyGift}`);
+    }
+    if (block.contributingGrips.length > 0) {
+      lines.push("");
+      lines.push(
+        `**Contributing grips:** ${block.contributingGrips.join(", ")}`
+      );
+    }
+    if (block.subRegister) {
+      lines.push("");
+      lines.push(`**Sub-register:** ${block.subRegister}`);
+    }
+    lines.push("");
+    lines.push(`**Confidence:** ${block.confidence}`);
+  }
+
+  return lines.join("\n");
+}
+
+// CC-166 §C — extract the Guide's clinician-only "Possible surface
+// label" italic note and wrap in a <details> drawer. Returns "" when
+// the Guide didn't emit a label (non-canonical stack / low
+// confidence), so the drawer is omitted entirely.
+function composeMbtiHumilityDrawer(guideMd: string): string {
+  const m = guideMd.match(
+    /^\*Possible surface label:\s*([A-Z]{4})\.\s*([^\n*]+)\.\*$/m
+  );
+  if (!m) return "";
+  const code = m[1];
+  const lines: string[] = [];
+  lines.push("<details>");
+  lines.push("<summary>If you use personality-type language</summary>");
+  lines.push("");
+  lines.push(
+    `*This may resemble ${code}-patterning, but the report isn't built on type labels — what matters more is the pattern above.*`
+  );
+  lines.push("");
+  lines.push("</details>");
+  return lines.join("\n");
+}
+
+// CC-166 §A.1 — Top Gifts and Growth Edges. Extract the Guide's
+// "## Your Top Gifts and Growth Edges" section (which is already a
+// compact per-user 3-row table). Keep the table verbatim + at most one
+// lead sentence; do not author new prose (shape-blind-routing guard).
+function composeTopGiftsAndGrowthEdges(
+  inputs: ComposeFiftyDegreeInputs
+): string {
+  const raw = extractV3Section(
+    inputs.guideMd,
+    "## Your Top Gifts and Growth Edges"
+  );
+  if (!raw) return "";
+  // Strip the Guide's heading line; keep the body. The body is
+  // typically a 3-row markdown table preceded by one optional lead
+  // sentence and optionally followed by clinician scaffolding (any
+  // "## " H2 below would already be excluded by `extractV3Section`).
+  const body = raw.replace(/^## Your Top Gifts and Growth Edges\b.*\n?/m, "").trim();
+  if (body.length === 0) return "";
+  // Length discipline (CC-166): keep the table + at most one lead
+  // sentence. Walk the body line-by-line; once we've captured the
+  // table (last "|" row), stop. A "lead sentence" before the table is
+  // any non-empty, non-table line above the first "|".
+  const inputLines = body.split("\n");
+  const out: string[] = [];
+  let seenTableStart = false;
+  let lastTableLineIdx = -1;
+  for (let i = 0; i < inputLines.length; i++) {
+    const ln = inputLines[i];
+    if (ln.trim().startsWith("|")) {
+      seenTableStart = true;
+      lastTableLineIdx = i;
+    }
+  }
+  if (lastTableLineIdx < 0) {
+    // No table found — take just the first non-empty paragraph as a
+    // defensive fallback (no stub, but no full re-bloat either).
+    const firstPara = inputLines
+      .reduce<string[]>((acc, ln) => {
+        if (acc.length === 0 && ln.trim().length === 0) return acc;
+        if (acc.length > 0 && ln.trim().length === 0) {
+          acc.push("__STOP__");
+          return acc;
+        }
+        if (acc[acc.length - 1] === "__STOP__") return acc;
+        acc.push(ln);
+        return acc;
+      }, [])
+      .filter((ln) => ln !== "__STOP__");
+    if (firstPara.length === 0) return "";
+    out.push("## Top Gifts and Growth Edges");
+    out.push("");
+    out.push(firstPara.join("\n"));
+    return out.join("\n");
+  }
+  // Table found: keep everything from the first non-empty line through
+  // the last table line. Drops any trailing prose past the table.
+  let firstKeepIdx = -1;
+  for (let i = 0; i < inputLines.length; i++) {
+    if (inputLines[i].trim().length > 0) {
+      firstKeepIdx = i;
+      break;
+    }
+  }
+  if (firstKeepIdx < 0) return "";
+  void seenTableStart;
+  out.push("## Top Gifts and Growth Edges");
+  out.push("");
+  out.push(inputLines.slice(firstKeepIdx, lastTableLineIdx + 1).join("\n"));
+  return out.join("\n");
+}
+
+// CC-166 §A.2 — When the Load Gets Heavy. Extract the Guide's
+// "## When the Load Gets Heavy" section and keep just the first
+// paragraph (the embodied "what narrows under load" prose). Stops at
+// the first blank line after the first non-empty line.
+function composeWhenTheLoadGetsHeavy(
+  inputs: ComposeFiftyDegreeInputs
+): string {
+  const raw = extractV3Section(inputs.guideMd, "## When the Load Gets Heavy");
+  if (!raw) return "";
+  const body = raw.replace(/^## When the Load Gets Heavy\b.*\n?/m, "").trim();
+  if (body.length === 0) return "";
+  const firstPara = firstParagraph(body);
+  if (firstPara.length === 0) return "";
+  const out: string[] = [];
+  out.push("## When the Load Gets Heavy");
+  out.push("");
+  out.push(firstPara);
+  return out.join("\n");
+}
+
+// CC-166 §A.3 — How Others May Experience You. Extract the Guide's
+// "## What Others May Experience" and keep the first paragraph;
+// rename to second-person ("How Others May Experience You" reads
+// warmer than the Guide's third-person observational framing).
+function composeHowOthersExperienceYou(
+  inputs: ComposeFiftyDegreeInputs
+): string {
+  const raw = extractV3Section(inputs.guideMd, "## What Others May Experience");
+  if (!raw) return "";
+  const body = raw.replace(/^## What Others May Experience\b.*\n?/m, "").trim();
+  if (body.length === 0) return "";
+  const firstPara = firstParagraph(body);
+  if (firstPara.length === 0) return "";
+  const out: string[] = [];
+  out.push("## How Others May Experience You");
+  out.push("");
+  out.push(firstPara);
+  return out.join("\n");
+}
+
+// Helper — take the first non-empty paragraph (text up to the first
+// double-newline) from a markdown body. Used by §A.2 and §A.3 for
+// the "first paragraph only" compression discipline.
+function firstParagraph(body: string): string {
+  const trimmed = body.trim();
+  if (trimmed.length === 0) return "";
+  const firstBreak = trimmed.search(/\n\s*\n/);
+  if (firstBreak < 0) return trimmed;
+  return trimmed.slice(0, firstBreak).trim();
 }
 
 function composeBodyCards(inputs: ComposeFiftyDegreeInputs): string {
@@ -394,10 +667,13 @@ function composeBodyCards(inputs: ComposeFiftyDegreeInputs): string {
   // composer runs server-side without access to those rewrites, so
   // any swap would silently downgrade the Copy/Download artifact.
   const lines: string[] = [];
-  lines.push("## Why This Is Happening — The Body Cards");
+  // CC-166 §F2 — renamed from "Why This Is Happening — The Body Cards".
+  // The cards organize interpretive dimensions; they don't claim
+  // causation. New heading clarifies what the section does.
+  lines.push("## Where the Pattern Shows Up — The Eight Body Cards");
   lines.push("");
   lines.push(
-    "*Eight body parts, eight pressure points. Each card names one register of your shape — the question that lives there, the strength it carries, the growth edge it surfaces, and a practice you can apply.*"
+    "*Eight body parts, eight pressure points. Each card names one part of how you operate — the question that lives there, the strength it carries, the growth edge it surfaces, and a practice you can apply.*"
   );
 
   for (let i = 0; i < BODY_CARDS.length; i++) {
@@ -505,7 +781,22 @@ function composeDispositionSignalMix(inputs: ComposeFiftyDegreeInputs): string {
   lines.push(`*${composeDispositionSummaryLine(mix)}*`);
   lines.push("");
   lines.push(renderOceanDashboardSVG(mix));
-  return lines.join("\n");
+  // CC-166 §D — 4-line shape-aware read under the chart. Pre-CC-166
+  // this section was just heading + summary + chart, which read as a
+  // bare diagnostic. `composeOceanProse` returns per-trait paragraphs
+  // built from the same `mix` data; take the first ~4 to keep the
+  // length discipline. Each paragraph is one trait's plain-language
+  // interpretation — no engine vocabulary, shape-aware per user.
+  const prose = composeOceanProse(mix, inputs.constitution.goalSoulGive);
+  const readParas = prose.paragraphs.slice(0, 4);
+  if (readParas.length > 0) {
+    lines.push("");
+    for (const para of readParas) {
+      lines.push(para);
+      lines.push("");
+    }
+  }
+  return lines.join("\n").trimEnd();
 }
 
 function composeOpenTensions(inputs: ComposeFiftyDegreeInputs): string {
@@ -551,27 +842,41 @@ function composeKeystone(inputs: ComposeFiftyDegreeInputs): string {
   // — those only emit in clinician mode in renderMirror.ts:1147+, but
   // belt-and-suspenders strip them here too.
   body = body.replace(/\n- \*\*Likely value:\*\*[\s\S]*$/m, "");
+  // CC-166 §F1 — strip any leading belief-blockquote from the warm
+  // body before we emit our own. The pre-CC-166 logic detected an
+  // echo by checking `body.startsWith("> ")` AND a 30-char belief
+  // prefix overlap, then skipped our own emission — but the leftover
+  // body still carried the quote, producing duplicate-render in the
+  // Individual (the Guide doesn't show this because its render starts
+  // the section a different way). Dedupe by always stripping any
+  // leading `> ` block from the warm body whose text contains the
+  // belief; we then unconditionally emit the canonical blockquote
+  // once below. Trim FIRST so the leading-`^` anchor reaches the
+  // `> ` even if the strips above left a leading newline.
   body = body.trim();
+  // CC-166.1 — strip the belief-echo blockquote WHEREVER it appears in the
+  // warm body (leading OR trailing). The pre-fix leading-only strip missed
+  // shapes whose Guide keystone prose echoes the belief at the END, leaving
+  // a duplicate quote under our canonical one (Daniel surfaced this). We
+  // emit the canonical belief blockquote once below, so any `> …belief…`
+  // line in the body is a removable echo.
+  const beliefKey = belief.belief_text.trim().slice(0, 30);
+  body = body
+    .split(/\r?\n/)
+    .filter((ln) => !(ln.trim().startsWith(">") && ln.includes(beliefKey)))
+    .join("\n")
+    .trim();
 
   const lines: string[] = [];
   lines.push("## Keystone Reflection");
   lines.push("");
-  // Belief blockquote — only if the warm prose doesn't already lead with
-  // a verbatim echo of the belief text. The CC-131 Keystone system
-  // prompt forbids restatement, but some warm cache entries pre-date
-  // that rule and open with the belief as a blockquote. Detect by
-  // checking whether the first line of the warm body is `> ` and
-  // contains a prefix of the belief text.
-  const beliefFirstWords = belief.belief_text.trim().slice(0, 40);
-  const warmStartsWithBelief =
-    body.startsWith("> ") &&
-    body.split("\n", 1)[0].includes(beliefFirstWords.slice(0, 30));
-  if (!warmStartsWithBelief) {
-    for (const ln of belief.belief_text.split(/\r?\n/)) {
-      lines.push(`> ${ln}`);
-    }
-    lines.push("");
+  // Always emit the belief blockquote exactly once (the warm body has
+  // been stripped of any leading echo above). Then the warm
+  // explanation. No second orphaned quote.
+  for (const ln of belief.belief_text.split(/\r?\n/)) {
+    lines.push(`> ${ln}`);
   }
+  lines.push("");
   lines.push(body);
   return lines.join("\n");
 }
@@ -697,7 +1002,7 @@ export function extractPathThisWeek(guideMd: string): string | null {
 // ─────────────────────────────────────────────────────────────────────
 
 function bandLabel(score: number | null | undefined): string {
-  if (score == null) return "Quiet — thin signal in this register.";
+  if (score == null) return "Quiet — thin signal here.";
   if (score >= 70) return "Strong.";
   if (score >= 55) return "Present.";
   if (score >= 40) return "Mixed.";
@@ -705,7 +1010,7 @@ function bandLabel(score: number | null | undefined): string {
 }
 
 function aimBandLabel(score: number | null | undefined): string {
-  if (score == null) return "Quiet — thin signal in this register.";
+  if (score == null) return "Quiet — thin signal here.";
   if (score >= 70) return "Open-handed — Aim is doing real work.";
   if (score >= 55) return "Present — Aim is holding the line.";
   if (score >= 40) return "Mixed — Aim is partial.";
