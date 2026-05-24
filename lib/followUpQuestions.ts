@@ -165,6 +165,26 @@ const ALL_FAMILIES: FollowUpFamily[] = [
 // `boost` tags lift the option when present in the person's `topValues`
 // / `stakesTriggers` / dom-function pool. Filtering = stable sort by
 // boost-count then by authored index; pick first 6.
+//
+// CC-149 — plain-language rubric for option `text` (the sentence
+// rendered as the visible option per `FollowUpBlock`'s mapping in
+// `app/follow-up/[token]/page.tsx`). The eight `control_mastery`
+// `aimReplacement` texts below were owner-rewritten and define the
+// target register; CC-150 will apply the same rubric to the remaining
+// ~40 aim options and the `gripObject` / `releaseCondition` banks
+// across families.
+//
+// Rubric:
+//   - Say what the person would actually DO or EXPERIENCE, concretely.
+//   - No insider nouns the report hasn't defined for a cold reader
+//     ("recoveries", "stewardship-as-register", "instrument",
+//     "downstream enablement"). The sentence must stand alone without
+//     the `label`.
+//   - Second person where natural; a single plain sentence; no
+//     nominalization that needs unpacking.
+//   - `label`, `tags`, `interpretation`, and `boost` remain the
+//     internal write-back contract — only `text` is the cold-reader
+//     surface and must follow this rubric.
 // ─────────────────────────────────────────────────────────────────────
 
 type SeedOption = {
@@ -205,14 +225,18 @@ const FAMILY_SEED_BANKS: Record<FollowUpFamily, FamilySeedBank> = {
       { label: "Trust the inputs", text: "Trusting the inputs I didn't author personally.", tags: ["delegation"], interpretation: "Release through letting go of attribution." },
     ],
     aimReplacement: [
-      { label: "Ships under feedback", text: "Craft that ships under feedback, not under perfection.", tags: ["shipping", "aim"], interpretation: "Aim = pace + responsiveness." },
-      { label: "Public iteration", text: "Public iteration as the practice itself.", tags: ["iteration", "aim"], interpretation: "Aim names the loop." },
-      { label: "Mastery as service", text: "Mastery measured by what it lets others do.", tags: ["service", "aim"], interpretation: "Aim = downstream enablement." },
-      { label: "Next revision", text: "Authorship of the next revision instead of the final answer.", tags: ["revision", "aim"], interpretation: "Aim = an evolving series." },
-      { label: "Held lightly", text: "Skill held lightly because the next version exists.", tags: ["humility", "aim"], interpretation: "Aim = succession-aware competence." },
-      { label: "Recoveries on record", text: "Recoveries logged as part of the record, not hidden.", tags: ["transparency", "aim"], interpretation: "Aim = mistakes-as-data." },
-      { label: "Stewardship of craft", text: "Stewardship of a craft someone else will inherit.", tags: ["inheritance", "aim"], interpretation: "Aim = pass-it-on register." },
-      { label: "Curiosity over certainty", text: "Curiosity holding more weight than certainty in how I work.", tags: ["curiosity", "aim"], interpretation: "Aim shifts from defense to inquiry." },
+      // CC-149 — `text` rewritten to the owner-locked plain-language
+      // wording (see rubric above). `label` / `tags` /
+      // `interpretation` unchanged — `label` remains the write-back
+      // key the POST handler matches on.
+      { label: "Ships under feedback", text: "Putting work out before it's perfect and improving it from real feedback.", tags: ["shipping", "aim"], interpretation: "Aim = pace + responsiveness." },
+      { label: "Public iteration", text: "Improving the work in the open, where people can watch it evolve.", tags: ["iteration", "aim"], interpretation: "Aim names the loop." },
+      { label: "Mastery as service", text: "Measuring your skill by what it lets other people do — not by how good you are.", tags: ["service", "aim"], interpretation: "Aim = downstream enablement." },
+      { label: "Next revision", text: "Aiming for the next good version instead of one final, perfect answer.", tags: ["revision", "aim"], interpretation: "Aim = an evolving series." },
+      { label: "Held lightly", text: "Holding your skill loosely, because there's always a next version.", tags: ["humility", "aim"], interpretation: "Aim = succession-aware competence." },
+      { label: "Recoveries on record", text: "Being open about your mistakes and how you fixed them, instead of hiding them.", tags: ["transparency", "aim"], interpretation: "Aim = mistakes-as-data." },
+      { label: "Stewardship of craft", text: "Tending a craft you'll hand down to someone after you.", tags: ["inheritance", "aim"], interpretation: "Aim = pass-it-on register." },
+      { label: "Curiosity over certainty", text: "Letting curiosity matter more than being certain.", tags: ["curiosity", "aim"], interpretation: "Aim shifts from defense to inquiry." },
     ],
   },
 
@@ -727,13 +751,28 @@ const RELEASE_CONDITION_STEM: Record<FollowUpFamily, string> = {
   responsibility: "What would actually make it feel safe to set down a piece of what you've been carrying?",
 };
 
+// CC-149 — the aim-replacement stem previously opened "If the Grip on X
+// softened, what could the same instrument be aimed at instead?" The
+// "same instrument" was a pronoun pointing at nothing the reader could
+// picture (it silently meant "the same drive/energy you've been
+// gripping with"). Owner read-through confirmed the stem was opaque.
+// Rewrite: open with the eased *fear* (concrete, named) and replace
+// "the same instrument" with a referent the reader can name — "that
+// same drive / care / strength / faithfulness." This is a concreteness
+// fix, not a vocabulary scrub: "grip" and "aim" remain allowed in this
+// product (the report has a `## Your Grip` section; the
+// release-condition stems use "loosen your grip on the work" verbatim
+// — see RELEASE_CONDITION_STEM).
+//
+// `control_mastery` is owner-locked to the exact wording below. The
+// other five families follow the same parallel structure.
 const AIM_REPLACEMENT_STEM: Record<FollowUpFamily, string> = {
-  control_mastery: "If the Grip on mastery softened, what could the same instrument be aimed at instead?",
-  belonging_usefulness: "If the Grip on being-useful softened, what could the same instrument be aimed at instead?",
-  worth_achievement: "If the Grip on the next win softened, what could the same instrument be aimed at instead?",
-  continuity: "If the Grip on continuity softened, what could the same instrument be aimed at instead?",
-  security: "If the Grip on the margin softened, what could the same instrument be aimed at instead?",
-  responsibility: "If the Grip on what-others-need softened, what could the same instrument be aimed at instead?",
+  control_mastery: "If being 'not good enough' felt less dangerous, where could that same drive point instead?",
+  belonging_usefulness: "If your place didn't depend on being useful, where could that same care point instead?",
+  worth_achievement: "If your worth didn't depend on the next win, where could that same drive point instead?",
+  continuity: "If keeping everything the way it's been felt less urgent, where could that same faithfulness point instead?",
+  security: "If the floor already felt solid enough, where could that same care point instead?",
+  responsibility: "If you didn't have to carry it all yourself, where could that same strength point instead?",
 };
 
 const COMPRESSION_CHECK_STEM =

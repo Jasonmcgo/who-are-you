@@ -575,22 +575,32 @@ function FollowUpBlock({
   onChange: (next: FollowUpDraft) => void;
 }) {
   // Convert FollowUpOption[] → RankingItem[] shape so we can reuse
-  // SinglePickPicker / Ranking unchanged. The option `label` doubles as
-  // both the id (write-back key — what the POST handler matches on)
-  // and the visible label; the option `text` slots in as the longer
-  // body line via the `quote` field, matching how the assessment's
-  // voice-style questions display.
+  // SinglePickPicker / Ranking unchanged.
+  //
+  // CC-149 — render the plain sentence as the displayed option, not the
+  // terse insider `label`. The owner read through `control_mastery`
+  // live and confirmed the terse labels ("Held lightly",
+  // "Recoveries on record") actively seeded wrong guesses; the
+  // sentence is the option a reader can act on. Implementation:
+  //   - `id` stays = `o.label`  (write-back key — the POST handler in
+  //     `app/api/follow-up/[token]/route.ts` matches on
+  //     `o.label === payload.pickedLabels[0]`; the picker passes the
+  //     item's `id` back through `onChange`)
+  //   - `label` displayed = `o.text`  (the sentence; `Ranking` reads
+  //     `item.label` in its else-branch — see `Ranking.tsx:335` —
+  //     because we don't supply a `voice` to trigger the quote-body
+  //     branch; `SinglePickPicker.tsx:85` likewise reads
+  //     `item.label`).
+  // No edit to `Ranking.tsx` (that would touch every ranking
+  // question's display); no change to the write-back key.
   const items: RankingItem[] = useMemo(
     () =>
       question.options.map((o) => ({
         id: o.label,
-        label: o.label,
-        // Show the full text line as the option's body. We don't have
-        // a SignalId per option at this surface (the engine reads the
-        // tag via the POST handler's signal translation), so we put a
-        // synthetic placeholder — `signal` is required by the
-        // RankingItem type but the public answer page never reads it.
-        quote: o.text,
+        label: o.text,
+        // `signal` is required by the RankingItem type but the public
+        // answer page never reads it; the engine reads tags via the
+        // POST handler's signal translation, not this surface.
         signal: `__followup_${o.label}` as never,
       })),
     [question.options]
