@@ -582,6 +582,16 @@ export default function InnerConstitutionPage({
                 keystone: liveScopedRewrites.keystone,
                 closingRead: liveScopedRewrites.closingRead,
                 synthesis: liveScopedRewrites.synthesis,
+                // CC-146 Part A — the four warm scoped rewrites feed the
+                // Individual's BodyCards (and would feed Path if Path were a
+                // body card). The Guide consumes these via MapSection's
+                // <LlmProseBlock> per card; the Individual mirrors that
+                // pattern in <BodyCards>, falling back to engine prose when
+                // a slot is null.
+                lens: liveScopedRewrites.lens,
+                compass: liveScopedRewrites.compass,
+                hands: liveScopedRewrites.hands,
+                path: liveScopedRewrites.path,
               }}
             />
           </div>

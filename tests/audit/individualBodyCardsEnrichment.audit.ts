@@ -28,7 +28,8 @@ import { fileURLToPath } from "node:url";
 import { buildInnerConstitution } from "../../lib/identityEngine";
 import { renderMirrorAsMarkdown } from "../../lib/renderMirror";
 import { BODY_CARDS, bodyCardFieldsFor, bodyGripBlockFor } from "../../lib/bodyCardFieldMap";
-import type { Answer, DemographicSet } from "../../lib/types";
+import { generateDriveProse } from "../../lib/drive";
+import type { Answer, DemographicSet, DriveOutput } from "../../lib/types";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -317,6 +318,258 @@ function checkGripHelper(): Result {
   };
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// CC-146 — extensions
+// ─────────────────────────────────────────────────────────────────────
+
+function renderIndividualForFixture(rel: string): string {
+  const f = JSON.parse(readFileSync(join(ROOT, rel), "utf-8")) as {
+    answers: Answer[];
+  };
+  const c = buildInnerConstitution(f.answers, [], null);
+  return renderMirrorAsMarkdown({
+    constitution: c,
+    answers: f.answers,
+    demographics: null,
+    includeBeliefAnchor: false,
+    renderMode: "user",
+    generatedAt: new Date("2026-05-24T00:00:00Z"),
+  });
+}
+
+function loadDriveForFixture(rel: string): DriveOutput | undefined {
+  const f = JSON.parse(readFileSync(join(ROOT, rel), "utf-8")) as {
+    answers: Answer[];
+  };
+  const c = buildInnerConstitution(f.answers, [], null);
+  return c.shape_outputs?.path.drive;
+}
+
+function checkIndividualCarriesDistributionAndClaimed(): Result {
+  // CC-146 Part B — the Individual must now emit the Distribution
+  // bracket line + Claimed drive line for the Jason cohort (aligned
+  // case, Q-3C1 answered). Anchor inside the Work, Love, and Giving
+  // section to confirm placement.
+  const md = renderIndividual();
+  const sectionStart = md.indexOf("## Work, Love, and Giving");
+  if (sectionStart < 0) {
+    return {
+      ok: false,
+      name: "cc146-individual-work-love-giving-section-present",
+      detail: "## Work, Love, and Giving heading not found",
+    };
+  }
+  const tail = md.slice(sectionStart);
+  const nextH2 = tail.slice(2).search(/\n## /);
+  const section = nextH2 < 0 ? tail : tail.slice(0, nextH2 + 2);
+  const hasDistribution = /\[Distribution: Building & wealth \d+%, People, Service & Society \d+%, Risk and uncertainty \d+%\]/.test(
+    section
+  );
+  const hasClaimed = /Claimed drive: 1\. .+ · 2\. .+ · 3\. .+/.test(section);
+  const ok = hasDistribution && hasClaimed;
+  return {
+    ok,
+    name: "cc146-individual-emits-distribution-and-claimed-lines",
+    detail: ok
+      ? "Distribution bracket line + Claimed drive line both present inside Work, Love, and Giving"
+      : `missing — distribution=${hasDistribution} claimed=${hasClaimed}`,
+  };
+}
+
+function checkIndividualCarriesDriveProse(): Result {
+  // CC-146 Part B — the case-aware drive prose (from generateDriveProse)
+  // closes with "Which feels closer?" across every case. Anchor the
+  // check on that sentinel inside the Work, Love, and Giving section.
+  const md = renderIndividual();
+  const sectionStart = md.indexOf("## Work, Love, and Giving");
+  if (sectionStart < 0) {
+    return {
+      ok: false,
+      name: "cc146-individual-drive-prose-present",
+      detail: "## Work, Love, and Giving heading not found",
+    };
+  }
+  const tail = md.slice(sectionStart);
+  const nextH2 = tail.slice(2).search(/\n## /);
+  const section = nextH2 < 0 ? tail : tail.slice(0, nextH2 + 2);
+  const hasProse = /Which feels closer\?/.test(section);
+  return {
+    ok: hasProse,
+    name: "cc146-individual-drive-prose-present",
+    detail: hasProse
+      ? `generateDriveProse paragraph closes Work, Love, and Giving with the canonical "Which feels closer?" sentinel`
+      : `generateDriveProse paragraph missing — "Which feels closer?" sentinel not found in section`,
+  };
+}
+
+function checkDriveCaseRouting(): Result[] {
+  // CC-146 — exercise generateDriveProse on >=2 distinct drive cases to
+  // prove case routing (aligned + at least one inverted/partial), AND
+  // verify it doesn't throw on the unstated template (no Q-3C1).
+  const out: Result[] = [];
+  const fixtures: Array<{ rel: string; label: string }> = [
+    { rel: "cohort-real/jason-real.json", label: "jason-real" },
+    { rel: "goal-soul-give/13-drive-inverted-case.json", label: "drive-inverted-case" },
+  ];
+  const casesSeen = new Set<string>();
+  for (const fx of fixtures) {
+    const drive = loadDriveForFixture(fx.rel);
+    if (!drive) {
+      out.push({
+        ok: false,
+        name: `cc146-drive-case-routing-${fx.label}`,
+        detail: `drive output absent on ${fx.rel}`,
+      });
+      continue;
+    }
+    let prose = "";
+    try {
+      prose = generateDriveProse(drive);
+    } catch (e) {
+      out.push({
+        ok: false,
+        name: `cc146-drive-case-routing-${fx.label}`,
+        detail: `generateDriveProse threw on case=${drive.case}: ${(e as Error).message}`,
+      });
+      continue;
+    }
+    const closes = /Which feels closer\?/.test(prose);
+    casesSeen.add(drive.case);
+    out.push({
+      ok: closes && prose.length > 0,
+      name: `cc146-drive-case-routing-${fx.label}`,
+      detail: closes
+        ? `case=${drive.case}; prose length=${prose.length}; closes with "Which feels closer?"`
+        : `case=${drive.case}; prose generated but missing canonical close`,
+    });
+  }
+  // Surface case-distinctness as its own assertion so a regression where
+  // both fixtures collapse to the same template would fail loudly.
+  out.push({
+    ok: casesSeen.size >= 2,
+    name: "cc146-drive-case-routing-distinct-cases",
+    detail:
+      casesSeen.size >= 2
+        ? `prose case routing exercised across ${casesSeen.size} distinct cases: ${[...casesSeen].join(", ")}`
+        : `only ${casesSeen.size} case seen — case routing not proven`,
+  });
+  return out;
+}
+
+function checkUnstatedDriveDoesNotThrow(): Result {
+  // CC-146 flag-in-report — a fixture lacking Q-3C1 should still
+  // produce a renderable "unstated" template (no throw). Synthesize a
+  // minimal DriveOutput with no claimed ranking and verify.
+  const synthetic: DriveOutput = {
+    distribution: {
+      cost: 40,
+      coverage: 35,
+      compliance: 25,
+      rankAware: false,
+      inputCount: { cost: 1, coverage: 1, compliance: 1 },
+    },
+    case: "unstated",
+    prose: "",
+  };
+  try {
+    const prose = generateDriveProse(synthetic);
+    const ok =
+      prose.length > 0 &&
+      /Without a claimed drive on file/.test(prose) &&
+      /Which feels closer/.test(prose);
+    return {
+      ok,
+      name: "cc146-unstated-drive-renders-without-throw",
+      detail: ok
+        ? `unstated template renders cleanly (${prose.length} chars), names absence of claim, closes canonically`
+        : `unstated template rendered but missing expected phrasing`,
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      name: "cc146-unstated-drive-renders-without-throw",
+      detail: `generateDriveProse threw on unstated case: ${(e as Error).message}`,
+    };
+  }
+}
+
+function checkInvertedFixtureRendersCleanly(): Result {
+  // CC-146 AC #3 — re-render the inverted-case fixture end-to-end and
+  // confirm the Individual markdown carries the same Distribution +
+  // Claimed lines + the case-specific generateDriveProse text. This
+  // proves the markdown composer wires the case routing through.
+  const rel = "goal-soul-give/13-drive-inverted-case.json";
+  let md: string;
+  try {
+    md = renderIndividualForFixture(rel);
+  } catch (e) {
+    return {
+      ok: false,
+      name: "cc146-inverted-fixture-individual-renders",
+      detail: `render threw: ${(e as Error).message}`,
+    };
+  }
+  const sectionStart = md.indexOf("## Work, Love, and Giving");
+  if (sectionStart < 0) {
+    return {
+      ok: false,
+      name: "cc146-inverted-fixture-individual-renders",
+      detail: `Work, Love, and Giving section absent in ${rel}`,
+    };
+  }
+  const tail = md.slice(sectionStart);
+  const nextH2 = tail.slice(2).search(/\n## /);
+  const section = nextH2 < 0 ? tail : tail.slice(0, nextH2 + 2);
+  const hasDistribution = /\[Distribution: /.test(section);
+  const hasClaimed = /Claimed drive: 1\./.test(section);
+  const hasProse = /Which feels closer\?/.test(section);
+  const ok = hasDistribution && hasClaimed && hasProse;
+  return {
+    ok,
+    name: "cc146-inverted-fixture-individual-renders",
+    detail: ok
+      ? `inverted-case fixture carries Distribution + Claimed + drive prose in Individual markdown`
+      : `inverted fixture render — distribution=${hasDistribution} claimed=${hasClaimed} prose=${hasProse}`,
+  };
+}
+
+function checkReactWarmCardWiring(): Result {
+  // CC-146 Part A — the React surface (FiftyDegreeIndividualSection.tsx)
+  // can't be exercised in a markdown audit, but the wiring is static.
+  // Assert the three structural facts: the warm-rewrites prop accepts
+  // lens/compass/hands/path, BodyCards renders <LlmProseBlock> when
+  // warm is present, and the warm slot maps off card.source. This
+  // catches future regressions where a refactor drops the splice.
+  const file = readFileSync(
+    join(__dirname, "..", "..", "app", "components", "FiftyDegreeIndividualSection.tsx"),
+    "utf-8"
+  );
+  const checks: Array<[string, boolean]> = [
+    ["liveRewrites.lens field", /\blens:\s*string \| null/.test(file)],
+    ["liveRewrites.compass field", /\bcompass:\s*string \| null/.test(file)],
+    ["liveRewrites.hands field", /\bhands:\s*string \| null/.test(file)],
+    ["liveRewrites.path field", /\bpath:\s*string \| null/.test(file)],
+    ["LlmProseBlock import", /import\s+LlmProseBlock\s+from/.test(file)],
+    ["warm-vs-engine branch", /useWarm\s*\?\s*\(\s*<LlmProseBlock/.test(file)],
+    [
+      "warm slot keyed off card.source",
+      /card\.source\s*===\s*["']lens["']/.test(file) &&
+        /card\.source\s*===\s*["']compass["']/.test(file) &&
+        /card\.source\s*===\s*["']hands["']/.test(file),
+    ],
+    ["generateDriveProse imported", /import\s*\{\s*generateDriveProse\s*\}/.test(file)],
+  ];
+  const failing = checks.filter(([, ok]) => !ok).map(([n]) => n);
+  return {
+    ok: failing.length === 0,
+    name: "cc146-react-warm-card-wiring-present",
+    detail:
+      failing.length === 0
+        ? `FiftyDegreeIndividualSection.tsx wires 4 warm-rewrite props + LlmProseBlock + drive prose import`
+        : `wiring gaps: ${failing.join(", ")}`,
+  };
+}
+
 function checkDuplicatedHelpersByteEqual(): Result {
   // Read both files; locate the PRIMAL_FALLBACK_COST + FOSTER_PHRASES
   // + formatHealthyGiftFallback blocks; assert byte-equality.
@@ -368,9 +621,17 @@ function main(): number {
     checkBodyCardFieldMapping(),
     checkGripHelper(),
     checkDuplicatedHelpersByteEqual(),
+    // CC-146 extensions — warm 4-card splice wiring (React-only) +
+    // claimed-vs-revealed drive prose (markdown + React).
+    checkIndividualCarriesDistributionAndClaimed(),
+    checkIndividualCarriesDriveProse(),
+    ...checkDriveCaseRouting(),
+    checkUnstatedDriveDoesNotThrow(),
+    checkInvertedFixtureRendersCleanly(),
+    checkReactWarmCardWiring(),
   ];
 
-  console.log("CC-145 — Individual body-cards + charts + grip enrichment audit");
+  console.log("CC-145 + CC-146 — Individual body-cards / charts / grip + warm-card splice & drive prose audit");
   console.log("=".repeat(64));
   let failures = 0;
   for (const r of results) {

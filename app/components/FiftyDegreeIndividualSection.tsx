@@ -37,6 +37,15 @@ import { renderDriveDistributionDonut } from "../../lib/driveDistributionChart";
 import { renderOceanDashboardSVG } from "../../lib/oceanDashboard";
 import { composeDispositionSummaryLine } from "../../lib/renderMirror";
 import type { ProseCardId } from "../../lib/proseRewriteLlm";
+// CC-146 Part A — warm 4-card splice for the Individual. Mirrors the
+// Guide's MapSection pattern (`<LlmProseBlock>` instead of engine prose
+// per card when a warm rewrite is present).
+import LlmProseBlock from "./LlmProseBlock";
+// CC-146 Part B — claimed-vs-revealed drive prose, lifted from the
+// engine's drive output (the same `path.drive.prose` the Guide emits;
+// imported as `generateDriveProse` so an unstated/missing-prose fixture
+// still renders the case-aware template).
+import { generateDriveProse } from "../../lib/drive";
 
 export interface FiftyDegreeIndividualSectionProps {
   constitution: InnerConstitution;
@@ -49,6 +58,16 @@ export interface FiftyDegreeIndividualSectionProps {
     keystone: string | null;
     closingRead: string | null;
     synthesis: string | null;
+    // CC-146 Part A — warm scoped rewrites for the 4 deep cards.
+    // `lens / compass / hands` map 1:1 to BodyCards entries; `path` is
+    // accepted for parity with the Guide's MapSection but has no
+    // body-card slot in BODY_CARDS, so it is currently a no-op in the
+    // Individual's render (Path content sits in §Work, Love, and Giving
+    // and is fed by `pathTriptych`).
+    lens: string | null;
+    compass: string | null;
+    hands: string | null;
+    path: string | null;
   };
 }
 
@@ -177,7 +196,14 @@ export default function FiftyDegreeIndividualSection({
         constitution={constitution}
         corePattern={liveRewrites.corePattern}
       />
-      <BodyCards constitution={constitution} />
+      <BodyCards
+        constitution={constitution}
+        warmRewrites={{
+          lens: liveRewrites.lens,
+          compass: liveRewrites.compass,
+          hands: liveRewrites.hands,
+        }}
+      />
       <DispositionSignalMix constitution={constitution} />
       <WorkLoveGiving
         constitution={constitution}
@@ -582,7 +608,23 @@ function PatternAndGrip({
   );
 }
 
-function BodyCards({ constitution }: { constitution: InnerConstitution }) {
+function BodyCards({
+  constitution,
+  warmRewrites,
+}: {
+  constitution: InnerConstitution;
+  // CC-146 Part A — warm prose per card. When non-null/non-empty for a
+  // given source, the card body renders the warm LLM rewrite via
+  // <LlmProseBlock> in place of the engine Strength / Growth Edge /
+  // Practice trio (mirrors MapSection's per-card treatment in the
+  // Guide). Sources without a warm slot — gravity / trust / weather /
+  // fire / conviction — always render engine prose.
+  warmRewrites?: {
+    lens: string | null;
+    compass: string | null;
+    hands: string | null;
+  };
+}) {
   return (
     <section>
       <H2>Why This Is Happening — The Body Cards</H2>
@@ -598,6 +640,18 @@ function BodyCards({ constitution }: { constitution: InnerConstitution }) {
         {BODY_CARDS.map((card, i) => {
           const num = String(i + 1).padStart(2, "0");
           const fields = bodyCardFieldsFor(card.source, constitution);
+          // CC-146 Part A — pick the warm rewrite slot for the 3 deep
+          // cards that have one (lens / compass / hands). Falsy →
+          // engine prose; truthy → LlmProseBlock replaces the trio.
+          const warm =
+            card.source === "lens"
+              ? warmRewrites?.lens
+              : card.source === "compass"
+                ? warmRewrites?.compass
+                : card.source === "hands"
+                  ? warmRewrites?.hands
+                  : null;
+          const useWarm = typeof warm === "string" && warm.trim().length > 0;
           return (
             <div
               key={card.source}
@@ -640,24 +694,30 @@ function BodyCards({ constitution }: { constitution: InnerConstitution }) {
                   >
                     {fields.readLede}
                   </p>
-                  <p
-                    className="font-serif"
-                    style={{ fontSize: 15, lineHeight: 1.6, margin: "0 0 8px 0" }}
-                  >
-                    <strong>Strength</strong> — {renderInline(fields.strength)}
-                  </p>
-                  <p
-                    className="font-serif"
-                    style={{ fontSize: 15, lineHeight: 1.6, margin: "0 0 8px 0" }}
-                  >
-                    <strong>Growth Edge</strong> — {renderInline(fields.growthEdge)}
-                  </p>
-                  <p
-                    className="font-serif"
-                    style={{ fontSize: 15, lineHeight: 1.6, margin: "0 0 0 0" }}
-                  >
-                    <strong>{fields.practiceLabel}</strong> — {renderInline(fields.practice)}
-                  </p>
+                  {useWarm ? (
+                    <LlmProseBlock markdown={warm as string} />
+                  ) : (
+                    <>
+                      <p
+                        className="font-serif"
+                        style={{ fontSize: 15, lineHeight: 1.6, margin: "0 0 8px 0" }}
+                      >
+                        <strong>Strength</strong> — {renderInline(fields.strength)}
+                      </p>
+                      <p
+                        className="font-serif"
+                        style={{ fontSize: 15, lineHeight: 1.6, margin: "0 0 8px 0" }}
+                      >
+                        <strong>Growth Edge</strong> — {renderInline(fields.growthEdge)}
+                      </p>
+                      <p
+                        className="font-serif"
+                        style={{ fontSize: 15, lineHeight: 1.6, margin: "0 0 0 0" }}
+                      >
+                        <strong>{fields.practiceLabel}</strong> — {renderInline(fields.practice)}
+                      </p>
+                    </>
+                  )}
                 </>
               ) : null}
             </div>
@@ -720,6 +780,15 @@ function WorkLoveGiving({
     }
   }
   if (!drive && beats.length === 0) return null;
+  // CC-146 Part B — claimed-vs-revealed drive prose. Mirrors the
+  // Guide's renderMirror.ts ~L1870-1890 emit so the Individual carries
+  // the same Distribution / Claimed lines + case-aware narrative.
+  const DRIVE_LABELS: Record<"cost" | "coverage" | "compliance", string> = {
+    cost: "Building & wealth",
+    coverage: "People, Service & Society",
+    compliance: "Risk and uncertainty",
+  };
+  const driveProse = drive ? generateDriveProse(drive) : null;
   return (
     <section>
       <H2>Work, Love, and Giving</H2>
@@ -733,6 +802,29 @@ function WorkLoveGiving({
             ),
           }}
         />
+      ) : null}
+      {drive ? (
+        <>
+          <p
+            className="font-serif"
+            style={{ fontSize: 15, lineHeight: 1.6, margin: "0 0 6px 0" }}
+          >
+            [Distribution: Building & wealth {drive.distribution.cost}%, People,
+            Service & Society {drive.distribution.coverage}%, Risk and
+            uncertainty {drive.distribution.compliance}%]
+          </p>
+          {drive.claimed ? (
+            <p
+              className="font-serif"
+              style={{ fontSize: 15, lineHeight: 1.6, margin: "0 0 10px 0" }}
+            >
+              Claimed drive: 1. {DRIVE_LABELS[drive.claimed.first]} · 2.{" "}
+              {DRIVE_LABELS[drive.claimed.second]} · 3.{" "}
+              {DRIVE_LABELS[drive.claimed.third]}
+            </p>
+          ) : null}
+          {driveProse ? <P text={driveProse} /> : null}
+        </>
       ) : null}
       {beats.map((b, i) => (
         <div key={i} style={{ marginBottom: 12 }}>

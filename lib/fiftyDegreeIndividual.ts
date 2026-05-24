@@ -45,6 +45,11 @@ import {
 import { renderDriveDistributionDonut } from "./driveDistributionChart";
 import { renderOceanDashboardSVG } from "./oceanDashboard";
 import { composeDispositionSummaryLine } from "./renderMirror";
+// CC-146 Part B — claimed-vs-revealed drive prose. The Individual's
+// Work, Love, and Giving section now carries the same Distribution /
+// Claimed lines + case-aware drive narrative the Guide emits in
+// renderMirror.ts ~L1870-1920.
+import { generateDriveProse } from "./drive";
 
 // ─────────────────────────────────────────────────────────────────────
 // Constants
@@ -383,6 +388,11 @@ function composeBodyCards(inputs: ComposeFiftyDegreeInputs): string {
   const shape = inputs.constitution.shape_outputs;
   if (!shape) return "";
 
+  // CC-146 Part A — markdown stays on engine prose. The warm 4-card
+  // splice (lens / compass / hands / path) is React-only (live LLM
+  // rewrites fetch client-side via `/api/report-cards`); the markdown
+  // composer runs server-side without access to those rewrites, so
+  // any swap would silently downgrade the Copy/Download artifact.
   const lines: string[] = [];
   lines.push("## Why This Is Happening — The Body Cards");
   lines.push("");
@@ -441,6 +451,31 @@ function composeWorkLoveGiving(inputs: ComposeFiftyDegreeInputs): string {
       'aria-label="Drive distribution chart"'
     );
     lines.push(donutSvg);
+    lines.push("");
+    // CC-146 Part B — claimed-vs-revealed drive narrative. Mirrors the
+    // Guide's emit in renderMirror.ts ~L1870-1890 (Distribution line +
+    // Claimed line + case-aware prose). The donut is already above, so
+    // labels alone interpolate here — no second chart, no inverted
+    // tension footnote (the Open Tensions section already carries the
+    // T-D1 paragraph for inverted cases).
+    const d = drive.distribution;
+    lines.push(
+      `[Distribution: Building & wealth ${d.cost}%, People, Service & Society ${d.coverage}%, Risk and uncertainty ${d.compliance}%]`
+    );
+    if (drive.claimed) {
+      const labels: Record<"cost" | "coverage" | "compliance", string> = {
+        cost: "Building & wealth",
+        coverage: "People, Service & Society",
+        compliance: "Risk and uncertainty",
+      };
+      const c = drive.claimed;
+      lines.push("");
+      lines.push(
+        `Claimed drive: 1. ${labels[c.first]} · 2. ${labels[c.second]} · 3. ${labels[c.third]}`
+      );
+    }
+    lines.push("");
+    lines.push(generateDriveProse(drive));
     lines.push("");
   }
   if (triptych) {

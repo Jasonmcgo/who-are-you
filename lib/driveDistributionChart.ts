@@ -19,16 +19,39 @@
 import type { DriveBucket } from "./types";
 
 // ── Layout constants ────────────────────────────────────────────────────
-
-const VIEWBOX_W = 280;
+//
+// CC-147 — widened viewBox + tighter label geometry so the three segment
+// labels ("People, Service & Society 41%" worst case ≈ 156px @ font 10)
+// fit fully inside the box without clipping. Pre-CC-147 the viewBox was
+// 280×280 with labels at radius 110; right-side labels anchored `start`
+// at x≈250 overflowed past the 280 edge, and left-side labels anchored
+// `end` ended at x≈30 with text running into negative x. Both clipped.
+//
+// New layout:
+//   - Width grows to 480 (height stays 280 so the chart remains compact);
+//     the donut moves to CENTER_X=240 so left/right have ~190px of room.
+//   - LABEL_R reduced to 95 to pull labels slightly inboard.
+//   - Segment-label font-size drops to 9 (set inline below) so worst-case
+//     "People, Service & Society NN%" (≈141px @ font 9) fits when a
+//     dominant segment's midpoint lands at 3 o'clock — the empirical worst
+//     case for a 3-bucket distribution.
+// Result: aspect ratio 1.71:1 (was 1:1). Style `max-width` grows from 320
+// to 420 so the donut still renders ~157px diameter on a typical column.
+const VIEWBOX_W = 480;
 const VIEWBOX_H = 280;
-const CENTER_X = 140;
+const CENTER_X = 240;
 const CENTER_Y = 140;
 const OUTER_R = 90;
 const INNER_R = 55;
 // Outside-the-donut label radius — slightly outside OUTER_R so segment
 // labels don't crowd the arcs.
-const LABEL_R = 110;
+const LABEL_R = 95;
+// Segment-label typography. Center "Claimed #1 / [bucket]" annotation
+// uses its own (slightly larger) sizes — see the centerLines block.
+const SEGMENT_LABEL_FONT_SIZE = 9;
+// SVG `style="max-width:…"`. Grows alongside VIEWBOX_W so the rendered
+// donut size on a typical content column doesn't shrink dramatically.
+const MAX_WIDTH_PX = 420;
 
 const BUCKET_COLOR: Record<DriveBucket, string> = {
   cost: "#8b6f47",
@@ -87,7 +110,7 @@ export function renderDriveDistributionDonut(
   // so the slot is preserved without a misleading "100% something" arc.
   if (total <= 0) {
     return [
-      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VIEWBOX_W} ${VIEWBOX_H}" width="100%" height="100%" role="img" aria-label="Drive distribution donut chart (no signal)" style="max-width:320px; aspect-ratio:1/1;">`,
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VIEWBOX_W} ${VIEWBOX_H}" width="100%" height="100%" role="img" aria-label="Drive distribution donut chart (no signal)" style="max-width:${MAX_WIDTH_PX}px; aspect-ratio:${VIEWBOX_W}/${VIEWBOX_H};">`,
       `  <circle cx="${CENTER_X}" cy="${CENTER_Y}" r="${OUTER_R}" fill="none" stroke="#cccccc" stroke-width="1" stroke-dasharray="3 3" />`,
       `  <text x="${CENTER_X}" y="${CENTER_Y}" font-size="11" font-family="system-ui, sans-serif" fill="#666" text-anchor="middle">no Drive signal</text>`,
       `</svg>`,
@@ -135,7 +158,7 @@ export function renderDriveDistributionDonut(
         ? "start"
         : "middle";
     labels.push(
-      `<text x="${labelPt.x.toFixed(2)}" y="${labelPt.y.toFixed(2)}" font-size="10" font-family="system-ui, sans-serif" fill="#444" text-anchor="${anchor}">${BUCKET_LABEL[bucket]} ${pct}%</text>`
+      `<text x="${labelPt.x.toFixed(2)}" y="${labelPt.y.toFixed(2)}" font-size="${SEGMENT_LABEL_FONT_SIZE}" font-family="system-ui, sans-serif" fill="#444" text-anchor="${anchor}">${BUCKET_LABEL[bucket]} ${pct}%</text>`
     );
     cursor = segEnd;
   }
@@ -152,7 +175,7 @@ export function renderDriveDistributionDonut(
   }
 
   return [
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VIEWBOX_W} ${VIEWBOX_H}" width="100%" height="100%" role="img" aria-label="Drive distribution donut chart" style="max-width:320px; aspect-ratio:1/1;">`,
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VIEWBOX_W} ${VIEWBOX_H}" width="100%" height="100%" role="img" aria-label="Drive distribution donut chart" style="max-width:${MAX_WIDTH_PX}px; aspect-ratio:${VIEWBOX_W}/${VIEWBOX_H};">`,
     ...segments.map((s) => `  ${s}`),
     ...labels.map((l) => `  ${l}`),
     ...centerLines.map((l) => `  ${l}`),
