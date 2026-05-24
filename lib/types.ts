@@ -104,11 +104,49 @@ export type MultiSelectDerivedQuestion = {
   other_option?: { id: string; label: string; allows_text?: boolean };
 };
 
+// CC-138 — binary-pick (select-one-of-two) question type for the
+// reformatted Q-T attitude binaries. Each binary asks a same-dimension
+// pair (Ni vs Ne, Si vs Se, Ti vs Te, Fi vs Fe) so the cross-dimension
+// valence confound (warm-Ti pulls Fi, warm-N pulls S) cannot fire.
+// Answered as a `SinglePickAnswer` (existing type — same shape: pick
+// one item, write its signal at rank 1) so the engine's signal
+// extraction path is unchanged.
+//
+// The legacy CC-104 4-way ranking (Q-T1-Q-T8) remains in the bank for
+// backward compatibility with already-collected cohort fixtures; the
+// assessment surface routes new sessions to the binary path while the
+// engine continues to derive legacy ranking answers via the CC-134
+// top-pick convergence path. See `lib/jungianStack.ts` dispatch.
+export type BinaryPickQuestion = {
+  question_id: string;
+  card_id: CardId;
+  type: "binary_pick";
+  text: string;
+  helper?: string;
+  items: RankingItem[]; // length must be 2; the same-dimension attitude pair
+};
+
+// CC-138 — binary-pick whose two items derive from the user's prior
+// binary picks (the perceiving / judging dominance orderings). The
+// user picks which of their two prior selections leads on that axis.
+// Items resolve at render time from `derived_from` (typically two
+// `BinaryPickQuestion` ids on the same axis).
+export type BinaryPickDerivedQuestion = {
+  question_id: string;
+  card_id: CardId;
+  type: "binary_pick_derived";
+  derived_from: string[]; // typically 2 question_ids whose picks become the items
+  text: string;
+  helper?: string;
+};
+
 export type Question =
   | ForcedFreeformQuestion
   | RankingQuestion
   | DerivedRankingQuestion
-  | MultiSelectDerivedQuestion;
+  | MultiSelectDerivedQuestion
+  | BinaryPickQuestion
+  | BinaryPickDerivedQuestion;
 
 export type ForcedFreeformAnswer = {
   question_id: string;
@@ -317,8 +355,9 @@ export type LensStack = {
   confidenceLowReasons?: ConfidenceLowReason[];
 };
 
-// CC-141 — reason flags for `LensStack.confidenceLowReasons`. Each
-// flag corresponds to a distinct check in `aggregateLensStack`:
+// CC-141 + CC-138 — reason flags for `LensStack.confidenceLowReasons`.
+// Each flag corresponds to a distinct check in `aggregateLensStack`
+// (legacy path) or `aggregateLensStackBinary` (CC-138 path):
 //   - "thin-floor": below MIN_DOMINANT_TOP_PICKS or below
 //     MIN_QT_BLOCKS_WITH_DATA in the dominant pool.
 //   - "aux-ambiguous": the dominant's aux runner-up is within the
@@ -339,7 +378,19 @@ export type ConfidenceLowReason =
   | "dominant-mirror"
   | "dominant-convergence-weak"
   | "ns-valence"
-  | "judging-cooccurrence";
+  | "judging-cooccurrence"
+  // CC-138 binary-path reasons:
+  //   - "binary-attitude-violation": opposite-attitude constraint
+  //     violated (both perceiving picks introverted, or both judging
+  //     picks introverted, etc.) — impossible in a canonical stack.
+  //   - "binary-dominance-ambiguous": the dominance ordering didn't
+  //     resolve (missing pick, or ordering tie when added).
+  //   - "binary-thin": fewer than 4 binary picks present in the
+  //     session (the 4 attitude binaries are required for the
+  //     binary-path resolver).
+  | "binary-attitude-violation"
+  | "binary-dominance-ambiguous"
+  | "binary-thin";
 
 export type GiftCategory =
   | "Pattern"

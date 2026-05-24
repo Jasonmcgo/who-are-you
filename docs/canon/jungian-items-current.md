@@ -1,7 +1,61 @@
 # Jungian (Cognitive-Function) Items — Current Snapshot
 
-**Internal reference. Snapshot as of 2026-05-22 (post-CC-122).** Function tags
+**Internal reference. Snapshot as of 2026-05-23 (post-CC-138).** Function tags
 shown for engine/review work — these are NOT reader-facing.
+
+## CC-138 — Binary-format reformat (the active path for new sessions)
+
+New sessions answer **six binary-pick questions** under `card_id:
+"temperament"`, replacing the legacy 4-way ranking (which remains in the
+bank for backward-compat — see "Legacy ranking" section below):
+
+- **Q-TB-NI-NE** (`type: "binary_pick"`) — intuitive attitude: Ni vs Ne
+- **Q-TB-SI-SE** (`type: "binary_pick"`) — sensing attitude: Si vs Se
+- **Q-TB-TI-TE** (`type: "binary_pick"`) — thinking attitude: Ti vs Te
+- **Q-TB-FI-FE** (`type: "binary_pick"`) — feeling attitude: Fi vs Fe
+- **Q-TB-PERC-ORDER** (`type: "binary_pick_derived"`, derived_from:
+  `[Q-TB-NI-NE, Q-TB-SI-SE]`) — perceiving dominance: of the user's two
+  perceiving picks, which leads?
+- **Q-TB-JUDG-ORDER** (`type: "binary_pick_derived"`, derived_from:
+  `[Q-TB-TI-TE, Q-TB-FI-FE]`) — judging dominance: which leads?
+
+Each `binary_pick` answers as a `SinglePickAnswer` (existing type — reused).
+The derived ordering questions populate their items at render time from
+the user's earlier picks (parallel to `ranking_derived` / `multiselect_
+derived`). The engine extracts each pick as a rank-1 function signal
+via the existing `signalFromSinglePick` path; no new extractor.
+
+**Why binaries:** every canonical Jungian stack holds exactly one T and
+one F (opposite attitudes — `{Ti,Fe}` or `{Te,Fi}`) and exactly one N
+and one S (opposite attitudes — `{Ni,Se}` or `{Ne,Si}`). Same-dimension
+selection asks an *answerable* question; the cross-dimension valence
+confound (warm-Ti pulls Fi, warm-N pulls S) that drove CC-134/135 cannot
+fire structurally. The opposite-attitude constraint becomes a built-in
+consistency check: a same-attitude pair (Ni+Si, Ti+Fi) is impossible in
+a canonical stack and flags contamination → `confidence = "low"` +
+CC-134 §D head-to-head clarifier.
+
+**Dominance + I/E resolution:** the two page-winners (one perceiving,
+one judging — guaranteed opposite attitude by the binaries) form the
+dominant/auxiliary pair. I/E is inferred from the existing
+`extraversion_proxy` / `extraversion_priority` / `outward_energy_priority`
+signal — no new prompt. If inference is ambiguous, the resolver
+defaults to introverted dominance (historically safer); a future
+explicit "order the two" fallback is flagged but not implemented in
+CC-138.
+
+**Resolver:** `lib/jungianStack.ts:aggregateLensStackBinary`. The
+top-level `aggregateLensStack` dispatches: presence of any `Q-TB-*`
+signal in the session routes to `aggregateLensStackBinary`; absence
+falls through to the CC-134 top-pick path (legacy compatibility).
+
+**Voice text:** the binary items reuse the CC-122 warm-balanced Ni/Ne
+voices and the CC-135 warm-balanced Se/Si voices verbatim. The judging
+binaries (Q-TB-TI-TE, Q-TB-FI-FE) reuse the canonical Ti/Te/Fi/Fe
+voices from Q-T5/Q-T7 (the most discriminating instances). All voices
+labeled "Voice A / Voice B" — no attitude-label leakage.
+
+## Legacy ranking format (kept for backward-compat)
 
 Source: `data/questions.ts`, `card_id: "temperament"`, `type: "ranking"`.
 Each item is a **forced ranking** of four Voices. Scoring uses the Voice's
@@ -10,8 +64,15 @@ is display-only (`signalsFromRankingAnswer`, identityEngine.ts:502).
 
 - **Q-T1–T4** = perceiving axis (Ni / Ne / Si / Se). Ne/Ni voices **revised by
   CC-122** (register-neutral re-voicing to fix NF intuition under-detection);
-  Si/Se voices unchanged.
-- **Q-T5–T8** = judging axis (Ti / Te / Fi / Fe). Unchanged; not yet reviewed.
+  Si/Se voices **revised by CC-135** (warm-balanced rewrite for N/S valence
+  parity).
+- **Q-T5–T8** = judging axis (Ti / Te / Fi / Fe). Unchanged.
+
+**Status:** the legacy questions remain in the bank so existing cohort
+fixtures (the 25 fixtures captured pre-CC-138) continue to derive
+byte-identically via the CC-134 top-pick convergence path. New sessions
+no longer answer Q-T1-Q-T8 (the assessment surface filters them out via
+the binary-path conditional); the engine path persists.
 
 ---
 

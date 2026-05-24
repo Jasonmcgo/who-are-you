@@ -3170,7 +3170,13 @@ export function toAnswer(
     !q ||
     q.type === "ranking" ||
     q.type === "ranking_derived" ||
-    q.type === "multiselect_derived"
+    q.type === "multiselect_derived" ||
+    // CC-138 — binary_pick questions are answered as SinglePickAnswer
+    // via a dedicated single-pick UI path, not via the freeform/forced
+    // text-response converter. `toAnswer` only constructs the
+    // text-response variants.
+    q.type === "binary_pick" ||
+    q.type === "binary_pick_derived"
   )
     return null;
   return {

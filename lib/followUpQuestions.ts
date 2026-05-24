@@ -457,14 +457,35 @@ export function buildFollowUpInput(
   const nsValenceReason = reasons.includes("ns-valence");
   const thinFloorReason = reasons.includes("thin-floor");
   const judgingCooccurrenceReason = reasons.includes("judging-cooccurrence");
+  // CC-138 — binary-format constraint violations also surface the
+  // head-to-head clarifiers. `binary-attitude-violation` can fire on
+  // either axis; without per-axis specificity the eligibility goes to
+  // both clarifiers — the generator emits both (whichever the user
+  // actually picks both leaders on resolves the violation).
+  // `binary-dominance-ambiguous` is a near-tie ordering, which CC-138
+  // also routes to the §D clarifier per the canon's "near-tie
+  // ordering" rule.
+  const binaryAttitudeViolation = reasons.includes(
+    "binary-attitude-violation"
+  );
+  const binaryDominanceAmbiguous = reasons.includes(
+    "binary-dominance-ambiguous"
+  );
   // The clarifier-eligible state for the N/S head-to-head is: the
   // lens layer flagged an N/S contamination OR thin-floor + a real
   // N-vs-S top-pick split. CC-134.1's clarifier originally gated on
   // `confidence === "low"`; CC-141 widens the gate to the reasons so
   // a Megan-shape (lifted to high on a corroborated Fi dominant +
-  // contaminated N/S) still gets asked.
-  const nsClarifierEligible = nsValenceReason || thinFloorReason;
-  const judgingClarifierEligible = judgingCooccurrenceReason;
+  // contaminated N/S) still gets asked. CC-138 adds the binary flags.
+  const nsClarifierEligible =
+    nsValenceReason ||
+    thinFloorReason ||
+    binaryAttitudeViolation ||
+    binaryDominanceAmbiguous;
+  const judgingClarifierEligible =
+    judgingCooccurrenceReason ||
+    binaryAttitudeViolation ||
+    binaryDominanceAmbiguous;
 
   // CC-134 Part D §D.1 — pull the per-pool top-pick leaders so the
   // generator can build an N-vs-S head-to-head clarifier. The leaders

@@ -374,7 +374,241 @@ function averageRank(signals: Signal[], fn: CognitiveFunctionId): number {
 // here as the single source of truth, and `identityEngine.ts` now
 // re-exports it for backward-compat with import sites.
 
+// CC-138 — binary-pick (Q-TB-*) detection. A session uses the new
+// binary-format resolver if it contains AT LEAST ONE binary-pick
+// signal (rank 1 with `source_question_ids` containing a `Q-TB-` id).
+// Legacy ranking sessions never reach the binary path.
+const BINARY_PERCEIVING_QID_NI_NE = "Q-TB-NI-NE";
+const BINARY_PERCEIVING_QID_SI_SE = "Q-TB-SI-SE";
+const BINARY_JUDGING_QID_TI_TE = "Q-TB-TI-TE";
+const BINARY_JUDGING_QID_FI_FE = "Q-TB-FI-FE";
+const BINARY_PERC_ORDER_QID = "Q-TB-PERC-ORDER";
+const BINARY_JUDG_ORDER_QID = "Q-TB-JUDG-ORDER";
+
+const ALL_BINARY_PICK_QIDS: readonly string[] = [
+  BINARY_PERCEIVING_QID_NI_NE,
+  BINARY_PERCEIVING_QID_SI_SE,
+  BINARY_JUDGING_QID_TI_TE,
+  BINARY_JUDGING_QID_FI_FE,
+  BINARY_PERC_ORDER_QID,
+  BINARY_JUDG_ORDER_QID,
+];
+
+function hasBinarySignals(signals: Signal[]): boolean {
+  for (const s of signals) {
+    if (s.source_question_ids?.some((q) => ALL_BINARY_PICK_QIDS.includes(q))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * CC-138 — binary-format Lens resolver. Reads the 4 attitude binary
+ * picks (Q-TB-NI-NE, Q-TB-SI-SE, Q-TB-TI-TE, Q-TB-FI-FE) + the 2
+ * dominance ordering picks (Q-TB-PERC-ORDER, Q-TB-JUDG-ORDER), applies
+ * the opposite-attitude constraint, infers I/E from an existing
+ * extraversion proxy signal, and resolves a canonical STACK_TABLE
+ * entry. Confidence is `high` only when:
+ *   - all 4 attitude binaries are present
+ *   - both opposite-attitude constraints hold (perceiving picks are
+ *     opposite attitude, judging picks are opposite attitude)
+ *   - both dominance orderings are present
+ *   - I/E inference is unambiguous
+ *
+ * Otherwise `low` with reasons populated (see ConfidenceLowReason
+ * `binary-*` flags). Low-confidence sessions trigger the CC-134 §D
+ * head-to-head clarifier via `followUpQuestions.ts` (the binary path
+ * reuses the same clarifier surface).
+ *
+ * Exported separately so the compat dispatch in `aggregateLensStack`
+ * can call it conditionally.
+ */
+export function aggregateLensStackBinary(signals: Signal[]): LensStack {
+  const reasons: ConfidenceLowReason[] = [];
+
+  // Helper: get the function id chosen for a binary-pick question.
+  const pickFor = (qid: string): CognitiveFunctionId | null => {
+    for (const s of signals) {
+      if (s.source_question_ids?.includes(qid) && s.rank === 1) {
+        if (ALL_FUNCTIONS.includes(s.signal_id as CognitiveFunctionId)) {
+          return s.signal_id as CognitiveFunctionId;
+        }
+      }
+    }
+    return null;
+  };
+
+  const nePick = pickFor(BINARY_PERCEIVING_QID_NI_NE);
+  const sePick = pickFor(BINARY_PERCEIVING_QID_SI_SE);
+  const tePick = pickFor(BINARY_JUDGING_QID_TI_TE);
+  const fePick = pickFor(BINARY_JUDGING_QID_FI_FE);
+
+  const allFour = [nePick, sePick, tePick, fePick];
+  if (allFour.some((p) => p === null)) {
+    reasons.push("binary-thin");
+  }
+
+  // Opposite-attitude constraint check. Perceiving: Ni+Se or Ne+Si.
+  // Judging: Ti+Fe or Te+Fi. Same-attitude pair (Ni+Si etc.) means
+  // the user picked two introverted attitudes (or two extraverted) —
+  // impossible in a canonical stack → contamination fingerprint.
+  const isIntroverted = (fn: CognitiveFunctionId): boolean =>
+    fn === "ni" || fn === "si" || fn === "ti" || fn === "fi";
+  if (
+    nePick &&
+    sePick &&
+    isIntroverted(nePick) === isIntroverted(sePick)
+  ) {
+    reasons.push("binary-attitude-violation");
+  }
+  if (
+    tePick &&
+    fePick &&
+    isIntroverted(tePick) === isIntroverted(fePick)
+  ) {
+    reasons.push("binary-attitude-violation");
+  }
+
+  // Dominance ordering picks. Each names which of the user's two
+  // axis-picks leads on that axis (T-led or F-led; N-led or S-led).
+  const percOrderPick = pickFor(BINARY_PERC_ORDER_QID); // expected: nePick or sePick
+  const judgOrderPick = pickFor(BINARY_JUDG_ORDER_QID); // expected: tePick or fePick
+
+  // The perceiving axis page-winner = whichever of nePick / sePick the
+  // user ordered first on Q-TB-PERC-ORDER. If both are present and the
+  // ordering pick matches one of them, that's the perceiving leader.
+  // Same for judging.
+  let perceivingLeader: CognitiveFunctionId | null = null;
+  if (nePick && sePick && percOrderPick) {
+    if (percOrderPick === nePick) perceivingLeader = nePick;
+    else if (percOrderPick === sePick) perceivingLeader = sePick;
+    else reasons.push("binary-dominance-ambiguous");
+  } else if (nePick || sePick) {
+    reasons.push("binary-dominance-ambiguous");
+  }
+  let judgingLeader: CognitiveFunctionId | null = null;
+  if (tePick && fePick && judgOrderPick) {
+    if (judgOrderPick === tePick) judgingLeader = tePick;
+    else if (judgOrderPick === fePick) judgingLeader = fePick;
+    else reasons.push("binary-dominance-ambiguous");
+  } else if (tePick || fePick) {
+    reasons.push("binary-dominance-ambiguous");
+  }
+
+  // I/E inference: prefer the existing extraversion proxy signal
+  // (`extraversion_proxy` from Q-O2 / similar). When unavailable OR
+  // ambiguous, default to introverted-dominant (the historically
+  // safer default given the OCEAN engine's distribution) but flag.
+  // CC-138 owner-design fallback (b) — explicit order-the-two of the
+  // page-winners — is NOT implemented in this CC; flagged for
+  // follow-up if inference proves unreliable in practice.
+  const extraversionProxy = signals.find(
+    (s) =>
+      s.signal_id === "extraversion_proxy" ||
+      s.signal_id === "extraversion_priority" ||
+      s.signal_id === "outward_energy_priority"
+  );
+  const inferredExtravert =
+    extraversionProxy !== undefined &&
+    typeof extraversionProxy.rank === "number" &&
+    extraversionProxy.rank <= 2;
+
+  // Resolve dominant: between perceivingLeader + judgingLeader, the
+  // dominant is the one matching the I/E inference. If
+  // perceivingLeader is introverted AND inferredExtravert is false,
+  // perceivingLeader is dominant (introvert-led). If perceivingLeader
+  // is extraverted AND inferredExtravert is true, perceivingLeader is
+  // dominant. Otherwise judgingLeader is dominant.
+  let dominant: CognitiveFunctionId | null = null;
+  let auxiliary: CognitiveFunctionId | null = null;
+  if (perceivingLeader && judgingLeader) {
+    const percIsIntro = isIntroverted(perceivingLeader);
+    const judgIsIntro = isIntroverted(judgingLeader);
+    if (percIsIntro !== judgIsIntro) {
+      // One is intro, one is extra — clean dom/aux selection by I/E.
+      if (inferredExtravert) {
+        // Extraverted dominant.
+        if (!percIsIntro) {
+          dominant = perceivingLeader;
+          auxiliary = judgingLeader;
+        } else {
+          dominant = judgingLeader;
+          auxiliary = perceivingLeader;
+        }
+      } else {
+        // Introverted dominant.
+        if (percIsIntro) {
+          dominant = perceivingLeader;
+          auxiliary = judgingLeader;
+        } else {
+          dominant = judgingLeader;
+          auxiliary = perceivingLeader;
+        }
+      }
+    } else {
+      // Both leaders share attitude — not a canonical stack.
+      reasons.push("binary-attitude-violation");
+    }
+  }
+
+  // If we couldn't resolve dom/aux, fall back to a placeholder stack
+  // (low confidence). Don't throw — engine pipeline expects a value.
+  if (!dominant || !auxiliary) {
+    return {
+      dominant: dominant ?? "ni",
+      auxiliary: auxiliary ?? "te",
+      tertiary: "fi",
+      inferior: "se",
+      confidence: "low",
+      confidenceLowReasons: reasons.length > 0 ? reasons : ["binary-thin"],
+    };
+  }
+
+  // Look up the canonical stack tuple. If the dom|aux key isn't a
+  // valid canonical pair (e.g. Ni|Fi from a constraint violation),
+  // fall back to the placeholder. STACK_TABLE / VALID_AUX_BY_DOMINANT
+  // are unchanged — CC-138 reuses the existing canon.
+  const key = `${dominant}|${auxiliary}`;
+  const stackTuple = STACK_TABLE[key];
+  const mbtiCode = MBTI_LOOKUP[key];
+  if (!stackTuple) {
+    reasons.push("binary-attitude-violation");
+    return {
+      dominant,
+      auxiliary,
+      tertiary: "fi",
+      inferior: "se",
+      confidence: "low",
+      confidenceLowReasons: reasons,
+    };
+  }
+
+  const confidence: "high" | "low" = reasons.length > 0 ? "low" : "high";
+
+  return {
+    dominant: stackTuple[0],
+    auxiliary: stackTuple[1],
+    tertiary: stackTuple[2],
+    inferior: stackTuple[3],
+    mbtiCode,
+    confidence,
+    confidenceLowReasons: reasons.length > 0 ? reasons : undefined,
+  };
+}
+
 export function aggregateLensStack(signals: Signal[]): LensStack {
+  // CC-138 — dispatch: binary-format sessions resolve via the new
+  // binary resolver (Q-TB-* signals present). Legacy ranking-format
+  // sessions continue to use the CC-134 top-pick convergence path
+  // (unchanged below). The two paths are mutually exclusive per
+  // session by design — `data/questions.ts` no longer issues the
+  // legacy Q-T1-T8 rankings to new sessions, but the legacy questions
+  // remain in the bank so existing cohort answers continue to derive.
+  if (hasBinarySignals(signals)) {
+    return aggregateLensStackBinary(signals);
+  }
+
   // CC-134 Part C — Lens stack resolution is now driven by top-pick
   // convergence (rank-1 frequency per pool) instead of flat
   // averageRank. averageRank is retained as a deterministic

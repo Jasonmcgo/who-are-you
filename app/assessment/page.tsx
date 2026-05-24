@@ -20,6 +20,8 @@ import type {
   TensionStatus,
 } from "../../lib/types";
 import Ranking from "../components/Ranking";
+// CC-138 — reused by the binary attitude picks (Q-TB-*).
+import SinglePickPicker from "../components/SinglePickPicker";
 import QuestionShell from "../components/QuestionShell";
 import InnerConstitutionPage from "../components/InnerConstitutionPage";
 // CODEX-SYNTHESIS-3-RUNTIME-FALLBACK — augment constitution with LLM
@@ -357,6 +359,15 @@ export default function Home() {
       if (prev && prev.type === "ranking_derived") return prev.order;
       return derivedItems ? derivedItems.items.map((i) => i.id) : [];
     }
+    // CC-138 — binary picks seed with the prior single_pick id when
+    // present (resume / edit flow). Otherwise an empty string lets
+    // the picker render unchosen so the user must affirm.
+    if (
+      question.type === "binary_pick" ||
+      question.type === "binary_pick_derived"
+    ) {
+      return prev && prev.type === "single_pick" ? prev.picked_id : "";
+    }
     return prev && (prev.type === "forced" || prev.type === "freeform")
       ? prev.response
       : "";
@@ -585,6 +596,46 @@ export default function Home() {
       advance(answer);
       return;
     }
+    // CC-138 — binary_pick / binary_pick_derived: construct a
+    // SinglePickAnswer carrying the chosen function id + the item's
+    // signal. The engine's existing `signalFromSinglePick` path
+    // extracts the rank-1 signal that the binary resolver reads.
+    if (
+      (question.type === "binary_pick" || question.type === "binary_pick_derived") &&
+      typeof draft === "string" &&
+      draft.length > 0
+    ) {
+      // For binary_pick, the items list is on the question. For
+      // binary_pick_derived, items derive at render time from prior
+      // picks; we re-resolve them here so the picked_signal is correct.
+      let items: { id: string; signal: string }[] = [];
+      if (question.type === "binary_pick") {
+        items = question.items;
+      } else {
+        for (const pid of question.derived_from ?? []) {
+          const pa = answers.find((a) => a.question_id === pid);
+          if (pa && pa.type === "single_pick") {
+            const parentQ = questions.find((q) => q.question_id === pid);
+            if (parentQ && parentQ.type === "binary_pick") {
+              const chosen = parentQ.items.find((i) => i.id === pa.picked_id);
+              if (chosen) items.push(chosen);
+            }
+          }
+        }
+      }
+      const picked = items.find((i) => i.id === draft);
+      if (!picked) return;
+      const answer: SinglePickAnswer = {
+        question_id: question.question_id,
+        card_id: question.card_id,
+        question_text: question.text,
+        type: "single_pick",
+        picked_id: picked.id,
+        picked_signal: picked.signal,
+      };
+      advance(answer);
+      return;
+    }
     if (typeof draft === "string") {
       const trimmed = draft.trim();
       if (question.type === "freeform" && trimmed.length === 0) return;
@@ -615,6 +666,23 @@ export default function Home() {
       if (onlyOther && state.otherText.trim().length === 0) return false;
       void noneId;
       return true;
+    }
+    // CC-138 — binary picks gate Continue on a non-empty selection
+    // (any of the two items chosen). Derived variants additionally
+    // require both parent answers (else cascade-skip handles it).
+    if (question.type === "binary_pick") {
+      return typeof draft === "string" && draft.length > 0;
+    }
+    if (question.type === "binary_pick_derived") {
+      const parents = question.derived_from ?? [];
+      const allParentsAnswered = parents.every((pid) =>
+        answers.some((a) => a.question_id === pid && a.type === "single_pick")
+      );
+      return (
+        allParentsAnswered &&
+        typeof draft === "string" &&
+        draft.length > 0
+      );
     }
     if (question.type === "freeform") {
       return typeof draft === "string" && draft.trim().length > 0;
@@ -827,7 +895,9 @@ export default function Home() {
       helper={
         question.type === "ranking" ||
         question.type === "ranking_derived" ||
-        question.type === "multiselect_derived"
+        question.type === "multiselect_derived" ||
+        question.type === "binary_pick" ||
+        question.type === "binary_pick_derived"
           ? question.helper
           : undefined
       }
@@ -907,6 +977,45 @@ export default function Home() {
             });
           }}
         />
+      ) : question.type === "binary_pick" ? (
+        // CC-138 — same-dimension attitude binary. SinglePickPicker
+        // renders the two voices side-by-side; pick stores as a
+        // SinglePickAnswer carrying the chosen function's signal.
+        <SinglePickPicker
+          key={question.question_id}
+          items={question.items}
+          selectedId={typeof draft === "string" ? draft : null}
+          onChange={(id) => updateDraft(id)}
+        />
+      ) : question.type === "binary_pick_derived" ? (
+        // CC-138 — dominance ordering. Items derive at render time
+        // from the user's two prior axis picks (Q-TB-NI-NE + Q-TB-SI-SE
+        // for perceiving, Q-TB-TI-TE + Q-TB-FI-FE for judging). When
+        // either parent is unanswered, the derived items list is
+        // empty → cascade-skip behavior identical to ranking_derived.
+        (() => {
+          const parents = question.derived_from ?? [];
+          const items: { id: string; label: string; signal: string; quote?: string; voice?: string; example?: string }[] = [];
+          for (const pid of parents) {
+            const pa = answers.find((a) => a.question_id === pid);
+            if (pa && pa.type === "single_pick") {
+              const parentQ = questions.find((q) => q.question_id === pid);
+              if (parentQ && parentQ.type === "binary_pick") {
+                const chosen = parentQ.items.find((i) => i.id === pa.picked_id);
+                if (chosen) items.push(chosen);
+              }
+            }
+          }
+          if (items.length < 2) return null; // cascade-skip
+          return (
+            <SinglePickPicker
+              key={question.question_id}
+              items={items}
+              selectedId={typeof draft === "string" ? draft : null}
+              onChange={(id) => updateDraft(id)}
+            />
+          );
+        })()
       ) : question.type === "multiselect_derived" &&
         multiSelectDerivedItems &&
         question.none_option &&

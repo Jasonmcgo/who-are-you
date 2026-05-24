@@ -358,6 +358,97 @@ export const questions: Question[] = [
       { id: "fi", label: "Voice D", voice: "Voice D", quote: `"Something about THIS person's situation lands hard in me — their feelings become my feelings, and I drop my own things to be with it. The pull is selective; not every struggle moves me this way. When it does, my response comes from how it lands inside me, not from what they're asking for."`, example: "When THIS particular person's situation hits me right, I'm gone — I cancel my plans, I'm in it with them, I can't think about anything else. Two days from now, someone else might be struggling and it won't pull me the same way. The intensity is selective and it comes from how their situation lands in me.", signal: "fi" },
     ],
   },
+  // ── CC-138 — Function-voice binary reformat ────────────────────────────
+  //
+  // Replaces the 4-way Q-T rankings with same-dimension select-one-of-two
+  // binaries. Why: the 4-way ranking forced cross-dimension comparisons
+  // (warm-Ti pulls Fi; warm-N pulls S) that produced typing noise. The
+  // binaries pit attitudes WITHIN a single dimension so the valence
+  // confound cannot fire. See docs/canon/jungian-items-current.md (CC-138)
+  // for the canonical record.
+  //
+  // The legacy Q-T1-Q-T8 ranking questions REMAIN in the bank above for
+  // backward-compat with already-collected cohort fixtures (the engine
+  // continues to derive legacy ranking answers via the CC-134 top-pick
+  // convergence path in lib/jungianStack.ts:aggregateLensStack). New
+  // sessions answer the binaries below; the assessment surface filters
+  // legacy Q-T1-Q-T8 by the `legacy_only` flag attached at runtime.
+  //
+  // Reuses the CC-122/CC-135 warm-balanced voice prose verbatim so the
+  // binaries preserve item validity while restructuring the question
+  // shape. Voices stay labeled "Voice A / Voice B" — no attitude-label
+  // leakage; the user picks between two voices, not "introverted vs
+  // extraverted intuition." Engine reads the `signal` to know which was
+  // chosen.
+  //
+  // Q-TB-NI-NE — intuitive attitude binary (Ni vs Ne).
+  {
+    question_id: "Q-TB-NI-NE",
+    card_id: "temperament",
+    type: "binary_pick",
+    text: "Which of these is closer to how your intuition actually moves?",
+    helper: "Pick the one that feels closer — both are intuition, two different attitudes.",
+    items: [
+      { id: "ni", label: "Voice A", voice: "Voice A", quote: `"I keep looking for the hidden shape underneath the details. Once I see the pattern, the scattered pieces start to arrange themselves."`, example: "I sit with it until the underlying shape clicks; after that the specifics mostly sort themselves out.", signal: "ni" },
+      { id: "ne", label: "Voice B", voice: "Voice B", quote: `"I start seeing several ways this could open up — one idea leads to another, and the useful path usually appears after I've followed a few live threads."`, example: "Partway in, I've got three or four threads I want to pull, and chasing them is usually how the workable path shows up.", signal: "ne" },
+    ],
+  },
+  // Q-TB-SI-SE — sensing attitude binary (Si vs Se).
+  {
+    question_id: "Q-TB-SI-SE",
+    card_id: "temperament",
+    type: "binary_pick",
+    text: "Which of these is closer to how you take in what's actually here?",
+    helper: "Pick the one that feels closer — both are sensing, two different attitudes.",
+    items: [
+      { id: "si", label: "Voice A", voice: "Voice A", quote: `"I remember the people and the moments when something like this worked — what they did, the small choices that held up. That lived memory is what I want to honor and lean on before I improvise."`, example: "I think back to how my mentor handled something like this — what they did, the small choices that worked — and I let that lived example anchor where I start.", signal: "si" },
+      { id: "se", label: "Voice B", voice: "Voice B", quote: `"I want to be with the problem directly — feel how it actually sits in my hands, read what's really in front of me. My close attention to what is here is how I take care of it."`, example: "I sit with the problem itself for a minute — feel where it's actually stuck — and let what's in front of me guide the first move I make.", signal: "se" },
+    ],
+  },
+  // Q-TB-TI-TE — thinking attitude binary (Ti vs Te).
+  {
+    question_id: "Q-TB-TI-TE",
+    card_id: "temperament",
+    type: "binary_pick",
+    text: "Which of these is closer to how your reasoning actually settles?",
+    helper: "Pick the one that feels closer — both are reasoning, two different attitudes.",
+    items: [
+      { id: "ti", label: "Voice A", voice: "Voice A", quote: `"There's a flaw in the underlying logic of the plan. I want to find it before we change what we're doing."`, example: "Before we change anything, I want to find the assumption in the original plan that turned out not to hold.", signal: "ti" },
+      { id: "te", label: "Voice B", voice: "Voice B", quote: `"Let's change what we're doing now to hit the target. We can diagnose the failure afterward."`, example: "Let's switch tactics now and still hit the deadline; we can figure out why the first plan failed once we're past it.", signal: "te" },
+    ],
+  },
+  // Q-TB-FI-FE — feeling attitude binary (Fi vs Fe).
+  {
+    question_id: "Q-TB-FI-FE",
+    card_id: "temperament",
+    type: "binary_pick",
+    text: "Which of these is closer to how your values actually move you?",
+    helper: "Pick the one that feels closer — both are values-led, two different attitudes.",
+    items: [
+      { id: "fi", label: "Voice A", voice: "Voice A", quote: `"What I personally hold as true matters more to me than their agreement. I can sit with their disapproval; what I can't sit with is abandoning my own felt-truth to keep peace. Being out of step with myself costs more than being out of step with them."`, example: "When a mentor I respect tells me my decision is wrong, I hear them — and I still can't move from what I felt was right. The cost of pretending to agree with them would be higher than the cost of them thinking I'm wrong.", signal: "fi" },
+      { id: "fe", label: "Voice B", voice: "Voice B", quote: `"Us landing on a position we can both stand on matters as much as which of us is right. I'd rather we arrive together than I be right alone. The connection between us is part of what's at stake here — not separate from the question of who's correct."`, example: "When we disagree, I want to keep working until we find a frame we can both speak from. If I 'win' the argument but lose how we stand together, I've lost the more important thing.", signal: "fe" },
+    ],
+  },
+  // Q-TB-PERC-ORDER — perceiving dominance ordering. Items derive at
+  // render time from the user's Q-TB-NI-NE pick + Q-TB-SI-SE pick.
+  {
+    question_id: "Q-TB-PERC-ORDER",
+    card_id: "temperament",
+    type: "binary_pick_derived",
+    derived_from: ["Q-TB-NI-NE", "Q-TB-SI-SE"],
+    text: "Of your two perceiving picks, which one leads in how you actually take in the world?",
+    helper: "Both are real for you; this names which one shows up FIRST when you read a situation.",
+  },
+  // Q-TB-JUDG-ORDER — judging dominance ordering. Items derive from
+  // Q-TB-TI-TE pick + Q-TB-FI-FE pick.
+  {
+    question_id: "Q-TB-JUDG-ORDER",
+    card_id: "temperament",
+    type: "binary_pick_derived",
+    derived_from: ["Q-TB-TI-TE", "Q-TB-FI-FE"],
+    text: "Of your two judging picks, which one leads in how you actually settle a decision?",
+    helper: "Both are real for you; this names which one shows up FIRST when a call gets made.",
+  },
   // ── CC-Q1 — OCEAN direct-measurement (Q-O1 + Q-O2) ─────────────────────
   //
   // Bundle 1 of the question-additions chain (docs/question-bank-additions-
