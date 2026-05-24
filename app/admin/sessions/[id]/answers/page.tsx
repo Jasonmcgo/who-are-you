@@ -455,9 +455,316 @@ export default function AnswerReviewPage({
             </section>
           );
         })}
+
+        {/* CC-140 — Follow-up / clarifier answers section. Lists every
+            saved answer whose question_id is NOT in the canonical
+            data/questions.ts bank — i.e. the fq* clarifiers + any
+            other dynamically-generated follow-up question. These
+            answers save into sessions.answers and feed the report,
+            but pre-CC-140 they were invisible in admin because the
+            bank-iteration above could never surface them.
+
+            Reset is wired the same way it is for bank answers (reuses
+            handleReset → resetSessionAnswer); on reset the entry is
+            archived to answer_history (CC-136) and re-surfaces on the
+            next gap-fill / follow-up link. Edit is not offered for
+            follow-up answers (their question structure isn't in the
+            bank, so there's no editor to dispatch to — Reset + re-ask
+            is the safe path). */}
+        <FollowUpAnswersSection
+          answers={data.answers ?? []}
+          bankIds={new Set(allQuestions.map((q) => q.question_id))}
+          pendingReask={pendingReask}
+          onReset={handleReset}
+        />
       </div>
     </main>
   );
+}
+
+// ── CC-140 — Follow-up / clarifier answers section ──────────────────────
+
+function FollowUpAnswersSection({
+  answers,
+  bankIds,
+  pendingReask,
+  onReset,
+}: {
+  answers: Answer[];
+  bankIds: Set<string>;
+  pendingReask: Set<string>;
+  onReset: (questionId: string, questionText: string) => Promise<void>;
+}) {
+  // Detection: any answer whose question_id is NOT in the canonical
+  // bank set. The bank set is computed from data/questions.ts once
+  // per render in the parent; here we just filter the live answers.
+  const followUps = answers.filter((a) => !bankIds.has(a.question_id));
+  if (followUps.length === 0) return null;
+
+  return (
+    <section
+      style={{
+        border: "1px solid var(--rule, #d4c8a8)",
+        background: "var(--paper, #f7f1e6)",
+        padding: "12px 16px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
+        marginTop: 18,
+      }}
+    >
+      <div className="flex flex-col" style={{ gap: 4 }}>
+        <p
+          className="font-mono uppercase"
+          style={{
+            fontSize: 11,
+            letterSpacing: "0.12em",
+            color: "var(--ink-mute)",
+            margin: 0,
+          }}
+        >
+          Follow-up & clarifier answers
+        </p>
+        <p
+          className="font-serif italic"
+          style={{
+            fontSize: 12,
+            color: "var(--ink-soft)",
+            margin: 0,
+            lineHeight: 1.45,
+          }}
+        >
+          These are post-test clarifier / follow-up picks the engine
+          generated for this session (fq* ids). They save into
+          sessions.answers and feed the report; Reset re-asks them on
+          the next gap-fill link.
+        </p>
+      </div>
+      {followUps.map((a) => (
+        <FollowUpAnswerRow
+          key={a.question_id}
+          answer={a}
+          pendingReask={pendingReask.has(a.question_id)}
+          onReset={onReset}
+        />
+      ))}
+    </section>
+  );
+}
+
+function FollowUpAnswerRow({
+  answer,
+  pendingReask,
+  onReset,
+}: {
+  answer: Answer;
+  pendingReask: boolean;
+  onReset: (questionId: string, questionText: string) => Promise<void>;
+}) {
+  const questionText =
+    "question_text" in answer && typeof answer.question_text === "string"
+      ? answer.question_text
+      : "(no question text on stored answer)";
+  return (
+    <div
+      style={{
+        borderTop: "1px solid var(--rule-soft, #ece3cf)",
+        paddingTop: 10,
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: 12,
+        }}
+      >
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+          <p
+            className="font-mono uppercase"
+            style={{
+              fontSize: 10,
+              letterSpacing: "0.10em",
+              color: "var(--ink-mute)",
+              margin: 0,
+            }}
+          >
+            {answer.question_id} · {answer.type}
+          </p>
+          <p
+            className="font-serif"
+            style={{
+              fontSize: 14,
+              color: "var(--ink, #2b2417)",
+              margin: 0,
+              lineHeight: 1.45,
+            }}
+          >
+            {questionText}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => onReset(answer.question_id, questionText)}
+          className="font-mono uppercase"
+          style={{
+            fontSize: 11,
+            letterSpacing: "0.10em",
+            padding: "4px 12px",
+            border: "1px solid var(--rule, #d4c8a8)",
+            background: "transparent",
+            color: "var(--umber, #8a6f3a)",
+            cursor: "pointer",
+            whiteSpace: "nowrap",
+          }}
+        >
+          Reset
+        </button>
+      </div>
+      <FollowUpAnswerValue answer={answer} />
+      {pendingReask ? (
+        <p
+          className="font-mono uppercase"
+          style={{
+            fontSize: 10,
+            letterSpacing: "0.10em",
+            color: "var(--umber, #8a6f3a)",
+            margin: 0,
+            fontStyle: "italic",
+          }}
+        >
+          pending re-ask · will surface on next gap-fill link
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function FollowUpAnswerValue({ answer }: { answer: Answer }) {
+  if (answer.type === "single_pick") {
+    return (
+      <p
+        className="font-serif"
+        style={{
+          fontSize: 13.5,
+          color: "var(--ink, #2b2417)",
+          margin: 0,
+        }}
+      >
+        Picked: <span className="font-mono">{answer.picked_id}</span>
+        <span
+          className="font-mono"
+          style={{
+            marginLeft: 8,
+            color: "var(--ink-mute)",
+            fontSize: 11,
+          }}
+        >
+          (signal: {answer.picked_signal})
+        </span>
+      </p>
+    );
+  }
+  if (answer.type === "ranking_derived") {
+    return (
+      <ol
+        style={{
+          margin: 0,
+          paddingLeft: 18,
+          fontSize: 13,
+          color: "var(--ink, #2b2417)",
+          lineHeight: 1.5,
+        }}
+      >
+        {answer.order.map((id) => {
+          const src = answer.derived_item_sources.find((s) => s.id === id);
+          return (
+            <li key={id}>
+              {id}
+              {src ? (
+                <span
+                  className="font-mono"
+                  style={{ marginLeft: 8, color: "var(--ink-mute)", fontSize: 11 }}
+                >
+                  (signal: {src.signal})
+                </span>
+              ) : null}
+            </li>
+          );
+        })}
+      </ol>
+    );
+  }
+  if (answer.type === "ranking") {
+    return (
+      <ol
+        style={{
+          margin: 0,
+          paddingLeft: 18,
+          fontSize: 13,
+          color: "var(--ink, #2b2417)",
+          lineHeight: 1.5,
+        }}
+      >
+        {answer.order.map((id) => (
+          <li key={id}>{id}</li>
+        ))}
+      </ol>
+    );
+  }
+  if (answer.type === "freeform" || answer.type === "forced") {
+    return (
+      <p
+        className="font-serif"
+        style={{
+          fontSize: 13.5,
+          color: "var(--ink, #2b2417)",
+          margin: 0,
+          whiteSpace: "pre-wrap",
+          lineHeight: 1.5,
+        }}
+      >
+        {answer.response}
+      </p>
+    );
+  }
+  if (answer.type === "multiselect_derived") {
+    if (answer.none_selected) {
+      return (
+        <p
+          className="font-serif italic"
+          style={{ fontSize: 13, color: "var(--ink-mute)", margin: 0 }}
+        >
+          Selected: None of these
+          {answer.other_text ? ` (other: "${answer.other_text}")` : ""}
+        </p>
+      );
+    }
+    return (
+      <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: "var(--ink, #2b2417)" }}>
+        {answer.selections.map((s) => (
+          <li key={s.id}>
+            {s.id}
+            {s.signal ? (
+              <span
+                className="font-mono"
+                style={{ marginLeft: 8, color: "var(--ink-mute)", fontSize: 11 }}
+              >
+                (signal: {s.signal})
+              </span>
+            ) : null}
+          </li>
+        ))}
+        {answer.other_text ? <li>Other: {answer.other_text}</li> : null}
+      </ul>
+    );
+  }
+  return null;
 }
 
 // ── Read-only renderer ──────────────────────────────────────────────────

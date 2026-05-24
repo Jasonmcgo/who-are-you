@@ -443,16 +443,38 @@ export function buildFollowUpInput(
       ? "moderate"
       : "low";
 
-  // CC-134 Part D §D.1 — when Lens confidence is low (post-Part C
-  // top-pick + N/S valence guard), pull the per-pool top-pick leaders
-  // so the generator can build an N-vs-S head-to-head clarifier. The
-  // leaders are the function with the most rank-1 picks in each sub-
-  // axis (Ni/Ne for N; Si/Se for S). Ties resolve alphabetically by
+  // CC-141 §C — clarifier triggers read the PRE-LIFT axis reason
+  // flags, NOT the (possibly lifted) `confidence` value. CC-097B's
+  // cross-signal lift can flip the displayed confidence from low to
+  // high when the dominant is corroborated — but if the reason for
+  // the original low was axis contamination (`ns-valence` /
+  // `judging-cooccurrence`) or thin floor, the contamination is still
+  // there and the clarifier must still fire. "Ask the question" is
+  // decoupled from "show high." Reasons are populated by
+  // `aggregateLensStack` (see CC-141 §A); when CC-097B lifts, the
+  // reasons remain attached for this exact reading.
+  const reasons = ls?.confidenceLowReasons ?? [];
+  const nsValenceReason = reasons.includes("ns-valence");
+  const thinFloorReason = reasons.includes("thin-floor");
+  const judgingCooccurrenceReason = reasons.includes("judging-cooccurrence");
+  // The clarifier-eligible state for the N/S head-to-head is: the
+  // lens layer flagged an N/S contamination OR thin-floor + a real
+  // N-vs-S top-pick split. CC-134.1's clarifier originally gated on
+  // `confidence === "low"`; CC-141 widens the gate to the reasons so
+  // a Megan-shape (lifted to high on a corroborated Fi dominant +
+  // contaminated N/S) still gets asked.
+  const nsClarifierEligible = nsValenceReason || thinFloorReason;
+  const judgingClarifierEligible = judgingCooccurrenceReason;
+
+  // CC-134 Part D §D.1 — pull the per-pool top-pick leaders so the
+  // generator can build an N-vs-S head-to-head clarifier. The leaders
+  // are the function with the most rank-1 picks in each sub-axis
+  // (Ni/Ne for N; Si/Se for S). Ties resolve alphabetically by
   // function id to keep the resolver deterministic.
   let nsLeaderN: CognitiveFunctionId | undefined;
   let nsLeaderS: CognitiveFunctionId | undefined;
   let nsHeadToHeadTrigger: "low_confidence" | "ns_split_suspect" | undefined;
-  if (ls?.confidence === "low") {
+  if (nsClarifierEligible) {
     const nCandidates: CognitiveFunctionId[] = ["ni", "ne"];
     const sCandidates: CognitiveFunctionId[] = ["si", "se"];
     const pickLeader = (
@@ -476,19 +498,18 @@ export function buildFollowUpInput(
     }
   }
 
-  // CC-134.1 §Task 3 — judging-axis head-to-head detection. When both
-  // members of an impossible same-attitude judging pair carry meaningful
-  // top-picks (≥ JUDGING_COOCCURRENCE_THRESHOLD each), surface a
-  // clarifier so the user explicitly picks one. The §C.6 guard already
-  // flipped confidence to `low` for this case in jungianStack; this
-  // pulls the leaders forward for the clarifier builder.
+  // CC-134.1 §Task 3 — judging-axis head-to-head detection. CC-141 §C
+  // — triggers on the `judging-cooccurrence` reason flag rather than
+  // the (possibly lifted) `confidence` value, so the warm-Ti-pulls-Fi
+  // (or warm-Te-pulls-Fe) clarifier still fires when cross-signal
+  // lift raised display confidence.
   let judgingHeadToHeadA: CognitiveFunctionId | undefined;
   let judgingHeadToHeadB: CognitiveFunctionId | undefined;
   let judgingHeadToHeadTrigger:
     | "ti_fi_cooccurrence"
     | "te_fe_cooccurrence"
     | undefined;
-  if (ls?.confidence === "low") {
+  if (judgingClarifierEligible) {
     const tiTop = topPickCountFor(constitution.signals, "ti");
     const fiTop = topPickCountFor(constitution.signals, "fi");
     const teTop = topPickCountFor(constitution.signals, "te");
@@ -885,6 +906,12 @@ function buildTypeClarityHeadToHead(
 ): FollowUpQuestion {
   const nVoice = PERCEIVING_VOICE[nLeader];
   const sVoice = PERCEIVING_VOICE[sLeader];
+  // CC-141 §D — neutral "Voice A / Voice B" labels match the bank's
+  // `data/questions.ts` convention (Q-T1–T8 hide function codes
+  // behind "Voice A–D" so the reader can't game which voice maps to
+  // which function). Function id lives in `tags[0]` so the resolver
+  // still maps the pick back correctly (it joins on label = picked_id
+  // and reads the function from the option's tags).
   return {
     id: "fq4_type_clarity_ns",
     purpose: "type_clarity",
@@ -893,13 +920,13 @@ function buildTypeClarityHeadToHead(
     responseMode: "choose_one",
     options: [
       {
-        label: nLeader.toUpperCase(),
+        label: "Voice A",
         text: `${nVoice.framing} — ${nVoice.texture}`,
         tags: [nLeader, "perceiving", "type_clarity"],
         interpretation: `Confirms ${nLeader.toUpperCase()}-led perceiving (intuitive).`,
       },
       {
-        label: sLeader.toUpperCase(),
+        label: "Voice B",
         text: `${sVoice.framing} — ${sVoice.texture}`,
         tags: [sLeader, "perceiving", "type_clarity"],
         interpretation: `Confirms ${sLeader.toUpperCase()}-led perceiving (sensing). Note: written with equal warmth to the N option per the §C.6 valence guard — so the pick is the choice, not the temperature.`,
@@ -921,6 +948,8 @@ function buildJudgingClarityHeadToHead(
 ): FollowUpQuestion {
   const aVoice = PERCEIVING_VOICE[aLeader];
   const bVoice = PERCEIVING_VOICE[bLeader];
+  // CC-141 §D — neutral "Voice A / Voice B" labels (see comment on
+  // buildTypeClarityHeadToHead). Function id stays in `tags[0]`.
   return {
     id: "fq5_type_clarity_judging",
     purpose: "type_clarity",
@@ -929,13 +958,13 @@ function buildJudgingClarityHeadToHead(
     responseMode: "choose_one",
     options: [
       {
-        label: aLeader.toUpperCase(),
+        label: "Voice A",
         text: `${aVoice.framing} — ${aVoice.texture}`,
         tags: [aLeader, "judging", "type_clarity"],
         interpretation: `Confirms ${aLeader.toUpperCase()}-led judging.`,
       },
       {
-        label: bLeader.toUpperCase(),
+        label: "Voice B",
         text: `${bVoice.framing} — ${bVoice.texture}`,
         tags: [bLeader, "judging", "type_clarity"],
         interpretation: `Confirms ${bLeader.toUpperCase()}-led judging. (CC-134.1 §Task 3: pair surfaced because both ${aLeader.toUpperCase()} & ${bLeader.toUpperCase()} accumulated significant top-picks — a canonical stack cannot hold both, so this pick resolves the contamination.)`,

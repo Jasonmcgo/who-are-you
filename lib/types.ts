@@ -300,7 +300,46 @@ export type LensStack = {
   crossSignalInferredDriver?: CognitiveFunctionId;
   // Populated only when `crossSignalAgreement === "mirror-axis"`.
   mirrorAxis?: MirrorAxisRead;
+  // CC-141 — when `confidence === "low"`, the specific reason(s) the
+  // jungianStack layer set it. Used by:
+  //   1. CC-097B's cross-signal lift (lib/identityEngine.ts ~2534) —
+  //      now gated to only override reasons that dominant agreement
+  //      genuinely resolves (`aux-ambiguous` / `dominant-mirror`); a
+  //      contaminated-axis low (`ns-valence` / `judging-cooccurrence`
+  //      / `thin-floor`) cannot be lifted because dominant inference
+  //      can't speak to those axes.
+  //   2. CC-141 §D clarifier triggers in lib/followUpQuestions.ts —
+  //      decoupled from the (possibly lifted) `confidence` field; the
+  //      clarifiers fire on the axis reasons directly so contamination
+  //      gets its disambiguation question even when display reads
+  //      `high`.
+  // Empty / undefined when `confidence === "high"`.
+  confidenceLowReasons?: ConfidenceLowReason[];
 };
+
+// CC-141 — reason flags for `LensStack.confidenceLowReasons`. Each
+// flag corresponds to a distinct check in `aggregateLensStack`:
+//   - "thin-floor": below MIN_DOMINANT_TOP_PICKS or below
+//     MIN_QT_BLOCKS_WITH_DATA in the dominant pool.
+//   - "aux-ambiguous": the dominant's aux runner-up is within the
+//     data-relative margin (the aux call is genuinely tight).
+//   - "dominant-mirror": the dominant's same-dimension opposite-
+//     attitude mirror (Si↔Se etc.) is within margin — the attitude
+//     is ambiguous, not the function family.
+//   - "dominant-convergence-weak": the dominant's own pool runner-up
+//     is within margin (rare — usually subsumed by mirror or aux
+//     checks but kept separate for diagnostic clarity).
+//   - "ns-valence": §C.6 N/S guard — an N-led perceiving call where
+//     the S leader is within margin (warm-N item bias risk).
+//   - "judging-cooccurrence": Ti+Fi or Te+Fe both at or above the
+//     co-occurrence threshold (impossible canonical pair).
+export type ConfidenceLowReason =
+  | "thin-floor"
+  | "aux-ambiguous"
+  | "dominant-mirror"
+  | "dominant-convergence-weak"
+  | "ns-valence"
+  | "judging-cooccurrence";
 
 export type GiftCategory =
   | "Pattern"

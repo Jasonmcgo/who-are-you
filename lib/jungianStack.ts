@@ -38,6 +38,7 @@ const JUNGIAN_BASE_UNIT = 15;
 
 import type {
   CognitiveFunctionId,
+  ConfidenceLowReason,
   LensStack,
   Signal,
 } from "./types";
@@ -537,15 +538,21 @@ export function aggregateLensStack(signals: Signal[]): LensStack {
     dominantPoolScoredBlocks < MIN_QT_BLOCKS_WITH_DATA;
   const belowMinDataFloor = belowMinDominantPicks || belowMinScoredBlocks;
 
-  const confidence: "high" | "low" =
-    belowMinDataFloor ||
-    dominantConvergenceWeak ||
-    auxConvergenceWeak ||
-    dominantMirrorTooTight ||
-    nsValenceSuspect ||
-    judgingCoOccurrenceSuspect
-      ? "low"
-      : "high";
+  // CC-141 §A — collect WHY confidence is low. Each flag corresponds
+  // to a distinct check above. Downstream (cross-signal lift +
+  // followUpQuestions clarifier triggers) uses these to make
+  // axis-specific decisions: dominant-agreement lift may only resolve
+  // reasons it actually addresses; contaminated-axis clarifiers fire
+  // on the reasons directly, decoupled from any lifted display value.
+  const reasons: ConfidenceLowReason[] = [];
+  if (belowMinDataFloor) reasons.push("thin-floor");
+  if (dominantConvergenceWeak) reasons.push("dominant-convergence-weak");
+  if (auxConvergenceWeak) reasons.push("aux-ambiguous");
+  if (dominantMirrorTooTight) reasons.push("dominant-mirror");
+  if (nsValenceSuspect) reasons.push("ns-valence");
+  if (judgingCoOccurrenceSuspect) reasons.push("judging-cooccurrence");
+
+  const confidence: "high" | "low" = reasons.length > 0 ? "low" : "high";
 
   return {
     dominant: stackTuple[0],
@@ -554,6 +561,7 @@ export function aggregateLensStack(signals: Signal[]): LensStack {
     inferior: stackTuple[3],
     mbtiCode,
     confidence,
+    confidenceLowReasons: reasons.length > 0 ? reasons : undefined,
   };
 }
 

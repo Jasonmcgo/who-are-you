@@ -1,19 +1,19 @@
 {
   "ocean/01-architectural-openness.json": {
-    "length": 44130,
-    "hash": "3eb7bfc1a974401578160a7fefec7b1b0d403b21e6cf6385e1a0089f670e320d"
+    "length": 43721,
+    "hash": "8326ce5ab520e225fc15d7a9ebd4f50a00cb37ed5a3a2773d8faefa0b46022ad"
   },
   "ocean/02-high-conscientiousness.json": {
-    "length": 39815,
-    "hash": "fcf7f181cd3a4ecaebf5b10527f492c3cdf80fb1e6ed30f85a779743aa7867f3"
+    "length": 39835,
+    "hash": "c59edee55c2b1644432420cc7c5ee52ec8b87437080347ec63ebd7d9183261f9"
   },
   "ocean/03-low-extraversion-high-soul.json": {
-    "length": 41282,
-    "hash": "59f41661b4b15215122e468a5557ecd0b75e376a17f44a93561f3f3028aa2199"
+    "length": 41163,
+    "hash": "ea087dbb3b0ae159296fb9422b9deac19f582f0a6dcc60ce1f291a3240148d47"
   },
   "ocean/04-high-agreeableness-loyalty.json": {
-    "length": 41517,
-    "hash": "3404d1a3e47194c6639690b3cd1f30bf052b1d09d2cc95691244c30dae6df9e4"
+    "length": 41392,
+    "hash": "fe5bc6b836c15741afdbd418fa843e897aea67a28502a0ea885392a050097baf"
   },
   "ocean/05-low-emotional-reactivity-proxy.json": {
     "length": 40674,
@@ -56,8 +56,8 @@
     "hash": "56d489a199bb7f5853e2307d92005359438abfe976f3c536e0d8ada049193d9d"
   },
   "goal-soul-give/04-longing.json": {
-    "length": 44474,
-    "hash": "4f3469389fa194a306cd8d585f8b52c00651d37eeaace20bb34947521a6386c8"
+    "length": 44355,
+    "hash": "65ace830a34d42b111e671a8292bef7ddd5a7c4a760db27fd3ab0c7316a685f7"
   },
   "goal-soul-give/05-steward-not-gripper.json": {
     "length": 44746,
@@ -84,15 +84,15 @@
     "hash": "4d588610eab6687d363e5225700aa8af5a68d643012d0741272e2f8b0017adc9"
   },
   "goal-soul-give/11-retirement-longing.json": {
-    "length": 44534,
-    "hash": "dd8a5324b8b46c3802c54cf4007c53b3fbda867aebd7be77c5f896e013bf57d5"
+    "length": 44415,
+    "hash": "b9dc3181147c1563ac2825f4c0506eaa36cf740fd18e4477be812e218e9bf0ec"
   },
   "goal-soul-give/12-productive-ne-default-pair.json": {
     "length": 45476,
     "hash": "c4af6d16dbaeb7820fc9e4f3cdb353daaf3ecde71a3253f71cce7d3973a37cd9"
   },
   "goal-soul-give/13-drive-inverted-case.json": {
-    "length": 45409,
-    "hash": "266fe5996c3d931fa2356cfdd7adad6b45484e3b29983c950eb8b1242c9e2816"
+    "length": 45290,
+    "hash": "532837547b06a3ad5e2f824f772a70f16ecc1adacb4f70b6b56ccf73065125c5"
   }
 }

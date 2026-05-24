@@ -2,6 +2,21 @@
 // router, prose generator, render integration, and engine-math
 // regression anchor.
 //
+// **CC-142 — anchor refresh.** Two render-integration assertions
+// (#8 prose-no-engine-vocabulary-leak, #9 section-ordering, also #11)
+// pointed at user-mode `## Next Moves`, which has been correct in
+// neither mode since:
+//   - CC-120: the register-based `## Next Moves` section was gated to
+//     clinician (it duplicated "Your Next 3 Moves" and exposed
+//     question-IDs).
+//   - CC-132: user-mode renders the 50° outline; its next-moves
+//     section is `## Your Next Three Moves — From Grip to Aim`.
+// The render contract is intact; the audit anchors were stale. CC-142
+// realigns #8, #9, #11 to the current contract (clinician body slice
+// for the leak check; both-mode ordering checks; user-mode caption
+// check against the live 50° header). Router / prose / engine math /
+// JASON_ANCHOR are unchanged.
+//
 // Invocation: `npm run audit:next-moves-shape-aware`.
 
 import { readFileSync } from "node:fs";
@@ -233,6 +248,12 @@ function runAudit(): AssertionResult[] {
   }
 
   // ── 8. prose-no-engine-vocabulary-leak ──────────────────────────────
+  // CC-142 realignment: the register-based section is now clinician-
+  // only, so the leak check anchors against the **clinician** mode's
+  // `## Next Moves` body (the section that carries the router's prose
+  // verbatim). The user-mode 50° `## Your Next Three Moves — From
+  // Grip to Aim` body is ALSO checked — it's the user-facing section
+  // that replaced the old user-mode `## Next Moves`.
   {
     const banList = [
       "V/O",
@@ -245,65 +266,124 @@ function runAudit(): AssertionResult[] {
       "stateLoad",
       "victim_owner",
     ];
+    const jasonClinicianMd = renderMirrorAsMarkdown({
+      constitution: jasonConstitution,
+      includeBeliefAnchor: false,
+      generatedAt: new Date("2026-05-17T00:00:00Z"),
+      renderMode: "clinician",
+    });
     const jasonUserMd = renderMirrorAsMarkdown({
       constitution: jasonConstitution,
       includeBeliefAnchor: false,
       generatedAt: new Date("2026-05-17T00:00:00Z"),
       renderMode: "user",
     });
-    const startIdx = jasonUserMd.indexOf("## Next Moves");
-    const endMarker = "## Path";
-    const endIdx = jasonUserMd.indexOf(endMarker, startIdx);
-    const nextMovesBody =
-      startIdx > -1 && endIdx > -1
-        ? jasonUserMd.slice(startIdx, endIdx)
-        : "";
-    const leaks = banList.filter((term) =>
-      nextMovesBody.toLowerCase().includes(term.toLowerCase())
+    // Slice a section between its header and the next `## ` header
+    // (or end of document). Empty string if the header isn't present.
+    function sliceSection(md: string, header: string): string {
+      const start = md.indexOf(header);
+      if (start < 0) return "";
+      const rest = md.slice(start + header.length);
+      const nextHeader = rest.search(/\n## /);
+      return nextHeader < 0 ? md.slice(start) : md.slice(start, start + header.length + nextHeader);
+    }
+    const clinicianBody = sliceSection(jasonClinicianMd, "## Next Moves");
+    const userBody = sliceSection(
+      jasonUserMd,
+      "## Your Next Three Moves — From Grip to Aim"
     );
+    // The clinician body legitimately carries an italic `_Register:
+    // <code>_` caption (asserted by #10 below). The caption is
+    // clinician-facing metadata, not user-facing prose, so the
+    // register-code term inside it is by design. Strip the caption
+    // line before banlist scanning so #8 measures prose-leaks only.
+    const clinicianBodyWithoutCaption = clinicianBody.replace(
+      /_Register: [^_]+_\s*/g,
+      ""
+    );
+    const clinicianLeaks = banList.filter((term) =>
+      clinicianBodyWithoutCaption.toLowerCase().includes(term.toLowerCase())
+    );
+    const userLeaks = banList.filter((term) =>
+      userBody.toLowerCase().includes(term.toLowerCase())
+    );
+    const ok =
+      clinicianLeaks.length === 0 &&
+      clinicianBody.length > 0 &&
+      userLeaks.length === 0 &&
+      userBody.length > 0;
     results.push(
-      leaks.length === 0 && nextMovesBody.length > 0
+      ok
         ? {
             ok: true,
             assertion: "prose-no-engine-vocabulary-leak",
-            detail: `user-mode Next Moves body (${nextMovesBody.length} chars): 0 banlist hits`,
+            detail: `clinician Next Moves body (${clinicianBody.length} chars) + user 50° Next-Three-Moves body (${userBody.length} chars): 0 banlist hits each`,
           }
         : {
             ok: false,
             assertion: "prose-no-engine-vocabulary-leak",
-            detail: `bodyLen=${nextMovesBody.length} leaks=${leaks.join(", ")}`,
+            detail: `clinicianLen=${clinicianBody.length} clinicianLeaks=[${clinicianLeaks.join(",")}] userLen=${userBody.length} userLeaks=[${userLeaks.join(",")}]`,
           }
     );
   }
 
-  // ── 9. render-section-emits-after-grip-before-path ──────────────────
+  // ── 9. render-section-emits-in-the-right-place ──────────────────────
+  // CC-142 realignment: section ordering is checked in BOTH modes
+  // against the live header set.
+  //   - clinician (post-CC-120): `## Next Moves` appears after
+  //     `## Your Grip` and before `## Path — Gait`.
+  //   - user (post-CC-132 50° outline): `## Your Next Three Moves —
+  //     From Grip to Aim` appears after `## Your Grip` and before
+  //     `## Closing Read`.
+  // Both ordering checks must hold; the intent "the Next-Moves
+  // section emits in the right place" is preserved end-to-end across
+  // the two surfaces.
   {
-    const md = renderMirrorAsMarkdown({
+    const clinicianMd = renderMirrorAsMarkdown({
+      constitution: jasonConstitution,
+      includeBeliefAnchor: false,
+      generatedAt: new Date("2026-05-17T00:00:00Z"),
+      renderMode: "clinician",
+    });
+    const userMd = renderMirrorAsMarkdown({
       constitution: jasonConstitution,
       includeBeliefAnchor: false,
       generatedAt: new Date("2026-05-17T00:00:00Z"),
       renderMode: "user",
     });
-    const gripIdx = md.indexOf("Grip Pattern");
-    const nextMovesIdx = md.indexOf("## Next Moves");
-    const pathIdx = md.indexOf("## Path");
-    const ok =
-      gripIdx > -1 &&
-      nextMovesIdx > -1 &&
-      pathIdx > -1 &&
-      gripIdx < nextMovesIdx &&
-      nextMovesIdx < pathIdx;
+    // Clinician contract.
+    const clGripIdx = clinicianMd.indexOf("## Your Grip");
+    const clNextIdx = clinicianMd.indexOf("## Next Moves");
+    const clPathIdx = clinicianMd.indexOf("## Path — Gait");
+    const clinicianOk =
+      clGripIdx > -1 &&
+      clNextIdx > -1 &&
+      clPathIdx > -1 &&
+      clGripIdx < clNextIdx &&
+      clNextIdx < clPathIdx;
+    // User-mode 50° contract.
+    const uGripIdx = userMd.indexOf("## Your Grip");
+    const uNextIdx = userMd.indexOf(
+      "## Your Next Three Moves — From Grip to Aim"
+    );
+    const uClosingIdx = userMd.indexOf("## Closing Read");
+    const userOk =
+      uGripIdx > -1 &&
+      uNextIdx > -1 &&
+      uClosingIdx > -1 &&
+      uGripIdx < uNextIdx &&
+      uNextIdx < uClosingIdx;
     results.push(
-      ok
+      clinicianOk && userOk
         ? {
             ok: true,
-            assertion: "render-section-emits-after-grip-before-path",
-            detail: `order: grip(${gripIdx}) < nextMoves(${nextMovesIdx}) < path(${pathIdx})`,
+            assertion: "render-section-emits-in-the-right-place",
+            detail: `clinician: grip(${clGripIdx}) < nextMoves(${clNextIdx}) < path(${clPathIdx}); user-50°: grip(${uGripIdx}) < next3moves(${uNextIdx}) < closing(${uClosingIdx})`,
           }
         : {
             ok: false,
-            assertion: "render-section-emits-after-grip-before-path",
-            detail: `bad order: grip=${gripIdx} nextMoves=${nextMovesIdx} path=${pathIdx}`,
+            assertion: "render-section-emits-in-the-right-place",
+            detail: `clinicianOk=${clinicianOk} (grip=${clGripIdx} next=${clNextIdx} path=${clPathIdx}); userOk=${userOk} (grip=${uGripIdx} next3=${uNextIdx} closing=${uClosingIdx})`,
           }
     );
   }
@@ -333,6 +413,13 @@ function runAudit(): AssertionResult[] {
   }
 
   // ── 11. render-user-mode-omits-register-caption ─────────────────────
+  // CC-142 realignment: anchored to the live user-mode 50° next-moves
+  // header AND to the full user-mode body (no `_Register: …_` caption
+  // anywhere in user mode, since the 50° outline never carries it
+  // and the entire register section is clinician-gated). The
+  // pre-CC-142 version sliced `## Next Moves … ## Path` in user
+  // mode — both headers absent, slice was empty, and "empty has no
+  // caption" passed vacuously.
   {
     const md = renderMirrorAsMarkdown({
       constitution: jasonConstitution,
@@ -340,21 +427,26 @@ function runAudit(): AssertionResult[] {
       generatedAt: new Date("2026-05-17T00:00:00Z"),
       renderMode: "user",
     });
-    const startIdx = md.indexOf("## Next Moves");
-    const endIdx = md.indexOf("## Path", startIdx);
-    const body = startIdx > -1 && endIdx > -1 ? md.slice(startIdx, endIdx) : "";
-    const ok = !/_Register: /.test(body);
+    // The 50° next-moves section must exist (proves we're checking
+    // the real surface, not vacuously passing on missing headers).
+    const nextThreeMovesIdx = md.indexOf(
+      "## Your Next Three Moves — From Grip to Aim"
+    );
+    // The user-mode mask + 50° outline drop the register caption from
+    // every section — assert it's absent anywhere in user mode.
+    const sectionPresent = nextThreeMovesIdx > -1;
+    const captionAbsent = !/_Register: /.test(md);
     results.push(
-      ok
+      sectionPresent && captionAbsent
         ? {
             ok: true,
             assertion: "render-user-mode-omits-register-caption",
-            detail: `user mode: no _Register: …_ caption in Next Moves body`,
+            detail: `user 50° next-moves section present at idx ${nextThreeMovesIdx}; no _Register: caption anywhere in user-mode output`,
           }
         : {
             ok: false,
             assertion: "render-user-mode-omits-register-caption",
-            detail: `user mode leaked the clinician _Register: …_ caption`,
+            detail: `sectionPresent=${sectionPresent}; captionAbsent=${captionAbsent} (caption appeared somewhere in user-mode body)`,
           }
     );
   }

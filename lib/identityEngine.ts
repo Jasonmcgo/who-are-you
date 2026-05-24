@@ -2531,7 +2531,36 @@ function attachCrossSignalDriverInference(
     // the post-process here; the agreement-lift rule joins it. The
     // confidence-value mutation flips the lens_stack field directly,
     // matching the CC's intent.
+    // CC-141 §B — scope the lift on CC-141's reason flags. The lift
+    // may resolve ONLY reasons that dominant agreement actually
+    // speaks to: `aux-ambiguous` (the aux call was tight; a clean
+    // dominant signature corroborates the canonical pair) and
+    // `dominant-mirror` (Si↔Se / Ni↔Ne attitude ambiguity; cross-
+    // signal converging on Si vs. Se disambiguates).
+    //
+    // The lift may NOT override:
+    //   - `ns-valence` — contamination is on the N/S axis; dominant
+    //     agreement (which fires on the JUDGING dominant for Megan-
+    //     shape) doesn't speak to N/S.
+    //   - `judging-cooccurrence` — Ti+Fi or Te+Fe contamination is
+    //     on the perceiving-vs-judging mix; dominant agreement on
+    //     either side can't reconcile both being claimed.
+    //   - `thin-floor` — the type instrument was too sparse to read
+    //     at all; a strong cross-signal can't manufacture data.
+    // When any of those flags is present, lift is suppressed and the
+    // CC-141 §C clarifier triggers still fire on the same flags via
+    // the parallel pre-lift `confidenceLowReasons` channel.
+    const blockingReasons: ReadonlyArray<string> = [
+      "ns-valence",
+      "judging-cooccurrence",
+      "thin-floor",
+    ];
+    const liftIsBlocked =
+      (constitution.lens_stack.confidenceLowReasons ?? []).some((r) =>
+        blockingReasons.includes(r)
+      );
     if (
+      !liftIsBlocked &&
       constitution.lens_stack.confidence === "low" &&
       cs.inferredDriver === constitution.lens_stack.dominant &&
       cs.inferredDriverScore >= AGREEMENT_LIFT_INFERRED_SCORE_FLOOR &&
