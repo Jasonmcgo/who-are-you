@@ -50,9 +50,35 @@ const PLOT_TOP = MARGIN_TOP;              // 24
 const GRIP_ZONE_SCORE_RADIUS = 50;
 const GRIP_ZONE_OPACITY = 0.15;
 
+// CC-164.1 — Target Zone NE quadrant box. The destination region:
+// high-Goal AND high-Soul, the upper-right quarter of the plot
+// (Goal ≥ 50 AND Soul ≥ 50, the "Giving / Presence" / Purposeful-
+// Presence quadrant). Conceptual mirror of the Grip Zone: SW
+// low-magnitude triangle (stuck-in-FUD) vs NE high-magnitude
+// quadrant (reach to aim for). They share NO scoring region, so
+// they don't visually fight.
+//
+// CC-164's first attempt (an angular 42–58° wedge from origin)
+// bled through the center and overlapped the Grip Zone — visually
+// reading as a corridor the line was already inside rather than a
+// destination. The NE-quadrant box reads correctly: as Grip drops,
+// the usable line extends out toward the green region.
+//
+// `TARGET_ZONE_SCORE_FLOOR` shares the same score-space value as
+// `GRIP_ZONE_SCORE_RADIUS` so the two zones stay tied to one
+// number (mirror regions; one threshold).
+const TARGET_ZONE_SCORE_FLOOR = 50;
+const TARGET_ZONE_FILL = "#3f8f5f";   // muted green — distinct from warm CONE_COLOR
+const TARGET_ZONE_OPACITY = 0.12;     // slightly under GRIP_ZONE_OPACITY (0.15) — cool zone reads quieter than warm
+
 // Legend block (below plot area).
 const LEGEND_START_Y = ORIGIN_Y + 22;     // 246
-const LEGEND_LINE_HEIGHT = 14;
+// CC-164 — tightened from 14 → 11 to accommodate the new target-zone
+// legend row inside the unchanged VIEWBOX_HEIGHT (320). With 7 worst-
+// case rows (usable + potential + tolerance + grip-drag + grip-zone
+// + target-zone + primal), the bottom row's text baseline lands at
+// 246 + 6*11 + 3 = 315, safely under 320.
+const LEGEND_LINE_HEIGHT = 11;
 const LEGEND_SWATCH_X1 = 22;
 const LEGEND_SWATCH_X2 = 42;
 const LEGEND_TEXT_X = 48;
@@ -234,6 +260,23 @@ function svgGripTriangle(): string {
   const c = mapToSvg(0, GRIP_ZONE_SCORE_RADIUS);
   const points = `${a.x},${a.y} ${b.x},${b.y} ${c.x},${c.y}`;
   return `<polygon points="${points}" fill="${CONE_COLOR}" opacity="${GRIP_ZONE_OPACITY}" data-element="grip-zone-triangle" />`;
+}
+
+// CC-164.1 — Target Zone NE quadrant. Box vertices in score space at
+// the four corners of the upper-right quarter (Goal ≥ 50 AND Soul
+// ≥ 50): (50,50), (100,50), (100,100), (50,100). Mapped through
+// the canonical score→SVG mapper. Never reaches toward origin; no
+// overlap with the SW Grip Zone. Both the floor (50) and the box
+// edge (100) are pinned to score-space constants — `mapToSvg`
+// handles the geometry change if any plot bound ever shifts.
+function svgTargetZoneQuadrant(): string {
+  const f = TARGET_ZONE_SCORE_FLOOR;
+  const sw = mapToSvg(f, f);
+  const se = mapToSvg(100, f);
+  const ne = mapToSvg(100, 100);
+  const nw = mapToSvg(f, 100);
+  const points = `${sw.x},${sw.y} ${se.x},${se.y} ${ne.x},${ne.y} ${nw.x},${nw.y}`;
+  return `<polygon points="${points}" fill="${TARGET_ZONE_FILL}" opacity="${TARGET_ZONE_OPACITY}" data-element="target-zone-quadrant" />`;
 }
 
 // Elements 1 + 2: potential trajectory line and usable trajectory line.
@@ -456,6 +499,22 @@ function svgLegend(opts: {
     row++;
   }
 
+  // 6. CC-164 — Target Zone wedge legend, directly below the Grip
+  //    Zone row per the CC. Same swatch shape (small triangle) as the
+  //    Grip Zone for visual parity, just with the green Target Zone
+  //    fill so the reader can map the legend back to the corridor on
+  //    the chart. Always rendered (the target is always worth showing).
+  {
+    const swatchY = rowY();
+    entries.push(
+      `<polygon points="${LEGEND_SWATCH_X1},${swatchY + 5} ${LEGEND_SWATCH_X2},${swatchY + 5} ${LEGEND_SWATCH_X1},${swatchY - 5}" fill="${TARGET_ZONE_FILL}" opacity="${TARGET_ZONE_OPACITY}" />`
+    );
+    entries.push(
+      `<text x="${LEGEND_TEXT_X}" y="${swatchY + 3}" font-size="8" font-family="system-ui, sans-serif" fill="${INK_MUTE}" data-element="legend-target-zone">Green quadrant: Target Zone — the reach to aim for</text>`
+    );
+    row++;
+  }
+
   // 6. Primal annotation (only when high or medium-high confidence).
   if (
     opts.primalPrimary &&
@@ -523,6 +582,10 @@ export function generateTrajectoryChartSvg(
       svgOpen,
       `  ${svgAxes()}`,
       `  ${svgGripTriangle()}`,
+      // CC-164 — Target Zone wedge sits immediately after the Grip
+      // Zone (z-order = source order in SVG): both zones live behind
+      // axis labels and the zero-movement hedge.
+      `  ${svgTargetZoneQuadrant()}`,
       `  ${svgAxisLabels()}`,
       `  ${svgZeroMovement()}`,
       svgClose,
@@ -552,6 +615,10 @@ export function generateTrajectoryChartSvg(
     usableMovement
   );
   const gripTriangle = svgGripTriangle();
+  // CC-164 — Target Zone wedge alongside Grip Zone; both placed early
+  // in the source so they render behind axis labels, cone, lines,
+  // drag marker, and legend (z-order = source order in SVG).
+  const targetZone = svgTargetZoneQuadrant();
   const hedge = isCrisis ? svgCrisisHedge() : "";
   const legend = svgLegend({
     hasTolerance: toleranceDegrees !== null,
@@ -570,6 +637,10 @@ export function generateTrajectoryChartSvg(
     svgOpen,
     `  ${svgAxes()}`,
     `  ${gripTriangle}`,
+    // CC-164 — Target Zone wedge immediately after the Grip Zone
+    // (z-order = source order in SVG); both sit behind every drawn
+    // element above.
+    `  ${targetZone}`,
     `  ${svgAxisLabels()}`,
     cornerLabels.length > 0 ? `  ${cornerLabels}` : "",
     cone.length > 0 ? `  ${cone}` : "",

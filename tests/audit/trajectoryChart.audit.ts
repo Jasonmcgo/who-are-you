@@ -854,6 +854,149 @@ function runAudit(): AssertionResult[] {
         }
   );
 
+  // ── 17b. CC-164.1 — target-zone-quadrant polygon vertices ─────────
+  // The Target Zone is the NE quadrant box in score space (Goal ≥ 50
+  // AND Soul ≥ 50), NOT an angular wedge from origin. Vertices:
+  // (50,50), (100,50), (100,100), (50,100). SCORE→SVG mapping is
+  // ORIGIN_X=60, ORIGIN_Y=224, PLOT_SIZE=200 → mapToSvg(g, s) =
+  // (60 + g*2, 224 - s*2). So expected svg points:
+  // (160,124), (260,124), (260,24), (160,24).
+  {
+    const ORIGIN_X = 60, ORIGIN_Y = 224, PLOT_SIZE = 200;
+    function toSvg(g: number, s: number): [number, number] {
+      return [ORIGIN_X + g * (PLOT_SIZE / 100), ORIGIN_Y - s * (PLOT_SIZE / 100)];
+    }
+    const FLOOR = 50;
+    const expectedVerts: Array<[number, number]> = [
+      toSvg(FLOOR, FLOOR),
+      toSvg(100, FLOOR),
+      toSvg(100, 100),
+      toSvg(FLOOR, 100),
+    ];
+    const m = syntheticSvg.match(
+      /<polygon points="([^"]+)"[^>]*data-element="target-zone-quadrant"/
+    );
+    const failures: string[] = [];
+    if (!m) {
+      failures.push("no <polygon data-element=\"target-zone-quadrant\"> in synthetic SVG");
+    } else {
+      const verts = m[1].split(/\s+/).map((p) => {
+        const [x, y] = p.split(",").map(Number);
+        return [x, y] as [number, number];
+      });
+      if (verts.length !== 4) {
+        failures.push(`expected 4 vertices, got ${verts.length}`);
+      } else {
+        for (let i = 0; i < 4; i++) {
+          const [ex, ey] = expectedVerts[i];
+          const [ax, ay] = verts[i];
+          if (Math.abs(ax - ex) > 0.5 || Math.abs(ay - ey) > 0.5) {
+            failures.push(
+              `vertex ${i}: got (${ax.toFixed(2)},${ay.toFixed(2)}), expected (${ex.toFixed(2)},${ey.toFixed(2)}) ±0.5`
+            );
+          }
+        }
+      }
+    }
+    results.push(
+      failures.length === 0
+        ? {
+            ok: true,
+            assertion: "cc164-target-zone-quadrant-vertices-correct",
+            detail: `polygon vertices match NE quadrant box (50,50)→(100,50)→(100,100)→(50,100) (±0.5)`,
+          }
+        : {
+            ok: false,
+            assertion: "cc164-target-zone-quadrant-vertices-correct",
+            detail: failures.slice(0, 5).join(" | "),
+          }
+    );
+  }
+
+  // ── 17b2. CC-164.1 — target-zone polygon must NOT contain origin ──
+  // Guard against any regression to the CC-164 origin-anchored wedge.
+  // The NE-quadrant box has no vertex at the SVG origin (60, 224).
+  {
+    const m = syntheticSvg.match(
+      /<polygon points="([^"]+)"[^>]*data-element="target-zone-quadrant"/
+    );
+    const verts = m
+      ? m[1].split(/\s+/).map((p) => {
+          const [x, y] = p.split(",").map(Number);
+          return [x, y] as [number, number];
+        })
+      : [];
+    const hasOrigin = verts.some(
+      ([x, y]) => Math.abs(x - 60) < 0.5 && Math.abs(y - 224) < 0.5
+    );
+    results.push(
+      !hasOrigin
+        ? {
+            ok: true,
+            assertion: "cc164-target-zone-no-origin-vertex",
+            detail: "polygon does not include svg origin (60,224) — no wedge regression",
+          }
+        : {
+            ok: false,
+            assertion: "cc164-target-zone-no-origin-vertex",
+            detail: "polygon includes origin (60,224) — regressed to origin-anchored wedge",
+          }
+    );
+  }
+
+  // ── 17c. CC-164.1 — target-zone legend row present ─────────────────
+  // The chart legend gets a new row directly below the Grip Zone row
+  // with `data-element="legend-target-zone"` and the chosen wording.
+  {
+    const hasMarker = syntheticSvg.includes(`data-element="legend-target-zone"`);
+    const hasText = syntheticSvg.includes(
+      "Target Zone — the reach to aim for"
+    );
+    results.push(
+      hasMarker && hasText
+        ? {
+            ok: true,
+            assertion: "cc164-target-zone-legend-row-present",
+            detail: "legend-target-zone marker + canonical text present in legend block",
+          }
+        : {
+            ok: false,
+            assertion: "cc164-target-zone-legend-row-present",
+            detail: `marker=${hasMarker} text=${hasText}`,
+          }
+    );
+  }
+
+  // ── 17d. CC-164 — legend rows stay inside the 320 viewBox ──────────
+  // After CC-164 added a row, LEGEND_LINE_HEIGHT was tightened from
+  // 14 → 11 so the worst-case 7-row stack still fits. Verify the
+  // last <text>'s y attribute in the synthetic SVG (which fires the
+  // grip-drag + tolerance + grip-zone + target-zone + primal rows)
+  // stays under 320.
+  {
+    const textYs: number[] = [];
+    const re = /<text[^>]*y="([0-9.]+)"/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(syntheticSvg)) !== null) {
+      const y = Number(m[1]);
+      if (y >= 246 && y <= 320) textYs.push(y);
+    }
+    const maxY = textYs.length > 0 ? Math.max(...textYs) : 0;
+    results.push(
+      maxY > 0 && maxY < 320
+        ? {
+            ok: true,
+            assertion: "cc164-legend-rows-fit-in-viewbox",
+            detail: `${textYs.length} legend-block text rows; deepest baseline at y=${maxY} (viewBox 320)`,
+          }
+        : {
+            ok: false,
+            assertion: "cc164-legend-rows-fit-in-viewbox",
+            detail: `legend overflowed: deepest y=${maxY} (must be < 320)`,
+          }
+    );
+  }
+
   // ── 18. tolerance-cone-band-smoothing-correct ──────────────────────
   // The *new* 6-band formula (3°/6°/9°/12°/15°/18°).
   const bandCases: Array<{ aim: number; expected: number }> = [
