@@ -129,7 +129,7 @@ export const COHORT_FOLLOW_UPS: Record<string, FollowUpQuestionSet> = {
         id: "fq3_aim_replacement",
         purpose: "aim_replacement",
         question:
-          "If the grip on being-useful softened, what could the same warm attentive instrument be aimed at instead — without becoming someone you're not?",
+          "If your place with the people you love didn't depend on being useful, where could that same attentive care point instead — without you becoming someone you're not?",
         responseMode: "rank_top_3",
         options: [
           {
@@ -271,7 +271,7 @@ export const COHORT_FOLLOW_UPS: Record<string, FollowUpQuestionSet> = {
         id: "fq3_aim_replacement",
         purpose: "aim_replacement",
         question:
-          "If the grip on holding the room softened, what could the same care and seeing be aimed at instead?",
+          "If carrying the room's emotional weather felt less necessary, where could that same care and seeing point instead?",
         responseMode: "choose_one",
         options: [
           {
@@ -547,7 +547,7 @@ export const COHORT_FOLLOW_UPS: Record<string, FollowUpQuestionSet> = {
         id: "fq3_aim_replacement",
         purpose: "aim_replacement",
         question:
-          "If being-needed softened as the measure, what could the same warm attention be aimed at instead?",
+          "If being needed weren't the thing that proved you matter, where could that same attentive care point instead?",
         responseMode: "choose_one",
         options: [
           {
@@ -688,7 +688,7 @@ export const COHORT_FOLLOW_UPS: Record<string, FollowUpQuestionSet> = {
         id: "fq3_aim_replacement",
         purpose: "aim_replacement",
         question:
-          "If the grip on the proven plan softened, what could the same steadiness be aimed at instead?",
+          "If holding to the plan that already works felt less necessary, where could that same steadiness point instead?",
         responseMode: "choose_one",
         options: [
           {
@@ -988,7 +988,7 @@ export const COHORT_FOLLOW_UPS: Record<string, FollowUpQuestionSet> = {
         id: "fq3_aim_replacement",
         purpose: "aim_replacement",
         question:
-          "If the grip on building the model softened, what action could the same instrument be aimed at instead?",
+          "If building the model didn't have to be the answer, where could that same focus point instead?",
         responseMode: "choose_one",
         options: [
           {
@@ -1294,7 +1294,7 @@ export const COHORT_FOLLOW_UPS: Record<string, FollowUpQuestionSet> = {
         id: "fq3_aim_replacement",
         purpose: "aim_replacement",
         question:
-          "If the grip on being right softened, where could the same focus be aimed instead?",
+          "If being right mattered less, where could that same focus point instead?",
         responseMode: "choose_one",
         options: [
           {
@@ -1424,7 +1424,7 @@ export const COHORT_FOLLOW_UPS: Record<string, FollowUpQuestionSet> = {
           },
           {
             label: "Respect",
-            text: "Respect — staying in the register people defer to.",
+            text: "Respect — staying the person other people defer to.",
             tags: ["release-respect"],
             interpretation: "Release-pull: respect-maintenance.",
           },
@@ -1446,7 +1446,7 @@ export const COHORT_FOLLOW_UPS: Record<string, FollowUpQuestionSet> = {
         id: "fq3_aim_replacement",
         purpose: "aim_replacement",
         question:
-          "If the grip on reputation softened, what would real freedom — usable, not performed — actually look like?",
+          "If your standing weren't on the line every day, what would real freedom — useful, not performed — actually look like for you?",
         responseMode: "choose_one",
         options: [
           {
@@ -1560,7 +1560,7 @@ export const COHORT_FOLLOW_UPS: Record<string, FollowUpQuestionSet> = {
           },
           {
             label: "Team",
-            text: "The team — people working alongside me who'd register the gap.",
+            text: "The team — people working alongside me who'd notice if the gap opened.",
             tags: ["release-team-disappointment"],
             interpretation: "Release-pull: lateral standing.",
           },
@@ -1594,7 +1594,7 @@ export const COHORT_FOLLOW_UPS: Record<string, FollowUpQuestionSet> = {
         id: "fq3_aim_replacement",
         purpose: "aim_replacement",
         question:
-          "If achievement softened as proof, what could the same care and capability be aimed at instead?",
+          "If you didn't need the next achievement to prove anything, where could that same care and capability point instead?",
         responseMode: "choose_one",
         options: [
           {
@@ -2073,7 +2073,7 @@ export const COHORT_FOLLOW_UPS: Record<string, FollowUpQuestionSet> = {
         id: "fq3_aim_replacement",
         purpose: "aim_replacement",
         question:
-          "If the grip on the framework softened, what action could the same instrument be aimed at instead?",
+          "If the framework didn't have to hold everything together, where could that same focus point instead?",
         responseMode: "choose_one",
         options: [
           {
