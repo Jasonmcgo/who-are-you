@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- CC-151 — macOS launchd agent that runs the local DB backup on a
+       weekly cadence. Copy this file (or symlink it) into
+       ~/Library/LaunchAgents/ and load it with `launchctl bootstrap`. See
+       docs/runbooks/db-restore.md for the install / unload commands. -->
+
+  <key>Label</key>
+  <string>com.who-are-you.db-backup</string>
+
+  <!-- Run /bin/bash to invoke the backup script. The script itself sources
+       .env.local by absolute path inside the repo, so the plist doesn't
+       need to carry the DATABASE_URL. -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/jasondmcgovernimac/Desktop/who-are-you/scripts/backup-db.sh</string>
+  </array>
+
+  <!-- Working directory matches the repo so any relative paths resolve
+       sanely. The script uses absolute paths internally, so this is
+       belt-and-suspenders. -->
+  <key>WorkingDirectory</key>
+  <string>/Users/jasondmcgovernimac/Desktop/who-are-you</string>
+
+  <!-- Weekly cadence: Sunday at 03:00 local time. Pick a quiet hour so the
+       dump never collides with anything else on the laptop. -->
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Weekday</key>
+    <integer>0</integer>
+    <key>Hour</key>
+    <integer>3</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+
+  <!-- If the laptop is asleep or off at 03:00 Sunday, run the job at the
+       next wake. Without RunAtLoad=false we'd also fire once at load. -->
+  <key>RunAtLoad</key>
+  <false/>
+
+  <!-- Logs. The backup dir lives in $HOME and is in .gitignore. Logs land
+       alongside the dumps so the same directory is the single forensic
+       site if a backup ever fails. -->
+  <key>StandardOutPath</key>
+  <string>/Users/jasondmcgovernimac/who-are-you-backups/backup.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/jasondmcgovernimac/who-are-you-backups/backup.err.log</string>
+
+  <!-- Inherit PATH from the user's interactive shell wouldn't work under
+       launchd; declare the postgresql@16 bin path explicitly so pg_dump
+       resolves. The script tolerates either Homebrew layout. -->
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/opt/postgresql@16/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
+</dict>
+</plist>

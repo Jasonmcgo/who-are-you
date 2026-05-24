@@ -69,3 +69,11 @@ question-bank-relationship-table-v[3-9]*.xlsx
 # tsconfig build info (regenerated locally, sandbox-permission issues)
 tsconfig.tsbuildinfo
 .commit-msg.txt
+
+# CC-151 — local Postgres backup artifacts. Dumps contain real user PII
+# (names, emails, answers); never commit. Default location is
+# ~/who-are-you-backups/ (outside the repo); override via $BACKUP_DIR.
+# Belt-and-suspenders: ignore *.dump anywhere in the tree in case a dump
+# ever lands inside the repo by accident.
+*.dump
+/who-are-you-backups/
