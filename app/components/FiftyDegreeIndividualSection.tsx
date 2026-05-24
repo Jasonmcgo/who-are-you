@@ -25,7 +25,17 @@ import {
 } from "../../lib/fiftyDegreeIndividual";
 import { generateTrajectoryChartSvgFromConstitution } from "../../lib/trajectoryChart";
 import { composeReportCallouts } from "../../lib/composeReportCallouts";
-import { SHAPE_CARD_QUESTION } from "../../lib/cardAssets";
+// CC-145 — single-sourced body-card + grip field map (shared with
+// the markdown composer in `lib/fiftyDegreeIndividual.ts` so the
+// two surfaces can't drift on Strength / Growth Edge / Practice).
+import {
+  BODY_CARDS,
+  bodyCardFieldsFor,
+  bodyGripBlockFor,
+} from "../../lib/bodyCardFieldMap";
+import { renderDriveDistributionDonut } from "../../lib/driveDistributionChart";
+import { renderOceanDashboardSVG } from "../../lib/oceanDashboard";
+import { composeDispositionSummaryLine } from "../../lib/renderMirror";
 import type { ProseCardId } from "../../lib/proseRewriteLlm";
 
 export interface FiftyDegreeIndividualSectionProps {
@@ -87,13 +97,6 @@ function firstSentence(s: string): string {
   const idx = s.search(/[.!?](\s|$)/);
   if (idx < 0) return s.trim();
   return s.slice(0, idx + 1).trim();
-}
-
-function firstTwoSentences(s: string): string {
-  if (!s) return "";
-  const re = /^[\s\S]*?[.!?](\s|$)(?:[\s\S]*?[.!?](\s|$))?/;
-  const m = s.match(re);
-  return (m?.[0] ?? s).trim();
 }
 
 function stripAccuracyPrompt(prompt: string): string {
@@ -175,7 +178,11 @@ export default function FiftyDegreeIndividualSection({
         corePattern={liveRewrites.corePattern}
       />
       <BodyCards constitution={constitution} />
-      <WorkLoveGiving pathTriptych={liveRewrites.pathTriptych} />
+      <DispositionSignalMix constitution={constitution} />
+      <WorkLoveGiving
+        constitution={constitution}
+        pathTriptych={liveRewrites.pathTriptych}
+      />
       <OpenTensions constitution={constitution} />
       <Keystone constitution={constitution} keystone={liveRewrites.keystone} />
       <NextMoves constitution={constitution} pathTriptych={liveRewrites.pathTriptych} />
@@ -463,6 +470,9 @@ function PatternAndGrip({
       : "Same protection without the cost — held with a lighter hand.";
     rows.push({ grip: taxonomy.distortedStrategy.text, aim: aimCell });
   }
+  // CC-145 — full Grip block sourced from `bodyGripBlockFor` so the
+  // React surface matches the markdown composer's emit.
+  const block = bodyGripBlockFor(constitution);
   return (
     <section>
       <H2>{possessive} Pattern</H2>
@@ -482,6 +492,7 @@ function PatternAndGrip({
                 borderCollapse: "collapse",
                 fontSize: 14,
                 marginTop: 8,
+                marginBottom: 12,
               }}
             >
               <thead>
@@ -500,49 +511,75 @@ function PatternAndGrip({
               </tbody>
             </table>
           ) : null}
+          {block ? (
+            <>
+              <P text={block.narrative} />
+              <p
+                className="font-serif"
+                style={{ fontSize: 15, lineHeight: 1.6, margin: "8px 0 4px 0" }}
+              >
+                <strong>Surface Grip:</strong> {renderInline(block.surfaceGrip)}
+              </p>
+              <p
+                className="font-serif"
+                style={{ fontSize: 15, lineHeight: 1.6, margin: "4px 0" }}
+              >
+                <strong>Grip Pattern:</strong> {renderInline(block.patternLabel)}
+              </p>
+              <p
+                className="font-serif"
+                style={{ fontSize: 15, lineHeight: 1.6, margin: "4px 0" }}
+              >
+                <strong>Underlying Question:</strong>{" "}
+                {renderInline(block.underlyingQuestion)}
+              </p>
+              {block.distortedStrategy.length > 0 ? (
+                <p
+                  className="font-serif"
+                  style={{ fontSize: 15, lineHeight: 1.6, margin: "4px 0" }}
+                >
+                  <strong>Distorted Strategy:</strong>{" "}
+                  {renderInline(block.distortedStrategy)}
+                </p>
+              ) : null}
+              {block.healthyGift.length > 0 ? (
+                <p
+                  className="font-serif"
+                  style={{ fontSize: 15, lineHeight: 1.6, margin: "4px 0" }}
+                >
+                  <strong>Healthy Gift:</strong>{" "}
+                  {renderInline(block.healthyGift)}
+                </p>
+              ) : null}
+              {block.contributingGrips.length > 0 ? (
+                <p
+                  className="font-serif"
+                  style={{ fontSize: 15, lineHeight: 1.6, margin: "4px 0" }}
+                >
+                  <strong>Contributing grips:</strong>{" "}
+                  {block.contributingGrips.join(", ")}
+                </p>
+              ) : null}
+              {block.subRegister ? (
+                <p
+                  className="font-serif"
+                  style={{ fontSize: 15, lineHeight: 1.6, margin: "4px 0" }}
+                >
+                  <strong>Sub-register:</strong> {renderInline(block.subRegister)}
+                </p>
+              ) : null}
+              <p
+                className="font-serif"
+                style={{ fontSize: 15, lineHeight: 1.6, margin: "4px 0" }}
+              >
+                <strong>Confidence:</strong> {renderInline(block.confidence)}
+              </p>
+            </>
+          ) : null}
         </>
       ) : null}
     </section>
   );
-}
-
-interface BodyCardSpec {
-  name: string;
-  body: string;
-  source:
-    | "lens"
-    | "compass"
-    | "hands"
-    | "conviction"
-    | "gravity"
-    | "trust"
-    | "weather"
-    | "fire";
-}
-
-const BODY_CARDS_REACT: BodyCardSpec[] = [
-  { name: "Lens", body: "Eyes", source: "lens" },
-  { name: "Compass", body: "Heart", source: "compass" },
-  { name: "Hands", body: "Work", source: "hands" },
-  { name: "Voice", body: "Conviction", source: "conviction" },
-  { name: "Gravity", body: "Spine", source: "gravity" },
-  { name: "Trust", body: "Ears", source: "trust" },
-  { name: "Weather", body: "Nervous System", source: "weather" },
-  { name: "Fire", body: "Immune Response", source: "fire" },
-];
-
-function bodyCardAnswerReact(
-  source: BodyCardSpec["source"],
-  constitution: InnerConstitution
-): string {
-  if (source === "hands") {
-    const h = constitution.handsCard;
-    if (!h) return "";
-    return firstTwoSentences(h.openingLine);
-  }
-  const card = constitution.shape_outputs?.[source];
-  if (!card) return "";
-  return firstTwoSentences(card.cardHeader);
 }
 
 function BodyCards({ constitution }: { constitution: InnerConstitution }) {
@@ -554,17 +591,13 @@ function BodyCards({ constitution }: { constitution: InnerConstitution }) {
         style={{ fontSize: 14, color: "var(--ink-soft)", margin: "0 0 8px 0" }}
       >
         Eight body parts, eight pressure points. Each card names one register
-        of your shape — the question that lives there and the one-line answer
-        your week is currently giving.
+        of your shape — the question that lives there, the strength it carries,
+        the growth edge it surfaces, and a practice you can apply.
       </p>
       <div style={{ display: "grid", gap: 12 }}>
-        {BODY_CARDS_REACT.map((card, i) => {
+        {BODY_CARDS.map((card, i) => {
           const num = String(i + 1).padStart(2, "0");
-          const q =
-            card.source === "hands"
-              ? "What you build and carry"
-              : SHAPE_CARD_QUESTION[card.source];
-          const a = bodyCardAnswerReact(card.source, constitution);
+          const fields = bodyCardFieldsFor(card.source, constitution);
           return (
             <div
               key={card.source}
@@ -585,17 +618,48 @@ function BodyCards({ constitution }: { constitution: InnerConstitution }) {
               >
                 {num} · {card.name} · {card.body}
               </p>
-              <p
-                className="font-serif italic"
-                style={{
-                  fontSize: 15,
-                  color: "var(--ink-soft)",
-                  margin: "0 0 6px 0",
-                }}
-              >
-                {q}
-              </p>
-              {a ? <P text={a} /> : null}
+              {fields ? (
+                <>
+                  <p
+                    className="font-serif italic"
+                    style={{
+                      fontSize: 15,
+                      color: "var(--ink-soft)",
+                      margin: "0 0 6px 0",
+                    }}
+                  >
+                    {fields.question}
+                  </p>
+                  <p
+                    className="font-serif italic"
+                    style={{
+                      fontSize: 15,
+                      color: "var(--ink-soft)",
+                      margin: "0 0 10px 0",
+                    }}
+                  >
+                    {fields.readLede}
+                  </p>
+                  <p
+                    className="font-serif"
+                    style={{ fontSize: 15, lineHeight: 1.6, margin: "0 0 8px 0" }}
+                  >
+                    <strong>Strength</strong> — {renderInline(fields.strength)}
+                  </p>
+                  <p
+                    className="font-serif"
+                    style={{ fontSize: 15, lineHeight: 1.6, margin: "0 0 8px 0" }}
+                  >
+                    <strong>Growth Edge</strong> — {renderInline(fields.growthEdge)}
+                  </p>
+                  <p
+                    className="font-serif"
+                    style={{ fontSize: 15, lineHeight: 1.6, margin: "0 0 0 0" }}
+                  >
+                    <strong>{fields.practiceLabel}</strong> — {renderInline(fields.practice)}
+                  </p>
+                </>
+              ) : null}
             </div>
           );
         })}
@@ -604,26 +668,72 @@ function BodyCards({ constitution }: { constitution: InnerConstitution }) {
   );
 }
 
+// CC-145 — Disposition Signal Mix React mirror. Renders the same
+// compact section the markdown composer emits: summary line + SVG.
+function DispositionSignalMix({
+  constitution,
+}: {
+  constitution: InnerConstitution;
+}) {
+  const mix = constitution.ocean?.dispositionSignalMix;
+  if (!mix) return null;
+  const svg = renderOceanDashboardSVG(mix);
+  const summary = composeDispositionSummaryLine(mix);
+  return (
+    <section>
+      <H2>Disposition Signal Mix</H2>
+      <p
+        className="font-serif italic"
+        style={{ fontSize: 15, color: "var(--ink-soft)", margin: "0 0 8px 0" }}
+      >
+        {summary}
+      </p>
+      <div
+        style={{ margin: "8px 0", maxWidth: 480 }}
+        dangerouslySetInnerHTML={{ __html: svg }}
+      />
+    </section>
+  );
+}
+
 function WorkLoveGiving({
+  constitution,
   pathTriptych,
 }: {
+  constitution: InnerConstitution;
   pathTriptych: string | null;
 }) {
-  if (!pathTriptych) return null;
+  // CC-145 — Drive distribution donut renders at the top of this
+  // section when Path drive data is available (mirrors the markdown
+  // composer's placement).
+  const drive = constitution.shape_outputs?.path.drive;
   const beats: Array<{ label: string; text: string }> = [];
-  for (const label of ["Work", "Love", "Give"] as const) {
-    const body = extractPathBeat(pathTriptych, label);
-    if (body) {
-      beats.push({
-        label: label === "Give" ? "Giving" : label,
-        text: body,
-      });
+  if (pathTriptych) {
+    for (const label of ["Work", "Love", "Give"] as const) {
+      const body = extractPathBeat(pathTriptych, label);
+      if (body) {
+        beats.push({
+          label: label === "Give" ? "Giving" : label,
+          text: body,
+        });
+      }
     }
   }
-  if (beats.length === 0) return null;
+  if (!drive && beats.length === 0) return null;
   return (
     <section>
       <H2>Work, Love, and Giving</H2>
+      {drive ? (
+        <div
+          style={{ margin: "0 0 16px 0", maxWidth: 480 }}
+          dangerouslySetInnerHTML={{
+            __html: renderDriveDistributionDonut(
+              drive.distribution,
+              drive.claimed?.first
+            ),
+          }}
+        />
+      ) : null}
       {beats.map((b, i) => (
         <div key={i} style={{ marginBottom: 12 }}>
           <p

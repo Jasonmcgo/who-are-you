@@ -34,8 +34,17 @@ import {
   extractV3Section,
   extractV3PathTriptych,
 } from "./v3SectionInputs";
-import { SHAPE_CARD_QUESTION } from "./cardAssets";
 import { composeReportCallouts } from "./composeReportCallouts";
+// CC-145 — single-source body-card + grip field mapping (shared with
+// FiftyDegreeIndividualSection.tsx so the two surfaces can't drift).
+import {
+  BODY_CARDS as SHARED_BODY_CARDS,
+  bodyCardFieldsFor,
+  bodyGripBlockFor,
+} from "./bodyCardFieldMap";
+import { renderDriveDistributionDonut } from "./driveDistributionChart";
+import { renderOceanDashboardSVG } from "./oceanDashboard";
+import { composeDispositionSummaryLine } from "./renderMirror";
 
 // ─────────────────────────────────────────────────────────────────────
 // Constants
@@ -104,46 +113,9 @@ export const FOUR_FORCES_CANON: Record<
   },
 };
 
-/**
- * Body Cards in Michele's outline order (8 cards = 7 ShapeOutputs cards
- * + handsCard). Each entry carries the display name, the body part, and
- * the constitution path the one-line answer is sliced from.
- */
-type BodyPart =
-  | "Eyes"
-  | "Heart"
-  | "Work"
-  | "Conviction"
-  | "Spine"
-  | "Ears"
-  | "Nervous System"
-  | "Immune Response";
-
-interface BodyCardSpec {
-  name: string;
-  body: BodyPart;
-  /** Which ShapeOutputs key drives the question + answer, or "hands" for handsCard. */
-  source:
-    | "lens"
-    | "compass"
-    | "hands"
-    | "conviction"
-    | "gravity"
-    | "trust"
-    | "weather"
-    | "fire";
-}
-
-const BODY_CARDS: BodyCardSpec[] = [
-  { name: "Lens", body: "Eyes", source: "lens" },
-  { name: "Compass", body: "Heart", source: "compass" },
-  { name: "Hands", body: "Work", source: "hands" },
-  { name: "Voice", body: "Conviction", source: "conviction" },
-  { name: "Gravity", body: "Spine", source: "gravity" },
-  { name: "Trust", body: "Ears", source: "trust" },
-  { name: "Weather", body: "Nervous System", source: "weather" },
-  { name: "Fire", body: "Immune Response", source: "fire" },
-];
+// CC-145 — body card spec + ordering live in `lib/bodyCardFieldMap.ts`
+// so the markdown composer and the React mirror share the same source.
+const BODY_CARDS = SHARED_BODY_CARDS;
 
 // ─────────────────────────────────────────────────────────────────────
 // Public entry point
@@ -175,6 +147,7 @@ export function composeFiftyDegreeIndividual(
   parts.push(composeTrajectory(inputs, possessive));
   parts.push(composePatternAndGrip(inputs, possessive));
   parts.push(composeBodyCards(inputs));
+  parts.push(composeDispositionSignalMix(inputs));
   parts.push(composeWorkLoveGiving(inputs));
   parts.push(composeOpenTensions(inputs));
   parts.push(composeKeystone(inputs));
@@ -364,6 +337,43 @@ function composePatternAndGrip(
         lines.push(`| ${g} | ${a} |`);
       }
     }
+
+    // CC-145 — full Grip block from `bodyGripBlockFor`, appended below
+    // the GRIP SAYS / AIM SAYS lead-in. Mirrors the Guide's ## Your Grip
+    // emit (narrative + Surface Grip / Grip Pattern / Underlying Question /
+    // Distorted Strategy / Healthy Gift / Contributing grips / Sub-register
+    // / Confidence), de-duplicated so each field appears once.
+    const block = bodyGripBlockFor(inputs.constitution);
+    if (block) {
+      lines.push("");
+      lines.push(block.narrative);
+      lines.push("");
+      lines.push(`**Surface Grip:** ${block.surfaceGrip}`);
+      lines.push("");
+      lines.push(`**Grip Pattern:** ${block.patternLabel}`);
+      lines.push("");
+      lines.push(`**Underlying Question:** ${block.underlyingQuestion}`);
+      if (block.distortedStrategy.length > 0) {
+        lines.push("");
+        lines.push(`**Distorted Strategy:** ${block.distortedStrategy}`);
+      }
+      if (block.healthyGift.length > 0) {
+        lines.push("");
+        lines.push(`**Healthy Gift:** ${block.healthyGift}`);
+      }
+      if (block.contributingGrips.length > 0) {
+        lines.push("");
+        lines.push(
+          `**Contributing grips:** ${block.contributingGrips.join(", ")}`
+        );
+      }
+      if (block.subRegister) {
+        lines.push("");
+        lines.push(`**Sub-register:** ${block.subRegister}`);
+      }
+      lines.push("");
+      lines.push(`**Confidence:** ${block.confidence}`);
+    }
   }
 
   return lines.join("\n");
@@ -377,22 +387,26 @@ function composeBodyCards(inputs: ComposeFiftyDegreeInputs): string {
   lines.push("## Why This Is Happening — The Body Cards");
   lines.push("");
   lines.push(
-    "*Eight body parts, eight pressure points. Each card names one register of your shape — the question that lives there and the one-line answer your week is currently giving.*"
+    "*Eight body parts, eight pressure points. Each card names one register of your shape — the question that lives there, the strength it carries, the growth edge it surfaces, and a practice you can apply.*"
   );
 
   for (let i = 0; i < BODY_CARDS.length; i++) {
     const card = BODY_CARDS[i];
     const num = String(i + 1).padStart(2, "0");
-    const question = bodyCardQuestion(card.source);
-    const answer = bodyCardAnswer(card.source, inputs.constitution);
+    const fields = bodyCardFieldsFor(card.source, inputs.constitution);
     lines.push("");
     lines.push(`### ${num} · ${card.name} · ${card.body}`);
+    if (!fields) continue;
     lines.push("");
-    lines.push(`*${question}*`);
-    if (answer.length > 0) {
-      lines.push("");
-      lines.push(answer);
-    }
+    lines.push(`*${fields.question}*`);
+    lines.push("");
+    lines.push(`*${fields.readLede}*`);
+    lines.push("");
+    lines.push(`**Strength** — ${fields.strength}`);
+    lines.push("");
+    lines.push(`**Growth Edge** — ${fields.growthEdge}`);
+    lines.push("");
+    lines.push(`**${fields.practiceLabel}** — ${fields.practice}`);
   }
 
   return lines.join("\n");
@@ -400,21 +414,63 @@ function composeBodyCards(inputs: ComposeFiftyDegreeInputs): string {
 
 function composeWorkLoveGiving(inputs: ComposeFiftyDegreeInputs): string {
   const triptych = extractV3PathTriptych(inputs.guideMd);
-  if (!triptych) return "";
+  // CC-145 — the Drive distribution donut renders at the top of this
+  // section when Path drive data is available. The Guide emits the
+  // donut inside its Path · Gait card; the user-mode mask strips the
+  // SVG block from the spliced guide markdown (see renderMirror.ts
+  // user-mode donut strip ~L743-748), so the Individual must generate
+  // it directly off `constitution` rather than inherit from `guideMd`.
+  const drive = inputs.constitution.shape_outputs?.path.drive;
+  if (!triptych && !drive) return "";
 
-  // Re-emit the three beats with the Michele register: ** Beat. ** as
-  // the head, body verbatim minus the bold-label prefix.
   const lines: string[] = [];
   lines.push("## Work, Love, and Giving");
   lines.push("");
-  for (const label of ["Work", "Love", "Give"] as const) {
-    const block = extractPathBeat(triptych, label);
-    if (!block) continue;
-    const displayLabel = label === "Give" ? "Giving" : label;
-    lines.push(`**${displayLabel}.** ${block}`);
+  if (drive) {
+    // CC-145 — `applyUserModeMask` in renderMirror.ts strips any SVG
+    // whose aria-label matches "Drive distribution donut chart" (the
+    // cached Path LLM rewrite copied the donut through; the mask was
+    // added to suppress it). Re-label this fresh donut so the mask
+    // pattern doesn't match — the Individual's donut survives the
+    // mask and renders on the user surface as intended.
+    const donutSvg = renderDriveDistributionDonut(
+      drive.distribution,
+      drive.claimed?.first
+    ).replace(
+      'aria-label="Drive distribution donut chart"',
+      'aria-label="Drive distribution chart"'
+    );
+    lines.push(donutSvg);
     lines.push("");
   }
+  if (triptych) {
+    for (const label of ["Work", "Love", "Give"] as const) {
+      const block = extractPathBeat(triptych, label);
+      if (!block) continue;
+      const displayLabel = label === "Give" ? "Giving" : label;
+      lines.push(`**${displayLabel}.** ${block}`);
+      lines.push("");
+    }
+  }
   return lines.join("\n").trimEnd();
+}
+
+// CC-145 — Disposition Signal Mix section. Compact mirror of the
+// Guide's "## Disposition Signal Mix" placement: emits the heading,
+// the plain-language summary line, and the bar chart SVG. Guarded for
+// when `constitution.ocean?.dispositionSignalMix` is absent (silently
+// omitted — sessions without OCEAN derivation skip this section).
+function composeDispositionSignalMix(inputs: ComposeFiftyDegreeInputs): string {
+  const mix = inputs.constitution.ocean?.dispositionSignalMix;
+  if (!mix) return "";
+
+  const lines: string[] = [];
+  lines.push("## Disposition Signal Mix");
+  lines.push("");
+  lines.push(`*${composeDispositionSummaryLine(mix)}*`);
+  lines.push("");
+  lines.push(renderOceanDashboardSVG(mix));
+  return lines.join("\n");
 }
 
 function composeOpenTensions(inputs: ComposeFiftyDegreeInputs): string {
@@ -602,35 +658,6 @@ export function extractPathThisWeek(guideMd: string): string | null {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Body Card helpers
-// ─────────────────────────────────────────────────────────────────────
-
-function bodyCardQuestion(source: BodyCardSpec["source"]): string {
-  if (source === "hands") return "What you build and carry";
-  if (source === "conviction") return SHAPE_CARD_QUESTION.conviction;
-  // The other 6 sources map 1:1 to SHAPE_CARD_QUESTION keys.
-  return SHAPE_CARD_QUESTION[source];
-}
-
-function bodyCardAnswer(
-  source: BodyCardSpec["source"],
-  constitution: InnerConstitution
-): string {
-  if (source === "hands") {
-    const h = constitution.handsCard;
-    if (!h) return "";
-    return firstTwoSentences(h.openingLine);
-  }
-  const card = constitution.shape_outputs?.[source];
-  if (!card) return "";
-  // Each ShapeOutputs card has a `cardHeader` — a short italicized
-  // "Read" sentence used in the Mirror card lede (see renderMirror.ts
-  // ShapeCard emit). Take the first 1-2 sentences for the Body Card
-  // one-liner.
-  return firstTwoSentences(card.cardHeader);
-}
-
-// ─────────────────────────────────────────────────────────────────────
 // Small helpers
 // ─────────────────────────────────────────────────────────────────────
 
@@ -655,14 +682,6 @@ function firstSentence(s: string): string {
   const idx = s.search(/[.!?](\s|$)/);
   if (idx < 0) return s.trim();
   return s.slice(0, idx + 1).trim();
-}
-
-function firstTwoSentences(s: string): string {
-  if (!s) return "";
-  // Match up to 2 sentence-terminators.
-  const re = /^[\s\S]*?[.!?](\s|$)(?:[\s\S]*?[.!?](\s|$))?/;
-  const m = s.match(re);
-  return (m?.[0] ?? s).trim();
 }
 
 function stripAccuracyPrompt(prompt: string): string {
