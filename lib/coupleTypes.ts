@@ -9,6 +9,8 @@
 // (e.g. love_register, grip_pattern, ns_valence) so partner-guess disagreements
 // can later feed the calibration/accuracy surface (CC-COUPLE-5).
 
+import type { InnerConstitution } from "./types";
+
 export type CoupleGameDirection = "a_guesses_b" | "b_guesses_a";
 
 export interface CoupleGameItem {
@@ -35,6 +37,53 @@ export const COUPLE_SESSION_STATUS: Record<
   B_JOINED: "b_joined",
   COMPLETED: "completed",
 };
+
+// ─────────────────────────────────────────────────────────────────────
+// CC-COUPLE-2 — game item bank + reveal-resolver types.
+// ─────────────────────────────────────────────────────────────────────
+
+export type RevealType =
+  | "obvious"
+  | "oblivious"
+  | "mirror_blind"
+  | "hidden_pattern"
+  | "loving_misread";
+
+export type OptionValence = "generous" | "neutral" | "critical";
+
+export interface CoupleGameOption {
+  id: string;
+  label: string;
+  // Present only on items where a generous/critical reading genuinely
+  // exists (e.g. `grip_costs_you`, `the_thing_i_call_helping`). Absent
+  // when all options are the same valence — Loving Misread requires a
+  // valence delta to fire.
+  valence?: OptionValence;
+  // Which engine signal this specific option expresses, if any. Optional;
+  // present for the items where the option-level mapping is clean.
+  signalTag?: string;
+}
+
+export interface CoupleGameItemSpec {
+  itemId: string;
+  // Second-person prompt — rendered as either "When you are under pressure…"
+  // (self answer) or "When your partner is under pressure…" (guess) by the
+  // CC-COUPLE-3 UI layer.
+  prompt: string;
+  options: CoupleGameOption[];
+  // Engine signal this whole item maps to. Load-bearing for CC-COUPLE-5
+  // calibration: disagreements on items tagged to a fragile signal are
+  // training examples for that signal's typing accuracy.
+  sourceSignal: string;
+  // Returns the option id the engine expects for this subject, or null when
+  // the engine has no confident prediction for this item. Pure read of
+  // individual output — no I/O, no mutation. Honest nulls beat invented
+  // mappings: when an item has no defensible engine projection, predict
+  // returns null and the resolver correctly routes mismatches to
+  // Oblivious / Loving Misread (never to a fabricated Mirror Blind /
+  // Hidden Pattern).
+  predict: (ic: InnerConstitution) => string | null;
+}
 
 export function isCoupleGameResults(value: unknown): value is CoupleGameResults {
   if (!value || typeof value !== "object") return false;
