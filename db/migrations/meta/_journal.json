@@ -57,6 +57,13 @@
       "when": 1779581629335,
       "tag": "0007_chief_gateway",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1779591441011,
+      "tag": "0008_whole_nick_fury",
+      "breakpoints": true
     }
   ]
 }

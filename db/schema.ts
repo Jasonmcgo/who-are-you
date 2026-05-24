@@ -225,6 +225,40 @@ export const answerHistory = pgTable("answer_history", {
   reason: text("reason").notNull().default("admin_reset"),
 });
 
+// CC-COUPLE-1 — Couple sessions. One row per invited couple. Partner A always
+// has a full individual `sessions` row; Partner B may join the game via the
+// invite link without a full individual session in MVP, so `partner_b_session_id`
+// is nullable. Cascade-delete on A's session removal (the couple row is
+// meaningless without it); SET NULL on B's session removal (so deleting a B
+// session — which may not exist at couple-create time — does not destroy
+// the couple row). `game_results` is JSONB to let the per-item tuple shape
+// (see `lib/coupleTypes.ts`) evolve without a migration, mirroring the
+// `sessions.answers` convention. `status` is plain text + a named constant
+// (`CoupleSessionStatus`) — no enum churn for a 3-state field still in flux.
+//
+// Hard invariant: a partner's guesses about the other partner are stored
+// ONLY here, never merged into either party's `sessions.answers`. See
+// docs/couple-module-mvp-spec.md §5.
+export const coupleSessions = pgTable("couple_sessions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  invite_token: text("invite_token").notNull().unique(),
+  partner_a_session_id: uuid("partner_a_session_id")
+    .notNull()
+    .references(() => sessions.id, { onDelete: "cascade" }),
+  partner_b_session_id: uuid("partner_b_session_id").references(
+    () => sessions.id,
+    { onDelete: "set null" }
+  ),
+  status: text("status").notNull().default("invited"),
+  game_results: jsonb("game_results"),
+  created_at: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updated_at: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 // CC-021a — Attachments table. One row per uploaded file associated with a
 // session. The file bytes live on disk under attachments/<session_id>/; only
 // the metadata + relative path live in Postgres. Cascade-deletes on session
