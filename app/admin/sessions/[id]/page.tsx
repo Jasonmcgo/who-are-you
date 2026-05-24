@@ -106,6 +106,13 @@ function AdminExportPanel({
   sessionDate,
   previewMode,
   setPreviewMode,
+  // CC-153 — the session id is threaded so the new "Download JSON
+  // (portable)" link can point to the GET API route at
+  // /api/admin/sessions/[id]/portable. The route builds the
+  // PortableSession server-side (it has access to the full session row
+  // — skipped IDs, meta signals, contact fields — which the client
+  // SessionDetail payload doesn't carry).
+  sessionId,
 }: {
   constitution: InnerConstitution;
   demographics: DemographicSet | null;
@@ -116,6 +123,7 @@ function AdminExportPanel({
   // the styled <InnerConstitutionPage> preview below.
   previewMode: "clinician" | "user";
   setPreviewMode: (mode: "clinician" | "user") => void;
+  sessionId: string;
 }) {
   const [copiedFlash, setCopiedFlash] = useState(false);
 
@@ -157,6 +165,14 @@ function AdminExportPanel({
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
+
+  // CC-153 — portable session JSON export. The download is served
+  // directly from a GET API route (Content-Disposition: attachment) so
+  // the client doesn't need to thread skipped IDs / meta signals /
+  // contact fields (those aren't on the SessionDetail payload — only
+  // the server-side session row carries them). The filename is built
+  // server-side from the demographics row.
+  const portableJsonHref = `/api/admin/sessions/${sessionId}/portable`;
 
   return (
     <section
@@ -264,6 +280,28 @@ function AdminExportPanel({
         >
           Download Markdown
         </button>
+        {/* CC-153 — portable JSON export. Anchor to the GET API route
+            with download attribute so the browser saves rather than
+            navigates. Title attribute spells out the contract for
+            hover-discovery. */}
+        <a
+          href={portableJsonHref}
+          download
+          title="Source-data export (answers + demographics). Re-import at /admin/sessions/import to create a new session."
+          className="font-mono uppercase"
+          style={{
+            fontSize: 11,
+            letterSpacing: "0.12em",
+            color: "var(--umber)",
+            border: "1px solid var(--rule)",
+            padding: "6px 12px",
+            background: "transparent",
+            cursor: "pointer",
+            textDecoration: "none",
+          }}
+        >
+          Download JSON (portable)
+        </a>
         {copiedFlash ? (
           <span
             className="font-serif italic"
@@ -518,6 +556,22 @@ export default function SessionDetailPage({
           >
             view / edit answers →
           </Link>
+          {/* CC-152 — bridge into the per-session demographics editor. The
+              editor itself (DemographicEditForm) shipped in CC-087 but was
+              not linked from the detail page; without this link admins
+              couldn't reach it without typing the URL by hand. */}
+          <Link
+            href={`/admin/sessions/${id}/demographics`}
+            className="font-mono uppercase"
+            style={{
+              fontSize: 11,
+              letterSpacing: "0.12em",
+              color: "var(--umber)",
+              textDecoration: "underline",
+            }}
+          >
+            edit demographics →
+          </Link>
           <Link
             href="/admin/sessions"
             className="font-mono uppercase"
@@ -551,6 +605,7 @@ export default function SessionDetailPage({
             sessionDate={data.saved_at ? new Date(data.saved_at) : null}
             previewMode={previewMode}
             setPreviewMode={setPreviewMode}
+            sessionId={id}
           />
           <LiveEngineBanner
             renderDate={new Date().toLocaleDateString(undefined, {

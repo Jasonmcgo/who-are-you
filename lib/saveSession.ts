@@ -42,6 +42,17 @@ type SaveSessionArgs = {
   // omits it (existing flows continue to work without modification).
   contactEmail?: string | null;
   contactMobile?: string | null;
+  // CC-153 — explicit engine-shape-version override. The normal save
+  // flow (omitted / undefined) stamps `ENGINE_SHAPE_VERSION` and is
+  // byte-for-byte unchanged from pre-CC-153. The legacy-import path
+  // (CC-153 admin import) passes `null` when `buildInnerConstitution`
+  // threw on a partial answer set so the stored row stamps a null
+  // engine version → `detectStaleShape` returns the "re-derivable"
+  // branch on read and the render entry re-derives against current
+  // code. Without this, an import-with-placeholder-constitution would
+  // otherwise look "fresh" to the staleness detector and the
+  // placeholder would render verbatim.
+  engineShapeVersion?: number | null;
 };
 
 export async function saveSession(
@@ -62,8 +73,13 @@ export async function saveSession(
         // every new row was produced against. The render path's
         // `detectStaleShape` predicate reads this column and falls
         // into the re-derivable branch when it doesn't match
-        // `ENGINE_SHAPE_VERSION`. NULL is reserved for pre-CC rows.
-        engine_shape_version: ENGINE_SHAPE_VERSION,
+        // `ENGINE_SHAPE_VERSION`. NULL is reserved for pre-CC rows
+        // AND for CC-153 imports that couldn't fully derive (the read
+        // path re-derives those at render time).
+        engine_shape_version:
+          args.engineShapeVersion === undefined
+            ? ENGINE_SHAPE_VERSION
+            : args.engineShapeVersion,
       })
       .returning({ id: sessions.id });
 

@@ -40,6 +40,12 @@ const COMPASS_SACRED_IDS = new Set([
   "family_priority",
 ]);
 
+// CC-153.1 — `ic.signals` / `ic.tensions` may be missing on a CC-153
+// import that deferred derivation (placeholder constitution +
+// `engine_shape_version: null`). This route mirrors the page.tsx's
+// roster aggregator and shares the same hazard — without the
+// `?? []` guard, a single placeholder row threw "undefined is not
+// iterable" and the JSON list endpoint 500'd.
 function deriveTopCompassSignalId(ic: InnerConstitution): string | null {
   // Mirrors the engine's getTopCompassValues idea: the highest-rank Sacred
   // signal across the user's signal set. We don't need the full rank-aware
@@ -47,7 +53,7 @@ function deriveTopCompassSignalId(ic: InnerConstitution): string | null {
   // sorting and filtering.
   let bestRank = Number.POSITIVE_INFINITY;
   let best: string | null = null;
-  for (const s of ic.signals) {
+  for (const s of ic.signals ?? []) {
     if (!COMPASS_SACRED_IDS.has(s.signal_id)) continue;
     const r = s.rank ?? 99;
     if (r < bestRank) {
@@ -59,8 +65,9 @@ function deriveTopCompassSignalId(ic: InnerConstitution): string | null {
 }
 
 function countAllocationTensions(ic: InnerConstitution): number {
-  return ic.tensions.filter((t) => ALLOCATION_TENSION_IDS.has(t.tension_id))
-    .length;
+  return (ic.tensions ?? []).filter((t) =>
+    ALLOCATION_TENSION_IDS.has(t.tension_id)
+  ).length;
 }
 
 type SortKey =

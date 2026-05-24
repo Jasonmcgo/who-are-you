@@ -100,10 +100,18 @@ const VALID_SORT_KEYS = new Set<SortKey>([
   "attachments",
 ]);
 
+// CC-153.1 — `ic.signals` / `ic.tensions` may be missing on a CC-153
+// import that deferred derivation (placeholder constitution +
+// `engine_shape_version: null`; the roster reads constitution fields
+// directly rather than through `detectStaleShape` → re-derive, so
+// these reads have to tolerate the empty shape). Without the
+// `?? []`, a single placeholder row threw "undefined is not
+// iterable" inside the summaries.map and the whole roster fell back
+// to the loadError message.
 function deriveTopCompassSignalId(ic: InnerConstitution): string | null {
   let bestRank = Number.POSITIVE_INFINITY;
   let best: string | null = null;
-  for (const s of ic.signals) {
+  for (const s of ic.signals ?? []) {
     if (!COMPASS_SACRED_IDS.has(s.signal_id)) continue;
     const r = s.rank ?? 99;
     if (r < bestRank) {
@@ -115,8 +123,9 @@ function deriveTopCompassSignalId(ic: InnerConstitution): string | null {
 }
 
 function countAllocationTensions(ic: InnerConstitution): number {
-  return ic.tensions.filter((t) => ALLOCATION_TENSION_IDS.has(t.tension_id))
-    .length;
+  return (ic.tensions ?? []).filter((t) =>
+    ALLOCATION_TENSION_IDS.has(t.tension_id)
+  ).length;
 }
 
 async function loadSessions(filters: {
@@ -454,31 +463,52 @@ export default async function SessionsPage({
             </p>
           ) : null}
         </div>
-        {/* Logout: a small form POSTing to the logout API which clears the
-            cookie and redirects to /admin. No client-side JS needed. */}
-        <form
-          action="/api/admin/auth/logout"
-          method="post"
-          style={{ margin: 0 }}
-        >
-          <button
-            type="submit"
-            data-focus-ring
+        <div className="flex flex-row" style={{ gap: 10, alignItems: "center" }}>
+          {/* CC-153 — entry into the admin import surface. Adjacent to
+              Logout in the header so it's discoverable without
+              scrolling the roster. The link target itself is
+              middleware-gated. */}
+          <Link
+            href="/admin/sessions/import"
             className="font-mono uppercase"
             style={{
               fontSize: 11,
               letterSpacing: "0.08em",
-              background: "transparent",
-              color: "var(--ink-mute)",
-              border: "1px solid var(--rule)",
+              color: "var(--umber)",
+              border: "1px solid var(--umber)",
               padding: "8px 14px",
               borderRadius: 6,
-              cursor: "pointer",
+              textDecoration: "none",
             }}
           >
-            Logout
-          </button>
-        </form>
+            Import JSON
+          </Link>
+          {/* Logout: a small form POSTing to the logout API which clears the
+              cookie and redirects to /admin. No client-side JS needed. */}
+          <form
+            action="/api/admin/auth/logout"
+            method="post"
+            style={{ margin: 0 }}
+          >
+            <button
+              type="submit"
+              data-focus-ring
+              className="font-mono uppercase"
+              style={{
+                fontSize: 11,
+                letterSpacing: "0.08em",
+                background: "transparent",
+                color: "var(--ink-mute)",
+                border: "1px solid var(--rule)",
+                padding: "8px 14px",
+                borderRadius: 6,
+                cursor: "pointer",
+              }}
+            >
+              Logout
+            </button>
+          </form>
+        </div>
       </header>
 
       <div style={{ padding: "20px 28px" }}>
@@ -671,9 +701,24 @@ export default async function SessionsPage({
                       }}
                     >
                       <td style={cellStyle}>
-                        <span style={{ fontStyle: name.isItalic ? "italic" : "normal", color: name.isItalic ? "var(--ink-soft)" : "var(--ink)" }}>
+                        {/* CC-152 — Name cell is a Link into the session
+                            detail page. Anonymous / Prefer-not-to-say
+                            states stay italicized + link so admin can
+                            still open the session and fix the name from
+                            inside. Underline-on-hover (not always-on)
+                            keeps the cell reading as a name; the cursor
+                            change is the discoverability cue. */}
+                        <Link
+                          href={`/admin/sessions/${s.id}`}
+                          style={{
+                            fontStyle: name.isItalic ? "italic" : "normal",
+                            color: name.isItalic ? "var(--ink-soft)" : "var(--ink)",
+                            textDecoration: "none",
+                          }}
+                          className="hover:underline"
+                        >
                           {name.text}
-                        </span>
+                        </Link>
                       </td>
                       <td style={cellStyle}>
                         {s.contact_email ? (
