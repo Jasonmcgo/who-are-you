@@ -26,6 +26,9 @@ import type {
   ValueDomain,
 } from "../../../lib/types";
 import { detectStaleShape } from "../../../lib/staleShape";
+// CC-169 — roster per-row re-derive (matches the report's branch
+// logic so the roster's lead function agrees with the report).
+import { deriveRosterConstitution } from "../../../lib/adminRosterDerive";
 import { DEMOGRAPHIC_FIELDS } from "../../../data/demographics";
 // CC-127 — client component sibling: Copy follow-up link button.
 import CopySessionLinkButton from "./CopySessionLinkButton";
@@ -150,6 +153,10 @@ async function loadSessions(filters: {
       id: sessionsTable.id,
       saved_at: sessionsTable.created_at,
       inner_constitution: sessionsTable.inner_constitution,
+      // CC-169 — selected so deriveRosterConstitution can branch
+      // through the same stale-shape detector the report uses.
+      answers: sessionsTable.answers,
+      engine_shape_version: sessionsTable.engine_shape_version,
       name_state: demographicsTable.name_state,
       name_value: demographicsTable.name_value,
       age_state: demographicsTable.age_state,
@@ -177,7 +184,16 @@ async function loadSessions(filters: {
   for (const c of counts) countBySession.set(c.session_id, c.count);
 
   let summaries: SessionSummary[] = rows.map((r) => {
-    const ic = r.inner_constitution as InnerConstitution;
+    // CC-169 — re-derive via the stale-shape detector so the roster's
+    // lead function (and the other ic-sourced columns below) agree
+    // with the report. Fresh rows return the stored constitution
+    // verbatim — only drifted rows pay the re-derive cost.
+    const ic = deriveRosterConstitution({
+      id: r.id,
+      inner_constitution: r.inner_constitution,
+      engine_shape_version: r.engine_shape_version,
+      answers: r.answers,
+    });
     return {
       id: r.id,
       saved_at: r.saved_at.toISOString(),

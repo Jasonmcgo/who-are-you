@@ -26,6 +26,9 @@ import type {
   InnerConstitution,
   SessionSummary,
 } from "../../../../lib/types";
+// CC-169 — roster per-row re-derive (shared with page.tsx so the
+// rendered roster and the JSON list endpoint can't disagree).
+import { deriveRosterConstitution } from "../../../../lib/adminRosterDerive";
 
 const ALLOCATION_TENSION_IDS = new Set(["T-013", "T-014", "T-015"]);
 
@@ -128,6 +131,10 @@ export async function GET(req: NextRequest) {
       id: sessionsTable.id,
       saved_at: sessionsTable.created_at,
       inner_constitution: sessionsTable.inner_constitution,
+      // CC-169 — selected so deriveRosterConstitution can branch
+      // through the same stale-shape detector the report uses.
+      answers: sessionsTable.answers,
+      engine_shape_version: sessionsTable.engine_shape_version,
       name_state: demographicsTable.name_state,
       name_value: demographicsTable.name_value,
       age_state: demographicsTable.age_state,
@@ -157,7 +164,16 @@ export async function GET(req: NextRequest) {
 
   // 3) Project to SessionSummary shape with derived columns.
   let summaries: SessionSummary[] = rows.map((r) => {
-    const ic = r.inner_constitution as InnerConstitution;
+    // CC-169 — re-derive via the stale-shape detector so the API's
+    // derived columns agree with the report. Fresh rows return the
+    // stored constitution verbatim — only drifted rows pay the
+    // re-derive cost.
+    const ic = deriveRosterConstitution({
+      id: r.id,
+      inner_constitution: r.inner_constitution,
+      engine_shape_version: r.engine_shape_version,
+      answers: r.answers,
+    });
     return {
       id: r.id,
       saved_at: r.saved_at.toISOString(),
