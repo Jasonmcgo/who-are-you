@@ -2357,7 +2357,126 @@ export function buildInnerConstitution(
   // the V/O predictor can read `lens_stack.crossSignalInferredDriver`
   // when computing the canon-predicted register (Kevin/Michele/Cindy
   // cross-signal-driver override per the predictor's lived-shape read).
+  //
+  // CC-173 — when CC-171's perceiving-axis correction flips the
+  // dominant inside this attach, every lens-derived field that was
+  // already populated (shape_outputs, cross_card, mirror,
+  // shape_summary, workMap, loveMap, profileArchetype) is stale —
+  // those layers ran with the pre-correction stack. We snapshot the
+  // dominant before the attach + re-derive in place after.
+  // Downstream attaches (V/O, aim, grip, hands, primal, nextMoves,
+  // synthesis) read `constitution.lens_stack` directly, so they
+  // naturally see the corrected dominant on first attach; no
+  // re-attach is needed for them.
+  const preCorrectionDominant = baseConstitution.lens_stack.dominant;
   attachCrossSignalDriverInference(baseConstitution);
+  if (baseConstitution.lens_stack.dominant !== preCorrectionDominant) {
+    // The flip is rare — only sessions whose Q-T data triggered
+    // `dominant-convergence-weak` AND whose cross-signal evidence
+    // strongly prefers the OTHER perceiving mirror axis (CC-171
+    // gates). For those sessions we rebuild every lens-dependent
+    // field against the corrected stack. Inputs that don't depend on
+    // `stack` (signals, raw answers, OCEAN intensities, driveOutput,
+    // tensions, blindSpots, goalSoulGiveOutput) are reused as-is —
+    // they're already deterministic in `signals + answers`. A fresh
+    // `BuildContext` is used so per-build fragment counters and
+    // category-by-card maps don't double-count.
+    const correctedStack = baseConstitution.lens_stack;
+    const reCtx = newBuildContext();
+    const reLens = deriveLensOutput(correctedStack, weather, fire, agency, topCompass, topGravity, reCtx);
+    const reCompass = deriveCompassOutput(topCompass, correctedStack, weather, fire, topGravity, agency, reCtx, signals, answers);
+    const reConviction = deriveConvictionOutput(topCompass, fire, correctedStack, topGravity, agency, weather, reCtx);
+    const reGravity = deriveGravityOutput(topGravity, correctedStack, weather, topCompass, agency, fire, reCtx);
+    const reTrust = deriveTrustOutput(topInst, topPersonal, correctedStack, weather, topCompass, topGravity, agency, fire, reCtx);
+    const reWeatherOut = deriveWeatherOutput(weather, formation, correctedStack, fire, topCompass, topGravity, agency, reCtx);
+    const reFireOut = deriveFireOutput(fire, topCompass, weather, correctedStack, topGravity, agency, reCtx);
+    const rePath = derivePathOutput(topCompass, correctedStack, topGravity, agency, weather);
+    if (driveOutput) {
+      rePath.drive = driveOutput;
+    }
+    const reShapeOutputs: ShapeOutputs = {
+      lens: reLens,
+      compass: reCompass,
+      conviction: reConviction,
+      gravity: reGravity,
+      trust: reTrust,
+      weather: reWeatherOut,
+      fire: reFireOut,
+      path: rePath,
+    };
+    baseConstitution.shape_outputs = reShapeOutputs;
+    baseConstitution.cross_card = {
+      topGifts: synthesizeTopGifts(reShapeOutputs, correctedStack, topCompass, topGravity, agency, weather, fire, reCtx),
+      topRisks: synthesizeTopRisks(reShapeOutputs, weather, fire),
+      growthPath: generateGrowthPath(topCompass, correctedStack, topGravity, agency),
+      relationshipTranslation: generateRelationshipTranslation(correctedStack, topCompass, fire),
+      conflictTranslation: generateConflictTranslation(correctedStack, topCompass, fire),
+      mirrorTypesSeed: generateMirrorTypesSeed(topCompass, correctedStack),
+    };
+    baseConstitution.shape_summary = generateShapeSummary(correctedStack, topCompass, topGravity, weather);
+    baseConstitution.watch_for = generateWatchFor(reShapeOutputs, weather, fire);
+    // workMap + loveMap consume `stack.dominant` / `stack.auxiliary`
+    // for lens-fit scoring; recompute against the corrected stack so
+    // the register match reflects the right register family.
+    baseConstitution.workMap = computeWorkMapOutput(
+      signals,
+      answers,
+      correctedStack,
+      driveOutput,
+      baseConstitution.ocean,
+      agency.aspiration
+    );
+    baseConstitution.loveMap = computeLoveMapOutput(
+      signals,
+      answers,
+      correctedStack,
+      driveOutput,
+      baseConstitution.ocean,
+      agency
+    );
+    // profileArchetype reads `constitution.lens_stack` directly — its
+    // input dictionary needs the corrected stack to be live first,
+    // which it already is. Recompute.
+    baseConstitution.profileArchetype = computeArchetype(
+      archetypeInputsFromConstitution(baseConstitution)
+    );
+    // Re-apply the archetype gift / risk label overlays per L≈2300 —
+    // the corrected stack may have flipped the archetype itself.
+    const reArchKey = baseConstitution.profileArchetype.primary;
+    if (reArchKey === "cindyType" || reArchKey === "danielType") {
+      const labelOverlay = GIFT_LABELS_BY_ARCHETYPE[reArchKey];
+      const descOverlay = GIFT_DESCRIPTIONS_BY_ARCHETYPE[reArchKey];
+      const n = Math.min(
+        labelOverlay.length,
+        descOverlay.length,
+        baseConstitution.cross_card.topGifts.length,
+        baseConstitution.cross_card.topRisks.length
+      );
+      for (let i = 0; i < n; i++) {
+        const existing = baseConstitution.cross_card.topGifts[i];
+        baseConstitution.cross_card.topGifts[i] = {
+          ...existing,
+          label: labelOverlay[i].label,
+          paragraph: swapLeadingDescription(existing.paragraph, descOverlay[i]),
+        };
+        baseConstitution.cross_card.topRisks[i] = {
+          ...baseConstitution.cross_card.topRisks[i],
+          label: labelOverlay[i].growthEdge,
+        };
+      }
+    }
+    // mirror reads `ctx.stack` — regenerate against the corrected
+    // stack so the masthead / core-pattern / load-heavy lines speak
+    // the right driver.
+    baseConstitution.mirror = generateMirror(baseConstitution, {
+      topCompass,
+      topGravity,
+      agency,
+      weather,
+      fire,
+      stack: correctedStack,
+    });
+  }
   // CC-101-VO-WIRING — attach V/O BEFORE Aim/Movement so the V/O score
   // can be threaded into both. (Grip was already attached above at
   // attachGripDecomposition; the §13 gripReading recompute below
@@ -2530,12 +2649,13 @@ function attachCrossSignalDriverInference(
     // the lift / classify steps so the corrected dominant flows into
     // both: the lift gate's `cs.inferredDriver === dominant` equality
     // (no spurious lift on a flipped-away surface dominant) and the
-    // agreement classifier (which then evaluates cross-signal against
-    // the corrected dominant). Gated on `dominant-convergence-weak`
-    // (thin Q-T data) + cross-signal evidence that the user lives on
-    // the OTHER perceiving mirror axis. See
-    // `applyPerceivingAxisCorrection` in lib/jungianStack.ts for the
-    // full gate semantics and the Ashley/Jason/Daniel control proof.
+    // agreement classifier.
+    //
+    // CC-173 — the caller (`buildInnerConstitution`) detects the flip
+    // by snapshotting `lens_stack.dominant` before this attach and
+    // comparing after. If changed, it re-derives every lens-dependent
+    // field so the entire prose surface speaks in the corrected
+    // dominant's register.
     const corrected = applyPerceivingAxisCorrection(
       constitution.lens_stack,
       constitution.signals,
