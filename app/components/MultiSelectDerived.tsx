@@ -7,14 +7,13 @@ import type { ReactNode } from "react";
 // Used by Q-I2 (trust drivers) and Q-I3 (sacred drivers). Items are derived
 // at render time from the user's already-ranked Trust / Compass card answers
 // and passed in as props by the parent (app/page.tsx).
-
-export type DerivedItem = {
-  id: string;
-  label: string;
-  gloss?: string;
-  signal: string;
-  source_question_id: string;
-};
+//
+// CC-170 — `DerivedItem` lives in `lib/deriveQuestionItems.ts` (the
+// shared resolver lib used by the assessment + follow-up surfaces).
+// Re-exported here so existing `import type { DerivedItem } from
+// "../components/MultiSelectDerived"` call sites keep working.
+export type { DerivedItem } from "../../lib/deriveQuestionItems";
+import type { DerivedItem } from "../../lib/deriveQuestionItems";
 
 type Props = {
   beliefAnchor: string | null;

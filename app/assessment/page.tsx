@@ -15,7 +15,6 @@ import type {
   MultiSelectDerivedAnswer,
   QuestionOption,
   RankingDerivedAnswer,
-  RankingItem,
   SinglePickAnswer,
   TensionStatus,
 } from "../../lib/types";
@@ -38,7 +37,14 @@ import IdentityAndContextPage from "../components/IdentityAndContextPage";
 import { saveSession } from "../../lib/saveSession";
 import type { DemographicAnswer } from "../../lib/types";
 import SecondPassPage from "../components/SecondPassPage";
-import MultiSelectDerived, { type DerivedItem } from "../components/MultiSelectDerived";
+import MultiSelectDerived from "../components/MultiSelectDerived";
+// CC-170 — derived-item resolvers moved to `lib/deriveQuestionItems.ts`
+// so the public follow-up page can reuse them.
+import {
+  deriveItemsForBinaryPick,
+  deriveItemsForCrossRank,
+  deriveItemsForMultiSelect,
+} from "../../lib/deriveQuestionItems";
 
 // CC-016 — the four allocation parent rankings that get the per-item
 // three-state aspirational overlay affordance.
@@ -56,92 +62,12 @@ const ALLOCATION_PARENT_RANKINGS = new Set([
 // possible parent answers.
 const Q_I1_INDEX = questions.findIndex((q) => q.question_id === "Q-I1");
 
-// CC-016 — derive items for a `ranking_derived` question from the top-N of
-// its parent answers. Returns null if any parent doesn't have enough items
-// (cascade-skip should fire in that case). CC-017 — extended for use by
-// `multiselect_derived` questions via `deriveItemsForMultiSelect` below;
-// the same parent-walking and id-namespacing semantics apply.
-function deriveItemsForCrossRank(
-  derivedQuestionId: string,
-  derivedFrom: string[],
-  topN: number,
-  answers: Answer[]
-): {
-  items: RankingItem[];
-  sources: { id: string; signal: string; source_question_id: string }[];
-} | null {
-  const items: RankingItem[] = [];
-  const sources: { id: string; signal: string; source_question_id: string }[] =
-    [];
-  for (const parentId of derivedFrom) {
-    const parentAnswer = answers.find(
-      (a) => a.question_id === parentId && a.type === "ranking"
-    );
-    if (!parentAnswer || parentAnswer.type !== "ranking") return null;
-    if (parentAnswer.order.length < topN) return null;
-    const parentQuestion = questions.find((q) => q.question_id === parentId);
-    if (!parentQuestion || parentQuestion.type !== "ranking") return null;
-    for (let i = 0; i < topN; i++) {
-      const itemId = parentAnswer.order[i];
-      const parentItem = parentQuestion.items.find((it) => it.id === itemId);
-      if (!parentItem) return null;
-      // Namespace the id so collisions across parents don't clobber.
-      const namespacedId = `${parentId}:${parentItem.id}`;
-      items.push({
-        id: namespacedId,
-        label: parentItem.label,
-        gloss: parentItem.gloss,
-        signal: parentItem.signal,
-      });
-      sources.push({
-        id: namespacedId,
-        signal: parentItem.signal,
-        source_question_id: parentId,
-      });
-    }
-  }
-  void derivedQuestionId;
-  return { items, sources };
-}
-
-// CC-017 — derive items for a `multiselect_derived` question from the top-N
-// of each parent ranking answer. Same shape as deriveItemsForCrossRank but
-// returns null only when ALL parents lack data (Q-I2 / Q-I3 can render with
-// just one parent's items per spec); per-parent partial availability is OK.
-// Returns the items list as `DerivedItem[]` (the MultiSelectDerived component's
-// expected shape).
-function deriveItemsForMultiSelect(
-  derivedFrom: string[],
-  topN: number,
-  answers: Answer[]
-): DerivedItem[] | null {
-  const items: DerivedItem[] = [];
-  let anyParentHadData = false;
-  for (const parentId of derivedFrom) {
-    const parentAnswer = answers.find(
-      (a) => a.question_id === parentId && a.type === "ranking"
-    );
-    if (!parentAnswer || parentAnswer.type !== "ranking") continue;
-    if (parentAnswer.order.length === 0) continue;
-    const parentQuestion = questions.find((q) => q.question_id === parentId);
-    if (!parentQuestion || parentQuestion.type !== "ranking") continue;
-    anyParentHadData = true;
-    const take = Math.min(topN, parentAnswer.order.length);
-    for (let i = 0; i < take; i++) {
-      const itemId = parentAnswer.order[i];
-      const parentItem = parentQuestion.items.find((it) => it.id === itemId);
-      if (!parentItem) continue;
-      items.push({
-        id: `${parentId}:${parentItem.id}`,
-        label: parentItem.label,
-        gloss: parentItem.gloss,
-        signal: parentItem.signal,
-        source_question_id: parentId,
-      });
-    }
-  }
-  return anyParentHadData ? items : null;
-}
+// CC-170 — `deriveItemsForCrossRank` + `deriveItemsForMultiSelect` (and
+// the new `deriveItemsForBinaryPick` resolver) moved to
+// `lib/deriveQuestionItems.ts` so the public follow-up page can reuse
+// them when rendering derived clarifiers against the session's stored
+// parent answers. The assessment behavior is byte-identical — same
+// signatures, same null-return semantics for cascade-skip.
 
 // CC-017 — find the user's belief anchor: Q-I1 freeform first; on skip,
 // Q-I1b. Returns null if neither was answered.
@@ -650,21 +576,14 @@ export default function Home() {
     ) {
       // For binary_pick, the items list is on the question. For
       // binary_pick_derived, items derive at render time from prior
-      // picks; we re-resolve them here so the picked_signal is correct.
+      // picks; we re-resolve them via the shared resolver
+      // (CC-170 — `deriveItemsForBinaryPick`) so the picked_signal is
+      // correct.
       let items: { id: string; signal: string }[] = [];
       if (question.type === "binary_pick") {
         items = question.items;
       } else {
-        for (const pid of question.derived_from ?? []) {
-          const pa = answers.find((a) => a.question_id === pid);
-          if (pa && pa.type === "single_pick") {
-            const parentQ = questions.find((q) => q.question_id === pid);
-            if (parentQ && parentQ.type === "binary_pick") {
-              const chosen = parentQ.items.find((i) => i.id === pa.picked_id);
-              if (chosen) items.push(chosen);
-            }
-          }
-        }
+        items = deriveItemsForBinaryPick(question.derived_from ?? [], answers) ?? [];
       }
       const picked = items.find((i) => i.id === draft);
       if (!picked) return;
@@ -1019,19 +938,12 @@ export default function Home() {
         // either parent is unanswered, the derived items list is
         // empty → cascade-skip behavior identical to ranking_derived.
         (() => {
-          const parents = question.derived_from ?? [];
-          const items: { id: string; label: string; signal: string; quote?: string; voice?: string; example?: string }[] = [];
-          for (const pid of parents) {
-            const pa = answers.find((a) => a.question_id === pid);
-            if (pa && pa.type === "single_pick") {
-              const parentQ = questions.find((q) => q.question_id === pid);
-              if (parentQ && parentQ.type === "binary_pick") {
-                const chosen = parentQ.items.find((i) => i.id === pa.picked_id);
-                if (chosen) items.push(chosen);
-              }
-            }
-          }
-          if (items.length < 2) return null; // cascade-skip
+          // CC-170 — items resolved by the shared
+          // `deriveItemsForBinaryPick` lib (parents' two picks become
+          // the two options); null when fewer than 2 parents resolved
+          // (cascade-skip fires from the effect above).
+          const items = deriveItemsForBinaryPick(question.derived_from ?? [], answers);
+          if (!items) return null;
           return (
             <SinglePickPicker
               key={question.question_id}

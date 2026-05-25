@@ -27,17 +27,32 @@
 import { use, useEffect, useMemo, useState } from "react";
 import Ranking from "../../components/Ranking";
 import SinglePickPicker from "../../components/SinglePickPicker";
+import MultiSelectDerived from "../../components/MultiSelectDerived";
 import type {
   Answer,
+  BinaryPickQuestion,
+  DerivedRankingQuestion,
   ForcedFreeformQuestion,
+  MultiSelectDerivedAnswer,
+  MultiSelectDerivedQuestion,
   Question,
   RankingItem,
   RankingQuestion,
+  SinglePickAnswer,
 } from "../../../lib/types";
 import type {
   FollowUpQuestion,
   FollowUpQuestionSet,
 } from "../../../lib/followUpQuestions";
+// CC-170 — same resolvers the assessment uses; turn the session's stored
+// parent rankings + binary picks into the items each derived question
+// would render in the assessment flow.
+import {
+  deriveItemsForBinaryPick,
+  deriveItemsForCrossRank,
+  deriveItemsForMultiSelect,
+  type DerivedItem,
+} from "../../../lib/deriveQuestionItems";
 
 // ─────────────────────────────────────────────────────────────────────
 // Types
@@ -47,13 +62,30 @@ interface GetResponse {
   personName: string;
   missingQuestions: Question[];
   followUps: FollowUpQuestionSet;
+  // CC-170 — the session's completed survey answers. The follow-up page
+  // resolves derived-question items against these.
+  answers: Answer[];
 }
 
 type RankingDraft = string[];
 type ForcedDraft = string;
 type FreeformDraft = string;
+// CC-170 — `binary_pick_derived` writes a single picked id (the chosen
+// item's id from the resolved two-item list).
+type BinaryPickDraft = string;
 
-type GapDraft = RankingDraft | ForcedDraft | FreeformDraft | undefined;
+type GapDraft =
+  | RankingDraft
+  | ForcedDraft
+  | FreeformDraft
+  | BinaryPickDraft
+  | undefined;
+
+// CC-170 — multiselect_derived state mirrors the assessment's per-
+// question `multiSelectState` shape. Kept in a separate record from
+// `gapDrafts` since the shape doesn't fit the simple primitive-/array-
+// of-strings union.
+type MultiSelectDraft = { selectedIds: string[]; otherText: string };
 
 type FollowUpDraft = string[];
 
@@ -85,6 +117,11 @@ export default function FollowUpAnswerPage({
   const [load, setLoad] = useState<LoadState>({ status: "loading" });
   const [submitState, setSubmitState] = useState<SubmitState>({ status: "idle" });
   const [gapDrafts, setGapDrafts] = useState<Record<string, GapDraft>>({});
+  // CC-170 — multiselect_derived drafts live in their own record (richer
+  // shape than the primitive GapDraft union).
+  const [multiSelectDrafts, setMultiSelectDrafts] = useState<
+    Record<string, MultiSelectDraft>
+  >({});
   const [followUpDrafts, setFollowUpDrafts] = useState<
     Record<string, FollowUpDraft>
   >({});
@@ -134,7 +171,9 @@ export default function FollowUpAnswerPage({
     try {
       const gapFillAnswers = buildGapFillAnswers(
         load.data.missingQuestions,
-        gapDrafts
+        gapDrafts,
+        multiSelectDrafts,
+        load.data.answers
       );
       const followUpAnswers = buildFollowUpAnswers(
         load.data.followUps.questions,
@@ -193,6 +232,8 @@ export default function FollowUpAnswerPage({
             data={load.data}
             gapDrafts={gapDrafts}
             setGapDrafts={setGapDrafts}
+            multiSelectDrafts={multiSelectDrafts}
+            setMultiSelectDrafts={setMultiSelectDrafts}
             followUpDrafts={followUpDrafts}
             setFollowUpDrafts={setFollowUpDrafts}
             submitState={submitState}
@@ -348,6 +389,10 @@ interface ReadyFormProps {
   setGapDrafts: React.Dispatch<
     React.SetStateAction<Record<string, GapDraft>>
   >;
+  multiSelectDrafts: Record<string, MultiSelectDraft>;
+  setMultiSelectDrafts: React.Dispatch<
+    React.SetStateAction<Record<string, MultiSelectDraft>>
+  >;
   followUpDrafts: Record<string, FollowUpDraft>;
   setFollowUpDrafts: React.Dispatch<
     React.SetStateAction<Record<string, FollowUpDraft>>
@@ -360,24 +405,80 @@ function ReadyForm({
   data,
   gapDrafts,
   setGapDrafts,
+  multiSelectDrafts,
+  setMultiSelectDrafts,
   followUpDrafts,
   setFollowUpDrafts,
   submitState,
   onSubmit,
 }: ReadyFormProps) {
-  // Only show gap-fill questions we can render here: ranking, forced,
-  // freeform. Derived types need parent bookkeeping — defer them.
+  // CC-170 — derived questions (ranking_derived / multiselect_derived /
+  // binary_pick_derived) are now renderable too, provided the
+  // session's stored parent answers have enough data for the resolver
+  // to produce items. The previous behavior — defer ALL derived types
+  // with a footer note — left exactly the highest-value
+  // typing-refinement clarifiers unanswerable via the link.
+  const beliefAnchor = useMemo(
+    () => findBeliefAnchor(data.answers),
+    [data.answers]
+  );
+
   const renderableMissing = useMemo(
     () =>
-      data.missingQuestions.filter(
-        (q) =>
+      data.missingQuestions.filter((q) => {
+        if (
           q.type === "ranking" ||
           q.type === "forced" ||
           q.type === "freeform"
-      ),
-    [data.missingQuestions]
+        ) {
+          return true;
+        }
+        // CC-170.1 — self-contained binary_pick (Q-TB attitude binaries):
+        // `items` live on the question definition, no parent resolution
+        // needed. Renderable on every legacy session whose bank exposes
+        // a Q-TB-* in the missing set.
+        if (q.type === "binary_pick") {
+          return true;
+        }
+        if (q.type === "ranking_derived") {
+          return (
+            deriveItemsForCrossRank(
+              q.question_id,
+              q.derived_from,
+              q.derived_top_n ?? 2,
+              data.answers
+            ) !== null
+          );
+        }
+        if (q.type === "multiselect_derived") {
+          return (
+            deriveItemsForMultiSelect(
+              q.derived_from,
+              q.derived_top_n_per_source ?? 3,
+              data.answers
+            ) !== null
+          );
+        }
+        if (q.type === "binary_pick_derived") {
+          return (
+            deriveItemsForBinaryPick(q.derived_from, data.answers) !== null
+          );
+        }
+        return false;
+      }),
+    [data.missingQuestions, data.answers]
   );
-  const deferredMissingCount = data.missingQuestions.length - renderableMissing.length;
+  const deferredMissingCount =
+    data.missingQuestions.length - renderableMissing.length;
+  // CC-170 — assemble the deferred-count copy as a single string so the
+  // adjacent JSX text/expression nodes don't collapse to "questionscouldn't"
+  // (the cross-line whitespace JSX bug).
+  const deferredNote =
+    deferredMissingCount > 0
+      ? `(${deferredMissingCount} follow-up question${
+          deferredMissingCount === 1 ? "" : "s"
+        } need answers you didn't complete in the original survey, so they're not shown here.)`
+      : null;
 
   const canSubmit = submitState.status !== "submitting";
 
@@ -436,6 +537,15 @@ function ReadyForm({
               onChange={(next) =>
                 setGapDrafts((prev) => ({ ...prev, [q.question_id]: next }))
               }
+              multiSelectDraft={multiSelectDrafts[q.question_id]}
+              onMultiSelectChange={(next) =>
+                setMultiSelectDrafts((prev) => ({
+                  ...prev,
+                  [q.question_id]: next,
+                }))
+              }
+              sessionAnswers={data.answers}
+              beliefAnchor={beliefAnchor}
             />
           ))}
         </section>
@@ -455,7 +565,7 @@ function ReadyForm({
         ))}
       </section>
 
-      {deferredMissingCount > 0 ? (
+      {deferredNote ? (
         <p
           className="font-serif italic"
           style={{
@@ -465,10 +575,7 @@ function ReadyForm({
             lineHeight: 1.5,
           }}
         >
-          ({deferredMissingCount} additional question
-          {deferredMissingCount === 1 ? "" : "s"} couldn&apos;t be shown here —
-          they depend on items you ranked elsewhere in the survey. Whoever sent
-          the link can collect them in a separate pass if useful.)
+          {deferredNote}
         </p>
       ) : null}
 
@@ -517,10 +624,24 @@ function GapFillBlock({
   question,
   draft,
   onChange,
+  multiSelectDraft,
+  onMultiSelectChange,
+  sessionAnswers,
+  beliefAnchor,
 }: {
   question: Question;
   draft: GapDraft;
   onChange: (next: GapDraft) => void;
+  // CC-170 — multiselect_derived has a richer draft shape than the
+  // primitive GapDraft union; tracked separately by the parent.
+  multiSelectDraft: MultiSelectDraft | undefined;
+  onMultiSelectChange: (next: MultiSelectDraft) => void;
+  // CC-170 — the session's stored survey answers, needed to resolve
+  // derived-question items here (same resolvers as the assessment).
+  sessionAnswers: Answer[];
+  // CC-170 — Q-I1 (or Q-I1b) freeform, shown above the multiselect
+  // derived clarifiers as the belief anchor.
+  beliefAnchor: string | null;
 }) {
   if (question.type === "ranking") {
     return (
@@ -557,6 +678,115 @@ function GapFillBlock({
         />
       </QuestionShellLite>
     );
+  }
+  // CC-170.1 — self-contained binary_pick (Q-TB attitude binaries).
+  // Items live on the question; render via SinglePickPicker with no
+  // parent resolution.
+  if (question.type === "binary_pick") {
+    const q = question as BinaryPickQuestion;
+    return (
+      <QuestionShellLite text={q.text} hint={q.helper}>
+        <SinglePickPicker
+          items={q.items}
+          selectedId={typeof draft === "string" && draft.length > 0 ? draft : null}
+          onChange={(pickedId) => onChange(pickedId)}
+        />
+      </QuestionShellLite>
+    );
+  }
+  // CC-170 — derived types. Resolvers return null when parents lack
+  // data; we filter those out upstream in `renderableMissing`, so a
+  // null return here is treated as a cascade-skip (render nothing —
+  // the deferred-count note covers it).
+  if (question.type === "ranking_derived") {
+    const q = question as DerivedRankingQuestion;
+    const resolved = deriveItemsForCrossRank(
+      q.question_id,
+      q.derived_from,
+      q.derived_top_n ?? 2,
+      sessionAnswers
+    );
+    if (!resolved) return null;
+    return (
+      <QuestionShellLite
+        text={q.text}
+        hint={q.helper ?? "Drag or click to rank in order."}
+      >
+        <Ranking
+          items={resolved.items}
+          initialOrder={Array.isArray(draft) ? (draft as string[]) : undefined}
+          onChange={(order) => onChange(order)}
+        />
+      </QuestionShellLite>
+    );
+  }
+  if (question.type === "multiselect_derived") {
+    const q = question as MultiSelectDerivedQuestion;
+    const resolved = deriveItemsForMultiSelect(
+      q.derived_from,
+      q.derived_top_n_per_source ?? 3,
+      sessionAnswers
+    );
+    if (!resolved || !q.none_option || !q.other_option) return null;
+    const state = multiSelectDraft ?? { selectedIds: [], otherText: "" };
+    return (
+      <QuestionShellLite text={q.text} hint={q.helper}>
+        <MultiSelectDerived
+          beliefAnchor={beliefAnchor}
+          items={resolved}
+          noneOption={q.none_option}
+          otherOption={q.other_option}
+          selectedIds={state.selectedIds}
+          otherText={state.otherText}
+          onSelectionsChange={(selectedIds) =>
+            onMultiSelectChange({
+              selectedIds,
+              otherText: state.otherText,
+            })
+          }
+          onOtherTextChange={(otherText) =>
+            onMultiSelectChange({
+              selectedIds: state.selectedIds,
+              otherText,
+            })
+          }
+        />
+      </QuestionShellLite>
+    );
+  }
+  if (question.type === "binary_pick_derived") {
+    const items = deriveItemsForBinaryPick(
+      question.derived_from ?? [],
+      sessionAnswers
+    );
+    if (!items) return null;
+    return (
+      <QuestionShellLite text={question.text} hint={question.helper}>
+        <SinglePickPicker
+          items={items}
+          selectedId={typeof draft === "string" && draft.length > 0 ? draft : null}
+          onChange={(pickedId) => onChange(pickedId)}
+        />
+      </QuestionShellLite>
+    );
+  }
+  return null;
+}
+
+// CC-170 — duplicate of the assessment's belief-anchor lookup. Kept
+// local to the follow-up page rather than extracted because (a) the
+// shape is tiny and (b) the assessment file is the only other call
+// site, so a shared helper would invert the dependency for almost no
+// reuse. The behavior is byte-identical with the assessment's
+// `findBeliefAnchor` (~app/assessment/page.tsx).
+function findBeliefAnchor(answers: Answer[]): string | null {
+  const qi1 = answers.find((a) => a.question_id === "Q-I1");
+  if (qi1 && qi1.type === "freeform" && qi1.response.trim().length > 0) {
+    return qi1.response.trim();
+  }
+  const qi1b = answers.find((a) => a.question_id === "Q-I1b");
+  if (qi1b && qi1b.type === "freeform" && qi1b.response.trim().length > 0) {
+    return qi1b.response.trim();
   }
   return null;
 }
@@ -797,46 +1027,158 @@ function FreeformInput({
 
 function buildGapFillAnswers(
   questions: Question[],
-  drafts: Record<string, GapDraft>
+  drafts: Record<string, GapDraft>,
+  multiSelectDrafts: Record<string, MultiSelectDraft>,
+  sessionAnswers: Answer[]
 ): Answer[] {
   const out: Answer[] = [];
   for (const q of questions) {
-    const draft = drafts[q.question_id];
-    if (draft === undefined) continue;
-    if (q.type === "ranking" && Array.isArray(draft) && draft.length > 0) {
-      out.push({
-        question_id: q.question_id,
-        card_id: q.card_id,
-        question_text: q.text,
-        type: "ranking",
-        order: draft as string[],
-      });
-    } else if (
-      q.type === "forced" &&
-      typeof draft === "string" &&
-      draft.length > 0
-    ) {
-      out.push({
-        question_id: q.question_id,
-        card_id: q.card_id,
-        question_text: q.text,
-        type: "forced",
-        response: draft,
-      });
-    } else if (
-      q.type === "freeform" &&
-      typeof draft === "string" &&
-      draft.trim().length > 0
-    ) {
-      out.push({
-        question_id: q.question_id,
-        card_id: q.card_id,
-        question_text: q.text,
-        type: "freeform",
-        response: draft.trim(),
-      });
+    if (q.type === "ranking") {
+      const draft = drafts[q.question_id];
+      if (Array.isArray(draft) && draft.length > 0) {
+        out.push({
+          question_id: q.question_id,
+          card_id: q.card_id,
+          question_text: q.text,
+          type: "ranking",
+          order: draft as string[],
+        });
+      }
+      continue;
     }
-    // derived types skipped (we didn't render them)
+    if (q.type === "forced") {
+      const draft = drafts[q.question_id];
+      if (typeof draft === "string" && draft.length > 0) {
+        out.push({
+          question_id: q.question_id,
+          card_id: q.card_id,
+          question_text: q.text,
+          type: "forced",
+          response: draft,
+        });
+      }
+      continue;
+    }
+    if (q.type === "freeform") {
+      const draft = drafts[q.question_id];
+      if (typeof draft === "string" && draft.trim().length > 0) {
+        out.push({
+          question_id: q.question_id,
+          card_id: q.card_id,
+          question_text: q.text,
+          type: "freeform",
+          response: draft.trim(),
+        });
+      }
+      continue;
+    }
+    // CC-170.1 — binary_pick (self-contained Q-TB attitude binaries).
+    // Persists as a SinglePickAnswer carrying the chosen item's signal
+    // — same shape the assessment writes via `handleContinue` and what
+    // `binary_pick_derived` already emits.
+    if (q.type === "binary_pick") {
+      const draft = drafts[q.question_id];
+      if (typeof draft !== "string" || draft.length === 0) continue;
+      const picked = q.items.find((it) => it.id === draft);
+      if (!picked) continue;
+      const answer: SinglePickAnswer = {
+        question_id: q.question_id,
+        card_id: q.card_id,
+        question_text: q.text,
+        type: "single_pick",
+        picked_id: picked.id,
+        picked_signal: picked.signal,
+      };
+      out.push(answer);
+      continue;
+    }
+    // CC-170 — derived gap-fills. Each writes the same Answer shape the
+    // assessment + saveSession.ts already know how to persist (matches
+    // the assessment's `handleContinue` branches one-for-one).
+    if (q.type === "ranking_derived") {
+      const draft = drafts[q.question_id];
+      if (!Array.isArray(draft) || draft.length === 0) continue;
+      const resolved = deriveItemsForCrossRank(
+        q.question_id,
+        q.derived_from,
+        q.derived_top_n ?? 2,
+        sessionAnswers
+      );
+      if (!resolved) continue;
+      out.push({
+        question_id: q.question_id,
+        card_id: q.card_id,
+        question_text: q.text,
+        type: "ranking_derived",
+        order: draft as string[],
+        derived_item_sources: resolved.sources,
+      });
+      continue;
+    }
+    if (q.type === "multiselect_derived") {
+      const state = multiSelectDrafts[q.question_id];
+      if (!state) continue;
+      if (state.selectedIds.length === 0) continue;
+      if (!q.none_option || !q.other_option) continue;
+      const resolved = deriveItemsForMultiSelect(
+        q.derived_from,
+        q.derived_top_n_per_source ?? 3,
+        sessionAnswers
+      );
+      if (!resolved) continue;
+      const noneId = q.none_option.id;
+      const otherId = q.other_option.id;
+      const selections: MultiSelectDerivedAnswer["selections"] = [];
+      for (const sid of state.selectedIds) {
+        if (sid === noneId || sid === otherId) continue;
+        const item: DerivedItem | undefined = resolved.find(
+          (it) => it.id === sid
+        );
+        if (!item) continue;
+        selections.push({
+          id: item.id,
+          signal: item.signal,
+          source_question_id: item.source_question_id,
+        });
+      }
+      if (state.selectedIds.includes(otherId)) {
+        selections.push({ id: otherId, signal: null });
+      }
+      const otherText = state.otherText.trim();
+      const noneSelected = state.selectedIds.includes(noneId);
+      const answer: MultiSelectDerivedAnswer = {
+        question_id: q.question_id,
+        card_id: q.card_id,
+        question_text: q.text,
+        type: "multiselect_derived",
+        selections,
+        none_selected: noneSelected,
+        ...(otherText.length > 0 ? { other_text: otherText } : {}),
+      };
+      out.push(answer);
+      continue;
+    }
+    if (q.type === "binary_pick_derived") {
+      const draft = drafts[q.question_id];
+      if (typeof draft !== "string" || draft.length === 0) continue;
+      const items: RankingItem[] | null = deriveItemsForBinaryPick(
+        q.derived_from ?? [],
+        sessionAnswers
+      );
+      if (!items) continue;
+      const picked = items.find((it) => it.id === draft);
+      if (!picked) continue;
+      const answer: SinglePickAnswer = {
+        question_id: q.question_id,
+        card_id: q.card_id,
+        question_text: q.text,
+        type: "single_pick",
+        picked_id: picked.id,
+        picked_signal: picked.signal,
+      };
+      out.push(answer);
+      continue;
+    }
   }
   return out;
 }

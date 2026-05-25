@@ -314,10 +314,18 @@ export async function GET(
     personName
   );
 
+  // CC-170 — return the session's stored answers so the follow-up page
+  // can resolve derived-question items (ranking_derived /
+  // multiselect_derived / binary_pick_derived) against the parent
+  // rankings the user already completed. The same answers feed the
+  // existing `missingQuestions` + `followUps` computations above; the
+  // payload addition is purely so the client can re-run the same
+  // resolvers the assessment uses.
   return NextResponse.json({
     personName,
     missingQuestions: missing,
     followUps,
+    answers,
   });
 }
 
