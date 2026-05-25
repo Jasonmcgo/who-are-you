@@ -2526,6 +2526,24 @@ function attachCrossSignalDriverInference(
 ): void {
   try {
     const cs = inferDriverFromCrossSignals(constitution);
+    // CC-171 — perceiving-axis cross-signal correction. Runs BEFORE
+    // the lift / classify steps so the corrected dominant flows into
+    // both: the lift gate's `cs.inferredDriver === dominant` equality
+    // (no spurious lift on a flipped-away surface dominant) and the
+    // agreement classifier (which then evaluates cross-signal against
+    // the corrected dominant). Gated on `dominant-convergence-weak`
+    // (thin Q-T data) + cross-signal evidence that the user lives on
+    // the OTHER perceiving mirror axis. See
+    // `applyPerceivingAxisCorrection` in lib/jungianStack.ts for the
+    // full gate semantics and the Ashley/Jason/Daniel control proof.
+    const corrected = applyPerceivingAxisCorrection(
+      constitution.lens_stack,
+      constitution.signals,
+      cs.scores
+    );
+    if (corrected !== constitution.lens_stack) {
+      constitution.lens_stack = corrected;
+    }
     // CC-097B-CALIBRATION Phase 1 — agreement-lift rule.
     // Runs BEFORE the existing agree/disagree/mirror-axis branching so
     // that when Q-T direct and cross-signal converge strongly on the
@@ -3233,7 +3251,10 @@ export function toAnswer(
 // classification (this file) and OCEAN bridges (lib/ocean.ts) read from
 // the shared resolver. Re-exported here so existing import sites that
 // `from "./identityEngine"` keep working bit-for-bit.
-import { aggregateLensStack } from "./jungianStack";
+import {
+  aggregateLensStack,
+  applyPerceivingAxisCorrection,
+} from "./jungianStack";
 export { aggregateLensStack };
 
 export type SignalRef = {

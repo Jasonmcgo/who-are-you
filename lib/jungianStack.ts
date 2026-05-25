@@ -928,6 +928,145 @@ export function computeJungianStack(
   });
 }
 
+// ── CC-171 — perceiving-axis cross-signal correction ────────────────────
+//
+// Bug context: CC-134 Part C replaced average-rank dominant selection
+// with top-pick (rank-1) frequency. For most sessions this is right —
+// it kills weak-vs-weak inversions (Ti-beats-Fi etc.) and prefers the
+// pick the user actually led with. But it has a thin-data failure mode
+// on the perceiving pool: when a function wins the rank-1 count by a
+// margin of 1 in a 4-block sample, the loser can be a more-consistent
+// (always rank 1 or 2) shape whose rank-1 wins clustered in just one
+// or two blocks.
+//
+// Harry (CC-171 anchor): canonical Si-Fe (ISFJ, Si↔Ne mirror), real
+// strong-Ne intuitive. Q-T perceiving top-picks: si=1, se=1, ni=2,
+// ne=0. CC-134 top-pick semantics picks Ni → INFJ. Cross-signal scores
+// from the broader signature (Compass + OCEAN + cost surface + Trust):
+// si=70, ne=40, ni=40, se=50. Cross-signal puts the user firmly on
+// the Si↔Ne axis with Si as the leader, NOT on the Ni↔Se axis.
+//
+// The fix gates STRICTLY on the data state CC-134 made fragile:
+//   (1) The dominant pool's top-pick convergence is weak
+//       (`confidenceLowReasons` includes `dominant-convergence-weak`).
+//   (2) The Q-T-direct dominant is a perceiving function.
+//   (3) The OTHER perceiving axis's higher-cross-signal scorer beats
+//       the current dominant's cross-signal score by ≥
+//       `PERCEIVING_AXIS_CORRECTION_CS_GAP_FLOOR`.
+// When all three hold, the dominant is reassigned to the cross-signal
+// leader of the other axis; the auxiliary is re-picked from
+// `VALID_AUX_BY_DOMINANT[new_dom]` by existing top-pick semantics; the
+// tertiary / inferior / mbtiCode follow from `STACK_TABLE[new_dom|aux]`.
+// `confidence` stays `low` (any session reaching this branch already
+// reads `low`); the existing CC-097B agree/disagree/mirror-axis
+// classifier runs AFTER the correction against the new dominant.
+//
+// Control safety (verified empirically against the cohort fixtures):
+//   - Ashley (canonical Ni, clean Q-T Ni lead = 3): no
+//     `dominant-convergence-weak` → gate (1) fails → no flip. Stays Ni.
+//   - Jason (canonical Ni, Q-T Ni lead = 4): no
+//     `dominant-convergence-weak` → stays Ni.
+//   - Daniel (canonical Si, Q-T Si lead = 2): no
+//     `dominant-convergence-weak` → stays Si.
+//   - Nat (CC-161 binary-format target): binary sessions resolve
+//     via `aggregateLensStackBinary` — which never emits
+//     `dominant-convergence-weak` (that flag is legacy-path only) →
+//     binary path untouched.
+//
+// `crossSignalScores` is the broader-signature score sheet from
+// `inferDriverFromCrossSignals`. Passing the score map (rather than
+// the full inference object) keeps this helper free of a
+// cross-signal-module import cycle.
+
+export const PERCEIVING_AXIS_CORRECTION_CS_GAP_FLOOR = 20;
+// CC-171 — minimum perceiving-pool scored blocks before the
+// cross-signal axis correction is allowed to fire. Set to
+// `MIN_QT_BLOCKS_WITH_DATA` (3) so we don't second-guess the
+// Q-T-direct dominant on inherently-ambiguous super-sparse data
+// (e.g., synthetic goal-soul-give test fixtures that only carry 1–3
+// Q-T answers). Harry's 8-block fixture clears this floor; the
+// 1-Q-T-rank-1-pick synthetic fixtures don't.
+export const PERCEIVING_AXIS_CORRECTION_MIN_BLOCKS =
+  MIN_QT_BLOCKS_WITH_DATA;
+
+/**
+ * The other perceiving axis's two candidate functions, given the
+ * dominant's axis. Returns null if `dom` isn't a perceiving function.
+ */
+function otherPerceivingAxisPair(
+  dom: CognitiveFunctionId
+): [CognitiveFunctionId, CognitiveFunctionId] | null {
+  if (dom === "ni" || dom === "se") return ["si", "ne"];
+  if (dom === "si" || dom === "ne") return ["ni", "se"];
+  return null;
+}
+
+export function applyPerceivingAxisCorrection(
+  lensStack: LensStack,
+  signals: Signal[],
+  crossSignalScores: Record<CognitiveFunctionId, number>
+): LensStack {
+  const reasons = lensStack.confidenceLowReasons ?? [];
+  if (!reasons.includes("dominant-convergence-weak")) return lensStack;
+
+  const currentDom = lensStack.dominant;
+  const otherAxis = otherPerceivingAxisPair(currentDom);
+  if (!otherAxis) return lensStack;
+
+  // CC-171 — perceiving-pool min-blocks guard. The correction is a
+  // cross-signal-informed re-routing of a thin Q-T lead; if the Q-T
+  // perceiving data itself is below the min-blocks floor, the
+  // correction would be a coin flip on the cross-signal scores alone,
+  // which is the exact "global Ni/Si re-weighting" failure the prompt
+  // forbids. Harry has 4 perceiving Q-T blocks (clears 3); the
+  // synthetic 1-pick goal-soul-give fixtures fail this floor and stay
+  // on the Q-T-direct read.
+  if (scoredBlocksFor(signals, PERCEIVING) < PERCEIVING_AXIS_CORRECTION_MIN_BLOCKS) {
+    return lensStack;
+  }
+
+  const [a, b] = otherAxis;
+  const aScore = crossSignalScores[a] ?? 0;
+  const bScore = crossSignalScores[b] ?? 0;
+  const candidate = aScore >= bScore ? a : b;
+  const candidateScore = Math.max(aScore, bScore);
+  const currentDomScore = crossSignalScores[currentDom] ?? 0;
+  if (candidateScore - currentDomScore < PERCEIVING_AXIS_CORRECTION_CS_GAP_FLOOR) {
+    return lensStack;
+  }
+
+  // Re-pick the auxiliary from `VALID_AUX_BY_DOMINANT[candidate]` using
+  // the same top-pick / averageRank / name tiebreak the legacy path
+  // uses (`aggregateLensStack` ~L711).
+  const validAuxCandidates = VALID_AUX_BY_DOMINANT[candidate];
+  const auxByTopPick = validAuxCandidates
+    .map((fn) => ({
+      fn,
+      topPicks: topPickCountFor(signals, fn),
+      avg: averageRank(signals, fn),
+    }))
+    .sort((a, b) => {
+      if (b.topPicks !== a.topPicks) return b.topPicks - a.topPicks;
+      if (a.avg !== b.avg) return a.avg - b.avg;
+      return a.fn.localeCompare(b.fn);
+    });
+  const newAux = auxByTopPick[0].fn;
+  const key = `${candidate}|${newAux}`;
+  const stackTuple = STACK_TABLE[key];
+  const mbtiCode = MBTI_LOOKUP[key];
+  if (!stackTuple) return lensStack; // defensive — should never miss given
+  // VALID_AUX_BY_DOMINANT is derived from STACK_TABLE.
+
+  return {
+    ...lensStack,
+    dominant: stackTuple[0],
+    auxiliary: stackTuple[1],
+    tertiary: stackTuple[2],
+    inferior: stackTuple[3],
+    mbtiCode,
+  };
+}
+
 // ── Re-exports for diagnostic-time inspection ───────────────────────────
 
 export const JUNGIAN_STACK_TABLE = STACK_TABLE;
