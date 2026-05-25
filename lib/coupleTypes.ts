@@ -54,6 +54,15 @@ export type OptionValence = "generous" | "neutral" | "critical";
 export interface CoupleGameOption {
   id: string;
   label: string;
+  // CC-COUPLE-PRONOUN-FIX — partner-mode template for the same option.
+  // Populated ONLY for options whose `label` contains "you/your/yourself"
+  // referring to the BELOVED (the assessed partner). Uses the same role
+  // tokens as `CoupleGameItemSpec.promptAboutPartner` ({S} / {S_pron} /
+  // {S_obj} / {S_poss} / {S_refl}); the API resolves them through the
+  // same substitution. Absent for options that already read correctly
+  // about a third person (abstract nouns, guesser-referring "you", and
+  // quoted direct-address compliments).
+  labelAboutPartner?: string;
   // Present only on items where a generous/critical reading genuinely
   // exists (e.g. `grip_costs_you`, `the_thing_i_call_helping`). Absent
   // when all options are the same valence — Loving Misread requires a
@@ -93,6 +102,68 @@ export interface CoupleGameItemSpec {
   // Oblivious / Loving Misread (never to a fabricated Mirror Blind /
   // Hidden Pattern).
   predict: (ic: InnerConstitution) => string | null;
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// CC-COUPLE-8 — Two-direction results bundle.
+//
+// When both partners are assessed (Mode 2), the bond stores one
+// `CoupleGameResults` per direction. The stored shape on
+// `couple_sessions.game_results` is one of:
+//
+//   - Legacy bare CoupleGameResults (Mode 1 from CC-COUPLE-1/3/4 — the
+//     bundle key was implicit "b_guesses_a"). New writes don't produce
+//     this shape, but existing completed bonds in dev/prod have it.
+//   - CoupleGameResultsBundle (Mode 2 + new Mode 1 writes): either or
+//     both direction keys populated.
+//
+// Readers normalize via `normalizeGameResultsBundle` so the reveal /
+// compare layer only ever sees the bundle shape.
+// ─────────────────────────────────────────────────────────────────────
+
+export interface CoupleGameResultsBundle {
+  a_guesses_b?: CoupleGameResults;
+  b_guesses_a?: CoupleGameResults;
+}
+
+export function isCoupleGameResultsBundle(
+  value: unknown
+): value is CoupleGameResultsBundle {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const v = value as Record<string, unknown>;
+  // A bundle is recognized by having direction keys at the top level
+  // (legacy bare CoupleGameResults has `items` + `playedAt`, not these).
+  if (!("a_guesses_b" in v) && !("b_guesses_a" in v)) return false;
+  if (v.a_guesses_b !== undefined && !isCoupleGameResults(v.a_guesses_b)) {
+    return false;
+  }
+  if (v.b_guesses_a !== undefined && !isCoupleGameResults(v.b_guesses_a)) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Normalize `couple_sessions.game_results` (which may be null, a legacy
+ * bare `CoupleGameResults`, or a `CoupleGameResultsBundle`) into the
+ * bundle shape. Legacy bare maps to `{ b_guesses_a: bare }` — Mode 1's
+ * implicit direction.
+ *
+ * Returns null only when the input is null/undefined or completely
+ * unrecognized. The reveal layer treats null as "no completed
+ * directions yet" (intro state).
+ */
+export function normalizeGameResultsBundle(
+  raw: unknown
+): CoupleGameResultsBundle | null {
+  if (raw === null || raw === undefined) return null;
+  if (isCoupleGameResultsBundle(raw)) return raw;
+  if (isCoupleGameResults(raw)) {
+    // Legacy bare CoupleGameResults — wrap into the implicit b_guesses_a
+    // slot so the reveal layer's per-direction code path works.
+    return { b_guesses_a: raw };
+  }
+  return null;
 }
 
 export function isCoupleGameResults(value: unknown): value is CoupleGameResults {

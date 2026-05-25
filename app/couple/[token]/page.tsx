@@ -30,16 +30,27 @@ interface ItemPayload {
 
 interface BondInfo {
   hasPartnerB: boolean;
+  /** CC-COUPLE-8 — true when both partners are assessed (Mode 2). */
+  mode2: boolean;
 }
 
+type CoupleRole = "a" | "b";
+
 interface IntroPayload {
-  status: "invited" | "b_joined";
-  /** CC-COUPLE-7 — alias of `partnerAName`, kept for back-compat. */
+  /**
+   * CC-COUPLE-8 — `"needs_role"` is the Mode 2 role-select state. The
+   * page renders a "Which one are you?" picker and re-fetches with the
+   * role.
+   */
+  status: "invited" | "b_joined" | "needs_role";
+  /** CC-COUPLE-7 — alias of partnerAName, kept for back-compat. */
   personName: string;
   partnerAName: string;
   /** CC-COUPLE-7 — guesser display name (null on legacy one-sided invites). */
   partnerBName: string | null;
   bond: BondInfo;
+  /** CC-COUPLE-8 — viewer role this intro is for (null in needs_role). */
+  role: CoupleRole | null;
   items: ItemPayload[];
 }
 
@@ -76,17 +87,42 @@ interface RevealPayload {
   partnerAName: string;
   partnerBName: string | null;
   bond: BondInfo;
+  direction: "a_guesses_b" | "b_guesses_a";
+  awaiting?: { partnerName: string };
   warmTotal: WarmTotalPayload;
   items: ResolvedItem[];
 }
 
-type ApiPayload = IntroPayload | RevealPayload;
+// CC-COUPLE-8 — compare-view payload (Mode 2, both directions done).
+interface DirectionView {
+  direction: "a_guesses_b" | "b_guesses_a";
+  subjectName: string;
+  guesserName: string;
+  warmTotal: WarmTotalPayload;
+  items: ResolvedItem[];
+}
+
+interface ComparePayload {
+  status: "compared";
+  partnerAName: string;
+  partnerBName: string;
+  bond: BondInfo;
+  directions: {
+    a_guesses_b: DirectionView;
+    b_guesses_a: DirectionView;
+  };
+  winner: { kind: "a" | "b" | "tie"; line: string };
+}
+
+type ApiPayload = IntroPayload | RevealPayload | ComparePayload;
 
 type LoadState =
   | { status: "loading" }
   | { status: "error"; message: string }
+  | { status: "role_select"; data: IntroPayload }
   | { status: "intro"; data: IntroPayload }
-  | { status: "reveal"; data: RevealPayload };
+  | { status: "reveal"; data: RevealPayload }
+  | { status: "compare"; data: ComparePayload };
 
 type SubmitState =
   | { status: "idle" }
@@ -109,68 +145,103 @@ export default function CoupleGamePage({
   // Per-item full ranked order (option ids). Top-3 is what gets scored;
   // we send the full order so the API can take slice(0, 3) deterministically.
   const [rankings, setRankings] = useState<Record<string, string[]>>({});
+  // CC-COUPLE-8 — viewer-picked role in Mode 2. Drives the fetch (?role=)
+  // and the POST body's role field.
+  const [role, setRole] = useState<CoupleRole | null>(null);
+
+  function classifyPayload(data: ApiPayload): LoadState {
+    if (data.status === "compared") {
+      return { status: "compare", data };
+    }
+    if (data.status === "completed") {
+      return { status: "reveal", data };
+    }
+    if (data.status === "needs_role") {
+      return { status: "role_select", data };
+    }
+    return { status: "intro", data };
+  }
+
+  // CC-COUPLE-8 — fetch with optional role query param. The role-select
+  // step calls this to re-fetch as the chosen partner.
+  async function fetchPayload(activeRole: CoupleRole | null): Promise<void> {
+    const qs = activeRole ? `?role=${activeRole}` : "";
+    try {
+      const res = await fetch(`/api/couple/${token}${qs}`);
+      if (!res.ok) {
+        if (res.status === 404) {
+          setLoad({ status: "error", message: "this-link-isnt-active" });
+          return;
+        }
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setLoad({
+          status: "error",
+          message: body.error ?? `request failed (${res.status})`,
+        });
+        return;
+      }
+      const data = (await res.json()) as ApiPayload;
+      setLoad(classifyPayload(data));
+    } catch (e) {
+      setLoad({
+        status: "error",
+        message: e instanceof Error ? e.message : "request failed",
+      });
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const res = await fetch(`/api/couple/${token}`);
-        if (!res.ok) {
-          if (cancelled) return;
-          if (res.status === 404) {
-            setLoad({ status: "error", message: "this-link-isnt-active" });
-            return;
-          }
-          const body = (await res.json().catch(() => ({}))) as { error?: string };
-          setLoad({
-            status: "error",
-            message: body.error ?? `request failed (${res.status})`,
-          });
-          return;
-        }
-        const data = (await res.json()) as ApiPayload;
-        if (cancelled) return;
-        if (data.status === "completed") {
-          setLoad({ status: "reveal", data });
-        } else {
-          setLoad({ status: "intro", data });
-        }
-      } catch (e) {
-        if (cancelled) return;
-        setLoad({
-          status: "error",
-          message: e instanceof Error ? e.message : "request failed",
-        });
-      }
+      // Initial fetch — no role yet. Mode 2 returns needs_role; Mode 1
+      // returns intro/reveal directly. Either is fine.
+      await fetchPayload(null);
+      if (cancelled) return;
     })();
     return () => {
       cancelled = true;
     };
+    // CC-COUPLE-8 — `fetchPayload` is defined inside the component and
+    // would re-create every render; including it in deps causes an
+    // infinite re-fetch loop. The token is the only thing that
+    // legitimately drives a re-fetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  function handlePickRole(picked: CoupleRole) {
+    setRole(picked);
+    setLoad({ status: "loading" });
+    fetchPayload(picked);
+  }
 
   async function handleSubmit() {
     if (load.status !== "intro") return;
     setSubmitState({ status: "submitting" });
     try {
-      // Build the ranked-top-3 map. For any item B didn't touch, fall back
-      // to the option order as presented (an undeliberate ranking) — the
-      // resolver will score it the same way as any other guess.
       const rankedGuesses: Record<string, string[]> = {};
       for (const item of load.data.items) {
         const order = rankings[item.itemId] ?? item.options.map((o) => o.id);
         rankedGuesses[item.itemId] = order.slice(0, 3);
       }
+      // CC-COUPLE-8 — include role in the POST body in Mode 2. Mode 1
+      // ignores it. Take role from intro payload (server-emitted) which
+      // is the source of truth.
+      const submitRole = load.data.role ?? role;
       const res = await fetch(`/api/couple/${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rankedGuesses }),
+        body: JSON.stringify(
+          submitRole
+            ? { rankedGuesses, role: submitRole }
+            : { rankedGuesses }
+        ),
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(body.error ?? `submit failed (${res.status})`);
       }
-      const data = (await res.json()) as RevealPayload;
-      setLoad({ status: "reveal", data });
+      const data = (await res.json()) as ApiPayload;
+      setLoad(classifyPayload(data));
       setSubmitState({ status: "idle" });
     } catch (e) {
       setSubmitState({
@@ -197,6 +268,10 @@ export default function CoupleGamePage({
           <LoadingState />
         ) : load.status === "error" ? (
           <InactiveLinkState detail={load.message} />
+        ) : load.status === "role_select" ? (
+          <RoleSelectScreen data={load.data} onPick={handlePickRole} />
+        ) : load.status === "compare" ? (
+          <CompareScreen data={load.data} />
         ) : load.status === "reveal" ? (
           <RevealScreen data={load.data} />
         ) : (
@@ -502,6 +577,97 @@ const TIER_BLURB: Record<RankedRevealTier, string> = {
     "No strong read on this one — skipped for scoring.",
 };
 
+// CC-COUPLE-8 — Mode 2 role-select. Shown when the bond is both-assessed
+// and no role yet. The viewer picks which partner they are; the page
+// re-fetches with the role to bring up the right direction.
+function RoleSelectScreen({
+  data,
+  onPick,
+}: {
+  data: IntroPayload;
+  onPick: (role: CoupleRole) => void;
+}) {
+  const aName = data.partnerAName;
+  const bName = data.partnerBName ?? "Partner B";
+  return (
+    <>
+      <header className="flex flex-col" style={{ gap: 10 }}>
+        <p
+          className="font-mono uppercase"
+          style={{
+            fontSize: 11,
+            letterSpacing: "0.16em",
+            color: "var(--ink-mute)",
+            margin: 0,
+          }}
+        >
+          Obvious or Oblivious?
+        </p>
+        <h1
+          className="font-serif"
+          style={{
+            fontSize: 22,
+            fontWeight: 500,
+            color: "var(--ink)",
+            margin: 0,
+            lineHeight: 1.25,
+          }}
+        >
+          Which one are you?
+        </h1>
+        <p
+          className="font-serif italic"
+          style={{
+            fontSize: 14,
+            color: "var(--ink-soft)",
+            margin: 0,
+            lineHeight: 1.55,
+          }}
+        >
+          Pick yourself. You&apos;ll read the other one, and when both of you
+          finish, you&apos;ll see the head-to-head.
+        </p>
+      </header>
+      <div
+        className="flex flex-col"
+        style={{ gap: 12, marginTop: 8 }}
+      >
+        <RolePickButton label={`I'm ${aName}`} onClick={() => onPick("a")} />
+        <RolePickButton label={`I'm ${bName}`} onClick={() => onPick("b")} />
+      </div>
+    </>
+  );
+}
+
+function RolePickButton({
+  label,
+  onClick,
+}: {
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      data-focus-ring
+      className="font-serif text-left"
+      style={{
+        background: "var(--paper-warm)",
+        border: "1px solid var(--rule)",
+        padding: "16px 18px",
+        borderRadius: 8,
+        cursor: "pointer",
+        fontSize: 16,
+        color: "var(--ink)",
+        lineHeight: 1.4,
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
 function RevealScreen({ data }: { data: RevealPayload }) {
   const { warmTotal, items, personName, partnerAName, partnerBName, bond } =
     data;
@@ -544,19 +710,239 @@ function RevealScreen({ data }: { data: RevealPayload }) {
 
       <WarmTotalCard warmTotal={warmTotal} personName={aName} />
 
+      {/* CC-COUPLE-8 — Mode 2 one-side-done state: viewer's reveal is in,
+          but their partner hasn't played yet. The compare view will
+          unlock once both finish. */}
+      {data.awaiting ? (
+        <AwaitingPartnerBanner partnerName={data.awaiting.partnerName} />
+      ) : null}
+
       <section className="flex flex-col" style={{ gap: 16 }}>
         {items.map((it) => (
           <ItemReveal key={it.itemId} item={it} />
         ))}
       </section>
 
-      {/* CC-COUPLE-7 — Mode 2 seam. Renders only when the bond ties two
-          real sessions (both assessed); the actual comparative game is
-          CC-COUPLE-8. Disabled until that lands. */}
-      {bond.hasPartnerB ? <Mode2Seam aName={aName} bName={partnerBName} /> : null}
+      {/* CC-COUPLE-7 — Mode 2 seam. Shown only on Mode 1 / pre-Mode 2
+          (bond.mode2 false) so it stops competing with the live compare
+          screen. */}
+      {bond.hasPartnerB && !bond.mode2 ? (
+        <Mode2Seam aName={aName} bName={partnerBName} />
+      ) : null}
 
       <PartnerTrajectoryNudge />
     </>
+  );
+}
+
+// CC-COUPLE-8 — banner over a one-side-done reveal.
+function AwaitingPartnerBanner({ partnerName }: { partnerName: string }) {
+  return (
+    <div
+      className="flex flex-col"
+      style={{
+        gap: 6,
+        padding: "12px 16px",
+        borderRadius: 8,
+        background: "var(--paper-warm)",
+        border: "1px dashed var(--rule-soft)",
+      }}
+    >
+      <p
+        className="font-mono uppercase"
+        style={{
+          fontSize: 10,
+          letterSpacing: "0.14em",
+          color: "var(--umber)",
+          margin: 0,
+        }}
+      >
+        Waiting on {partnerName}
+      </p>
+      <p
+        className="font-serif italic"
+        style={{
+          fontSize: 13,
+          color: "var(--ink-soft)",
+          margin: 0,
+          lineHeight: 1.5,
+        }}
+      >
+        Your read is in. When {partnerName} finishes their pass, the
+        head-to-head unlocks.
+      </p>
+    </div>
+  );
+}
+
+// CC-COUPLE-8 — head-to-head compare view (both directions done).
+function CompareScreen({ data }: { data: ComparePayload }) {
+  const { directions, winner, partnerAName, partnerBName } = data;
+  return (
+    <>
+      <header className="flex flex-col" style={{ gap: 10 }}>
+        <p
+          className="font-mono uppercase"
+          style={{
+            fontSize: 11,
+            letterSpacing: "0.16em",
+            color: "var(--ink-mute)",
+            margin: 0,
+          }}
+        >
+          Head-to-head
+        </p>
+        <h1
+          className="font-serif"
+          style={{
+            fontSize: 22,
+            fontWeight: 500,
+            color: "var(--ink)",
+            margin: 0,
+            lineHeight: 1.25,
+          }}
+        >
+          {partnerAName} & {partnerBName} — who read whom?
+        </h1>
+        <p
+          className="font-serif italic"
+          style={{
+            fontSize: 14,
+            color: "var(--ink-soft)",
+            margin: 0,
+            lineHeight: 1.55,
+          }}
+        >
+          {winner.line}
+        </p>
+      </header>
+
+      <CompareScoreboard
+        a_guesses_b={directions.a_guesses_b}
+        b_guesses_a={directions.b_guesses_a}
+        winnerKind={winner.kind}
+      />
+
+      <CompareDirectionBlock view={directions.b_guesses_a} />
+      <CompareDirectionBlock view={directions.a_guesses_b} />
+
+      <PartnerTrajectoryNudge />
+    </>
+  );
+}
+
+function CompareScoreboard({
+  a_guesses_b,
+  b_guesses_a,
+  winnerKind,
+}: {
+  a_guesses_b: DirectionView;
+  b_guesses_a: DirectionView;
+  winnerKind: "a" | "b" | "tie";
+}) {
+  const rows = [
+    {
+      who: a_guesses_b.guesserName,
+      subject: a_guesses_b.subjectName,
+      total: a_guesses_b.warmTotal.totalPoints,
+      max: a_guesses_b.warmTotal.maxPoints,
+      isWinner: winnerKind === "a",
+    },
+    {
+      who: b_guesses_a.guesserName,
+      subject: b_guesses_a.subjectName,
+      total: b_guesses_a.warmTotal.totalPoints,
+      max: b_guesses_a.warmTotal.maxPoints,
+      isWinner: winnerKind === "b",
+    },
+  ];
+  return (
+    <section
+      className="flex flex-col"
+      style={{
+        gap: 8,
+        padding: "16px 18px",
+        borderRadius: 8,
+        background: "var(--paper-warm)",
+        border: "1px solid var(--rule-soft)",
+      }}
+    >
+      <p
+        className="font-mono uppercase"
+        style={{
+          fontSize: 11,
+          letterSpacing: "0.16em",
+          color: "var(--ink-mute)",
+          margin: 0,
+        }}
+      >
+        Scoreboard
+      </p>
+      {rows.map((row) => (
+        <div
+          key={`${row.who}-${row.subject}`}
+          className="flex flex-row items-baseline justify-between"
+          style={{ gap: 12, flexWrap: "wrap" }}
+        >
+          <p
+            className="font-serif"
+            style={{
+              fontSize: 15,
+              color: "var(--ink)",
+              margin: 0,
+              lineHeight: 1.4,
+            }}
+          >
+            {row.who} read {row.subject}
+            {winnerKind !== "tie" && row.isWinner ? " ←" : ""}
+          </p>
+          <p
+            className="font-mono"
+            style={{
+              fontSize: 14,
+              color: "var(--ink)",
+              margin: 0,
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {row.total} / {row.max} pts
+          </p>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function CompareDirectionBlock({ view }: { view: DirectionView }) {
+  return (
+    <section
+      className="flex flex-col"
+      style={{
+        gap: 12,
+        padding: "16px 18px",
+        borderRadius: 8,
+        background: "var(--paper)",
+        border: "1px solid var(--rule)",
+      }}
+    >
+      <p
+        className="font-mono uppercase"
+        style={{
+          fontSize: 11,
+          letterSpacing: "0.16em",
+          color: "var(--umber)",
+          margin: 0,
+        }}
+      >
+        {view.guesserName} reading {view.subjectName}
+      </p>
+      <WarmTotalCard warmTotal={view.warmTotal} personName={view.subjectName} />
+      <div className="flex flex-col" style={{ gap: 12 }}>
+        {view.items.map((it) => (
+          <ItemReveal key={`${view.direction}-${it.itemId}`} item={it} />
+        ))}
+      </div>
+    </section>
   );
 }
 

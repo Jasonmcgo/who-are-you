@@ -1,25 +1,25 @@
-// CC-COUPLE-3 + CC-COUPLE-4 — Public couple-game GET/POST handler.
+// CC-COUPLE-3 + CC-COUPLE-4 + CC-COUPLE-8 — Public couple-game GET/POST handler.
 //
 // Route: `/api/couple/[token]` (outside /api/admin/**, public; the
 // unguessable token is the auth).
 //
-// GET  → intro payload (partner-A first name, the item bank, status,
-//        and — when the session is already `completed` — the saved
-//        reveal payload so the page can jump straight to the reveal).
-// POST → resolves B's ranked-top-3 guesses against A's
-//        `InnerConstitution`, stores the resulting `CoupleGameResults`
-//        on `couple_sessions`, and returns the resolved reveal payload.
+// Mode 1 (B not assessed, legacy report-page mint): one-way — B reads A.
+// Mode 2 (CC-COUPLE-8, both partners assessed): two-way — each reads
+// the other. The page passes a `role: "a" | "b"` so the route knows
+// which direction is being played; the subject is the OTHER partner and
+// engine predictions run against the SUBJECT's `InnerConstitution`
+// (not always A's). When both directions are done the route emits a
+// compare-view payload.
 //
-// Asymmetric, engine-as-truth: the "engine answer" for each item is
-// `item.predict(icA)`. Items where `predict` returns null surface as
-// `tier: "unscored"` ("no strong read") and are not scored.
+// Engine-as-truth: the "engine answer" for each item is
+// `item.predict(subjectIC)`. Items where `predict` returns null surface
+// as `tier: "unscored"`.
 //
-// CC-COUPLE-4: scoring is partial-credit per
-// docs/obvious-oblivious-game-spec.md — 5 / 3 / 1 / 0 tiers based on
-// where the engine answer lands in B's top-3, with a "strong adjacent"
-// tier for guesses that name a nearby pattern. The ranked top-3 is
-// pipe-encoded into the existing `CoupleGameItem.partnerGuess` string
-// field (CC-COUPLE-1 data model unchanged).
+// CC-COUPLE-4 scoring: partial-credit per
+// docs/obvious-oblivious-game-spec.md — 5 / 3 / 1 / 0 tiers; "strong
+// adjacent" for nearby patterns. Ranked top-3 is pipe-encoded into the
+// existing `CoupleGameItem.partnerGuess` string field (CC-COUPLE-1
+// data model unchanged).
 
 import { NextResponse, type NextRequest } from "next/server";
 import { eq } from "drizzle-orm";
@@ -32,7 +32,7 @@ import {
 import { buildInnerConstitution } from "../../../../lib/identityEngine";
 import {
   getCoupleSessionByToken,
-  saveGameResults,
+  saveDirectionResults,
   type CoupleSessionRow,
 } from "../../../../lib/coupleSession";
 import {
@@ -49,9 +49,11 @@ import {
   summarizeWarmTotal,
   type RankedRevealTier,
 } from "../../../../lib/coupleReveal";
-import type {
-  CoupleGameItem,
-  CoupleGameResults,
+import {
+  normalizeGameResultsBundle,
+  type CoupleGameDirection,
+  type CoupleGameItem,
+  type CoupleGameResults,
 } from "../../../../lib/coupleTypes";
 import type {
   Answer,
@@ -111,11 +113,43 @@ interface WarmTotalPayload {
 interface BondInfo {
   /** CC-COUPLE-7 — true when the row has both partner session ids. */
   hasPartnerB: boolean;
+  /**
+   * CC-COUPLE-8 — true when the bond is Mode 2 (both partners assessed
+   * AND we could derive a constitution for the second partner). When
+   * false, the bond stays on the Mode 1 one-way flow.
+   */
+  mode2: boolean;
+}
+
+type CoupleRole = "a" | "b";
+
+/** CC-COUPLE-8 — per-direction view block used inside the compare payload. */
+interface DirectionView {
+  direction: CoupleGameDirection;
+  /** The partner being read (the engine ran against THIS person's IC). */
+  subjectName: string;
+  /** The partner doing the guessing. */
+  guesserName: string;
+  warmTotal: WarmTotalPayload;
+  items: ResolvedItem[];
+}
+
+/** CC-COUPLE-8 — compare-view payload (both directions done). */
+interface ComparePayload {
+  status: "compared";
+  partnerAName: string;
+  partnerBName: string;
+  bond: BondInfo;
+  directions: {
+    a_guesses_b: DirectionView;
+    b_guesses_a: DirectionView;
+  };
+  winner: { kind: "a" | "b" | "tie"; line: string };
 }
 
 interface RevealPayload {
   status: "completed";
-  /** Subject (Partner A) display name. Alias of `partnerAName` for back-compat. */
+  /** Subject display name. Alias of subjectName for back-compat. */
   personName: string;
   /** CC-COUPLE-7 — bond-resolved subject name (was `personName`). */
   partnerAName: string;
@@ -123,16 +157,32 @@ interface RevealPayload {
   partnerBName: string | null;
   /** CC-COUPLE-7 — bond shape; the page uses this to show the Mode 2 seam. */
   bond: BondInfo;
+  /** CC-COUPLE-8 — direction this reveal corresponds to. */
+  direction: CoupleGameDirection;
+  /**
+   * CC-COUPLE-8 — populated in Mode 2 when the viewer's direction is
+   * done but the partner's isn't. The page shows the viewer's reveal
+   * with a "waiting on {partner}" overlay until the partner plays.
+   */
+  awaiting?: { partnerName: string };
   warmTotal: WarmTotalPayload;
   items: ResolvedItem[];
 }
 
 interface IntroPayload {
-  status: "invited" | "b_joined";
+  /**
+   * CC-COUPLE-8 — `"needs_role"` is the Mode 2 role-select state, when
+   * the bond is both-assessed but the GET arrived without a `?role=`
+   * query param. The page renders a "Which one are you?" picker and
+   * re-fetches with the role.
+   */
+  status: "invited" | "b_joined" | "needs_role";
   personName: string;
   partnerAName: string;
   partnerBName: string | null;
   bond: BondInfo;
+  /** CC-COUPLE-8 — viewer role on this fetch (null in role_select state). */
+  role: CoupleRole | null;
   items: ItemPayload[];
 }
 
@@ -247,6 +297,17 @@ interface SubjectPronouns {
   poss: string;
   /** reflexive — herself / himself / themselves */
   refl: string;
+  /**
+   * CC-COUPLE-PRONOUN-FIX — true only when the subject's demographics
+   * carried a binary-gender value we recognized (woman/female/f or
+   * man/male/m). False for opt-out, missing, or unrecognized values
+   * (which default to singular they/their). The substitution layer
+   * uses this to route the "name on file but no gender" case through
+   * a name-flavored fallback ({S_poss} → "Michele's", {S_obj}/{S} →
+   * "Michele") instead of producing awkward "they"/"them" forms when a
+   * concrete name is right there.
+   */
+  hasBinaryGender: boolean;
 }
 
 const PRONOUNS_THEY: SubjectPronouns = {
@@ -254,18 +315,21 @@ const PRONOUNS_THEY: SubjectPronouns = {
   obj: "them",
   poss: "their",
   refl: "themselves",
+  hasBinaryGender: false,
 };
 const PRONOUNS_SHE: SubjectPronouns = {
   pron: "she",
   obj: "her",
   poss: "her",
   refl: "herself",
+  hasBinaryGender: true,
 };
 const PRONOUNS_HE: SubjectPronouns = {
   pron: "he",
   obj: "him",
   poss: "his",
   refl: "himself",
+  hasBinaryGender: true,
 };
 
 function subjectPronouns(
@@ -288,40 +352,97 @@ function capitalizeFirstLetter(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+// CC-COUPLE-PRONOUN-FIX — shared token-substitution helper used by BOTH
+// `resolvePromptAboutPartner` (prompts) and `resolveOptionLabel` (option
+// labels). Three cases:
+//
+//   A. No name on file (personName === "your partner") — substitute the
+//      noun "your partner" for {S}, {S_pron}, and {S_obj}; singular
+//      "their" / "themselves" for {S_poss} / {S_refl}. Avoids the
+//      "they gives" verb-agreement awkwardness and matches the
+//      CC-COUPLE-6 acceptance example for `aim_gives_you`.
+//
+//   B. Name on file, gender NOT on file (pronouns.hasBinaryGender ===
+//      false but name is present) — use the name for {S}, {S_obj}, and
+//      `{name}'s` for {S_poss}; keep singular-they for {S_pron} and
+//      {S_refl}. "Michele themselves" / "they themselves" both read
+//      worse than "themselves" alone, so the reflexive stays
+//      pronoun-only.
+//
+//   C. Name + recognized binary gender — use the pronoun set verbatim.
+//
+// Sentence-leading-fallback capitalization applies in case A only:
+// when the template literally starts with `{S}`, the rendered subject
+// gets a capital first letter so the sentence reads "Your partner …".
+function substituteSubjectTokens(
+  template: string,
+  personName: string,
+  pronouns: SubjectPronouns
+): string {
+  const hasName = personName !== "your partner";
+  let sToken: string;
+  let sPronToken: string;
+  let sObjToken: string;
+  let sPossToken: string;
+  let sReflToken: string;
+
+  if (!hasName) {
+    // Case A — no name on file.
+    sToken = template.startsWith("{S}")
+      ? capitalizeFirstLetter(personName)
+      : personName;
+    sPronToken = "your partner";
+    sObjToken = "your partner";
+    sPossToken = pronouns.poss; // "their"
+    sReflToken = pronouns.refl; // "themselves"
+  } else if (!pronouns.hasBinaryGender) {
+    // Case B — name on file, gender unknown / opt-out.
+    sToken = personName;
+    sPronToken = "they";
+    sObjToken = personName;
+    sPossToken = `${personName}'s`;
+    sReflToken = "themselves";
+  } else {
+    // Case C — name + binary gender; use pronouns verbatim.
+    sToken = personName;
+    sPronToken = pronouns.pron;
+    sObjToken = pronouns.obj;
+    sPossToken = pronouns.poss;
+    sReflToken = pronouns.refl;
+  }
+
+  // Substitute longest tokens first so `{S_pron}` / `{S_poss}` /
+  // `{S_refl}` / `{S_obj}` never alias against the single-character
+  // `{S}` token.
+  return template
+    .replace(/\{S_pron\}/g, sPronToken)
+    .replace(/\{S_poss\}/g, sPossToken)
+    .replace(/\{S_refl\}/g, sReflToken)
+    .replace(/\{S_obj\}/g, sObjToken)
+    .replace(/\{S\}/g, sToken);
+}
+
 function resolvePromptAboutPartner(
   template: string,
   personName: string,
   pronouns: SubjectPronouns
 ): string {
-  // Sentence-leading-fallback capitalization: when the template starts
-  // with `{S}` AND the name fell back to "your partner", lift the case
-  // so the rendered sentence begins with "Your partner …" not "your".
-  const startsWithSubjectToken = template.startsWith("{S}");
-  const subject =
-    startsWithSubjectToken && personName === "your partner"
-      ? capitalizeFirstLetter(personName)
-      : personName;
-  // No-name case: substitute the noun "your partner" for the subject
-  // and object pronoun slots too. Avoids singular-they verb-agreement
-  // awkwardness ("they gives you" / "they becomes") and matches the
-  // CC-COUPLE-6 acceptance example for `aim_gives_you`:
-  //   "When your partner is at their best, your partner gives you:".
-  // Possessive + reflexive stay as singular "their" / "themselves",
-  // which read naturally when the unknown subject is referenced by
-  // pronoun rather than noun.
-  const subjectPron =
-    personName === "your partner" ? "your partner" : pronouns.pron;
-  const objectPron =
-    personName === "your partner" ? "your partner" : pronouns.obj;
-  // Substitute longest tokens first so `{S_pron}` / `{S_poss}` /
-  // `{S_refl}` / `{S_obj}` never alias against the single-character
-  // `{S}` token.
-  return template
-    .replace(/\{S_pron\}/g, subjectPron)
-    .replace(/\{S_poss\}/g, pronouns.poss)
-    .replace(/\{S_refl\}/g, pronouns.refl)
-    .replace(/\{S_obj\}/g, objectPron)
-    .replace(/\{S\}/g, subject);
+  return substituteSubjectTokens(template, personName, pronouns);
+}
+
+// CC-COUPLE-PRONOUN-FIX — partner-mode option-label resolver. Falls
+// through to the raw `label` when the option doesn't carry a partner-
+// mode template (abstract nouns, guesser-referring "you", quoted
+// direct-address compliments — see the audit in coupleGameItems.ts).
+function resolveOptionLabel(
+  o: { label: string; labelAboutPartner?: string },
+  personName: string,
+  pronouns: SubjectPronouns
+): string {
+  if (typeof o.labelAboutPartner === "string" && o.labelAboutPartner.length > 0) {
+    return substituteSubjectTokens(o.labelAboutPartner, personName, pronouns);
+  }
+  return o.label;
 }
 
 function deckMetaFor(itemId: string): { deck: CoupleDeck | null; deckLabel: string } {
@@ -352,25 +473,45 @@ function itemsForIntro(
       sourceSignal: item.sourceSignal,
       deck: meta.deck,
       deckLabel: meta.deckLabel,
-      options: item.options.map((o) => ({ id: o.id, label: o.label })),
+      // CC-COUPLE-PRONOUN-FIX — resolve partner-mode option labels
+      // through the same token system so options that referred to the
+      // beloved as "you/your/yourself" now read in third person.
+      options: item.options.map((o) => ({
+        id: o.id,
+        label: resolveOptionLabel(o, personName, pronouns),
+      })),
     };
   });
 }
 
-function labelFor(itemId: string, optionId: string): string {
+function labelFor(
+  itemId: string,
+  optionId: string,
+  personName: string,
+  pronouns: SubjectPronouns
+): string {
   if (!optionId) return "";
   const item = getCoupleGameItem(itemId);
-  return item?.options.find((o) => o.id === optionId)?.label ?? optionId;
+  const opt = item?.options.find((o) => o.id === optionId);
+  if (!opt) return optionId;
+  // CC-COUPLE-PRONOUN-FIX — reveal-side labels go through the same
+  // partner-mode resolution as the play screen, so "rankedGuessLabels"
+  // and the engine-predicted label read in third person about the
+  // beloved (matching the prompt's frame).
+  return resolveOptionLabel(opt, personName, pronouns);
 }
 
-async function loadPartnerASession(
+async function loadPartnerSession(
   db: ReturnType<typeof getDb>,
-  partnerASessionId: string
+  partnerSessionId: string
 ): Promise<{ ic: InnerConstitution; demoRow: DemoRow | undefined } | null> {
+  // CC-COUPLE-8 — generalized from `loadPartnerASession`. Loads any
+  // session by id + its demographics, re-derives the IC from raw
+  // answers, falls back to the stored bundle if re-derivation throws.
   const sessionRows = await db
     .select()
     .from(sessionsTable)
-    .where(eq(sessionsTable.id, partnerASessionId))
+    .where(eq(sessionsTable.id, partnerSessionId))
     .limit(1);
   if (sessionRows.length === 0) return null;
   const row = sessionRows[0];
@@ -378,7 +519,7 @@ async function loadPartnerASession(
   const demoRows = await db
     .select()
     .from(demographicsTable)
-    .where(eq(demographicsTable.session_id, partnerASessionId))
+    .where(eq(demographicsTable.session_id, partnerSessionId))
     .limit(1);
   const demoRow = demoRows[0];
 
@@ -397,15 +538,18 @@ async function loadPartnerASession(
 interface RevealBuildContext {
   partnerAName: string;
   partnerBName: string | null;
-  pronouns: SubjectPronouns;
+  /** CC-COUPLE-8 — subject's name + pronouns for THIS reveal direction. */
+  subjectName: string;
+  subjectPronouns: SubjectPronouns;
   bond: BondInfo;
+  direction: CoupleGameDirection;
 }
 
 function buildRevealPayload(
   results: CoupleGameResults,
   ctx: RevealBuildContext
 ): RevealPayload {
-  const { partnerAName: personName, pronouns } = ctx;
+  const { subjectName: personName, subjectPronouns: pronouns } = ctx;
   const resolvedItems: ResolvedItem[] = [];
   const tierResults: { tier: RankedRevealTier; points: number }[] = [];
 
@@ -440,10 +584,12 @@ function buildRevealPayload(
       deck: meta.deck,
       deckLabel: meta.deckLabel,
       rankedGuess: ranked,
-      rankedGuessLabels: ranked.map((id) => labelFor(stored.itemId, id)),
+      rankedGuessLabels: ranked.map((id) =>
+        labelFor(stored.itemId, id, personName, pronouns)
+      ),
       enginePredicted,
       enginePredictedLabel: enginePredicted
-        ? labelFor(stored.itemId, enginePredicted)
+        ? labelFor(stored.itemId, enginePredicted, personName, pronouns)
         : "",
       tier: scored.tier,
       points: scored.points,
@@ -458,20 +604,41 @@ function buildRevealPayload(
     partnerAName: ctx.partnerAName,
     partnerBName: ctx.partnerBName,
     bond: ctx.bond,
+    direction: ctx.direction,
     warmTotal: warm,
     items: resolvedItems,
   };
 }
 
+// CC-COUPLE-8 — build a per-direction view block for the compare payload.
+function buildDirectionView(
+  results: CoupleGameResults,
+  ctx: RevealBuildContext,
+  guesserName: string
+): DirectionView {
+  const reveal = buildRevealPayload(results, ctx);
+  return {
+    direction: ctx.direction,
+    subjectName: ctx.subjectName,
+    guesserName,
+    warmTotal: reveal.warmTotal,
+    items: reveal.items,
+  };
+}
+
+interface BondContext {
+  partnerAName: string;
+  partnerBName: string | null;
+  pronounsA: SubjectPronouns;
+  /** CC-COUPLE-8 — null when B isn't on file at all (legacy one-sided). */
+  pronounsB: SubjectPronouns | null;
+  bond: BondInfo;
+}
+
 async function loadBondNames(
   db: ReturnType<typeof getDb>,
   couple: CoupleSessionRow
-): Promise<{
-  partnerAName: string;
-  partnerBName: string | null;
-  pronouns: SubjectPronouns;
-  bond: BondInfo;
-}> {
+): Promise<BondContext> {
   const aDemoRows = await db
     .select()
     .from(demographicsTable)
@@ -485,11 +652,18 @@ async function loadBondNames(
     aDemoRows[0],
     "your partner"
   );
-  // CC-COUPLE-6 — derive subject pronouns from A's demographics gender
-  // (the bond stores names, not gender). Defaults to singular they/their.
-  const pronouns = subjectPronouns(aDemoRows[0]?.gender_value ?? null);
+  // CC-COUPLE-6 — derive subject pronouns from each partner's
+  // demographics gender (the bond stores names, not gender). Defaults
+  // to singular they/their.
+  const pronounsA = subjectPronouns(aDemoRows[0]?.gender_value ?? null);
 
   let partnerBName: string | null = null;
+  let pronounsB: SubjectPronouns | null = null;
+  // CC-COUPLE-8 — Mode 2 requires not just a B session row but a
+  // derivable IC. We probe that here so the route's branching has a
+  // single load-once truth (the page can't claim Mode 2 if we can't
+  // build the engine read).
+  let mode2 = false;
   if (couple.partner_b_session_id) {
     const bDemoRows = await db
       .select()
@@ -501,36 +675,217 @@ async function loadBondNames(
       bDemoRows[0],
       "Partner B"
     );
+    pronounsB = subjectPronouns(bDemoRows[0]?.gender_value ?? null);
+    // Confirm B's session is loadable (a row exists for the FK target;
+    // sessions are guaranteed non-empty by the mint validation, so we
+    // gate mode2 on the row existing).
+    const bSessionRows = await db
+      .select({ id: sessionsTable.id })
+      .from(sessionsTable)
+      .where(eq(sessionsTable.id, couple.partner_b_session_id))
+      .limit(1);
+    mode2 = bSessionRows.length > 0;
   } else if (couple.partner_b_name && couple.partner_b_name.trim().length > 0) {
     // Edge case: bond row has a B name but the B session id was
     // dropped (ON DELETE SET NULL). Preserve the sender's confirmed
-    // name even though the session is gone.
+    // name even though the session is gone. Mode 2 stays false because
+    // we can't run engine predictions against a missing session.
     partnerBName = couple.partner_b_name.trim();
   }
 
   const bond: BondInfo = {
     hasPartnerB: Boolean(couple.partner_b_session_id),
+    mode2,
   };
 
-  return { partnerAName, partnerBName, pronouns, bond };
+  return { partnerAName, partnerBName, pronounsA, pronounsB, bond };
 }
 
-async function buildIntroOrReveal(
-  db: ReturnType<typeof getDb>,
-  couple: CoupleSessionRow
-): Promise<IntroPayload | RevealPayload> {
-  const ctx = await loadBondNames(db, couple);
-
-  if (couple.status === "completed" && couple.game_results) {
-    return buildRevealPayload(couple.game_results, ctx);
+// CC-COUPLE-8 — pick the subject for a given direction. b_guesses_a's
+// subject is A; a_guesses_b's subject is B.
+function subjectForDirection(
+  ctx: BondContext,
+  direction: CoupleGameDirection
+): { name: string; pronouns: SubjectPronouns } {
+  if (direction === "a_guesses_b") {
+    return {
+      name: ctx.partnerBName ?? "Partner B",
+      pronouns: ctx.pronounsB ?? PRONOUNS_THEY,
+    };
   }
   return {
-    status: couple.status === "b_joined" ? "b_joined" : "invited",
-    personName: ctx.partnerAName,
+    name: ctx.partnerAName,
+    pronouns: ctx.pronounsA,
+  };
+}
+
+function directionForRole(role: CoupleRole): CoupleGameDirection {
+  return role === "a" ? "a_guesses_b" : "b_guesses_a";
+}
+
+
+// CC-COUPLE-8 — emit the compare-view payload from a normalized bundle.
+function buildComparePayload(
+  bundle: { a_guesses_b: CoupleGameResults; b_guesses_a: CoupleGameResults },
+  ctx: BondContext
+): ComparePayload {
+  const aSubject = subjectForDirection(ctx, "a_guesses_b"); // subject = B
+  const bSubject = subjectForDirection(ctx, "b_guesses_a"); // subject = A
+  const a_guesses_b = buildDirectionView(
+    bundle.a_guesses_b,
+    {
+      partnerAName: ctx.partnerAName,
+      partnerBName: ctx.partnerBName,
+      subjectName: aSubject.name,
+      subjectPronouns: aSubject.pronouns,
+      bond: ctx.bond,
+      direction: "a_guesses_b",
+    },
+    ctx.partnerAName
+  );
+  const b_guesses_a = buildDirectionView(
+    bundle.b_guesses_a,
+    {
+      partnerAName: ctx.partnerAName,
+      partnerBName: ctx.partnerBName,
+      subjectName: bSubject.name,
+      subjectPronouns: bSubject.pronouns,
+      bond: ctx.bond,
+      direction: "b_guesses_a",
+    },
+    ctx.partnerBName ?? "Partner B"
+  );
+  // Winner by total points; spec wants "head-to-head … winner/tie line".
+  const aPoints = a_guesses_b.warmTotal.totalPoints;
+  const bPoints = b_guesses_a.warmTotal.totalPoints;
+  let winner: ComparePayload["winner"];
+  if (aPoints > bPoints) {
+    winner = {
+      kind: "a",
+      line: `${ctx.partnerAName} read ${aSubject.name} more clearly.`,
+    };
+  } else if (bPoints > aPoints) {
+    winner = {
+      kind: "b",
+      line: `${ctx.partnerBName ?? "Partner B"} read ${bSubject.name} more clearly.`,
+    };
+  } else {
+    winner = { kind: "tie", line: "Dead even — you read each other equally well." };
+  }
+  return {
+    status: "compared",
+    partnerAName: ctx.partnerAName,
+    partnerBName: ctx.partnerBName ?? "Partner B",
+    bond: ctx.bond,
+    directions: { a_guesses_b, b_guesses_a },
+    winner,
+  };
+}
+
+type CouplePayload = IntroPayload | RevealPayload | ComparePayload;
+
+// CC-COUPLE-8 — central dispatcher. Branches:
+//   - Mode 1 (B not assessed): one-way as today. role param ignored.
+//   - Mode 2, no role on GET: emits a needs_role payload.
+//   - Mode 2, role on GET: per-direction intro / single reveal / compare.
+async function buildIntroOrReveal(
+  db: ReturnType<typeof getDb>,
+  couple: CoupleSessionRow,
+  role: CoupleRole | null
+): Promise<CouplePayload> {
+  const ctx = await loadBondNames(db, couple);
+  const bundle = normalizeGameResultsBundle(couple.game_results);
+
+  if (!ctx.bond.mode2) {
+    // ── Mode 1 (legacy / one-sided invite) ───────────────────────────
+    // Reveal when game_results present (legacy bare → b_guesses_a after
+    // normalization).
+    const legacyResults = bundle?.b_guesses_a;
+    if (couple.status === "completed" && legacyResults) {
+      const aSubject = subjectForDirection(ctx, "b_guesses_a");
+      return buildRevealPayload(legacyResults, {
+        partnerAName: ctx.partnerAName,
+        partnerBName: ctx.partnerBName,
+        subjectName: aSubject.name,
+        subjectPronouns: aSubject.pronouns,
+        bond: ctx.bond,
+        direction: "b_guesses_a",
+      });
+    }
+    return {
+      status: couple.status === "b_joined" ? "b_joined" : "invited",
+      personName: ctx.partnerAName,
+      partnerAName: ctx.partnerAName,
+      partnerBName: ctx.partnerBName,
+      bond: ctx.bond,
+      role: null,
+      items: itemsForIntro(
+        couple.invite_token,
+        ctx.partnerAName,
+        ctx.pronounsA
+      ),
+    };
+  }
+
+  // ── Mode 2 ─────────────────────────────────────────────────────────
+  // If both directions present → compare regardless of role (the view is
+  // bilateral by design).
+  if (bundle?.a_guesses_b && bundle?.b_guesses_a) {
+    return buildComparePayload(
+      { a_guesses_b: bundle.a_guesses_b, b_guesses_a: bundle.b_guesses_a },
+      ctx
+    );
+  }
+
+  // No role provided → role-select state.
+  if (!role) {
+    return {
+      status: "needs_role",
+      personName: ctx.partnerAName,
+      partnerAName: ctx.partnerAName,
+      partnerBName: ctx.partnerBName,
+      bond: ctx.bond,
+      role: null,
+      items: [],
+    };
+  }
+
+  const direction = directionForRole(role);
+  const subject = subjectForDirection(ctx, direction);
+  const myResults = bundle?.[direction];
+
+  if (myResults) {
+    // Viewer's direction is done; waiting on partner.
+    const partnerDirection: CoupleGameDirection =
+      direction === "a_guesses_b" ? "b_guesses_a" : "a_guesses_b";
+    const partnerResults = bundle?.[partnerDirection];
+    const partnerName =
+      direction === "a_guesses_b"
+        ? ctx.partnerBName ?? "Partner B"
+        : ctx.partnerAName;
+    const reveal = buildRevealPayload(myResults, {
+      partnerAName: ctx.partnerAName,
+      partnerBName: ctx.partnerBName,
+      subjectName: subject.name,
+      subjectPronouns: subject.pronouns,
+      bond: ctx.bond,
+      direction,
+    });
+    if (!partnerResults) {
+      reveal.awaiting = { partnerName };
+    }
+    return reveal;
+  }
+
+  // Viewer's direction not played yet → intro for their direction.
+  return {
+    status: "b_joined",
+    personName: subject.name,
     partnerAName: ctx.partnerAName,
     partnerBName: ctx.partnerBName,
     bond: ctx.bond,
-    items: itemsForIntro(couple.invite_token, ctx.partnerAName, ctx.pronouns),
+    role,
+    items: itemsForIntro(couple.invite_token, subject.name, subject.pronouns),
   };
 }
 
@@ -538,8 +893,13 @@ async function buildIntroOrReveal(
 // GET
 // ─────────────────────────────────────────────────────────────────────
 
+function parseRole(raw: string | null): CoupleRole | null {
+  if (raw === "a" || raw === "b") return raw;
+  return null;
+}
+
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ token: string }> }
 ) {
   const { token } = await params;
@@ -559,7 +919,10 @@ export async function GET(
     return NextResponse.json({ error: "Link not found" }, { status: 404 });
   }
 
-  return NextResponse.json(await buildIntroOrReveal(db, couple));
+  // CC-COUPLE-8 — `?role=a|b` indicates the viewer's identity in Mode 2.
+  // Mode 1 ignores it; the dispatcher branches.
+  const role = parseRole(new URL(req.url).searchParams.get("role"));
+  return NextResponse.json(await buildIntroOrReveal(db, couple, role));
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -568,11 +931,16 @@ export async function GET(
 
 interface PostBody {
   /**
-   * Map of itemId → B's ranked top-3 option ids (in rank order). Items
+   * Map of itemId → ranked top-3 option ids (in rank order). Items
    * not present are recorded with an empty ranked guess (still scored
    * if the engine has a prediction — the `off` tier handles it).
    */
   rankedGuesses?: Record<string, string[]>;
+  /**
+   * CC-COUPLE-8 — viewer identity in Mode 2. Required in Mode 2,
+   * ignored in Mode 1. "a" → guess about B; "b" → guess about A.
+   */
+  role?: "a" | "b";
 }
 
 export async function POST(
@@ -596,12 +964,6 @@ export async function POST(
     return NextResponse.json({ error: "Link not found" }, { status: 404 });
   }
 
-  // Idempotent on a completed session.
-  if (couple.status === "completed" && couple.game_results) {
-    const ctx = await loadBondNames(db, couple);
-    return NextResponse.json(buildRevealPayload(couple.game_results, ctx));
-  }
-
   let body: PostBody;
   try {
     body = (await req.json()) as PostBody;
@@ -616,37 +978,75 @@ export async function POST(
     );
   }
 
-  const loaded = await loadPartnerASession(db, couple.partner_a_session_id);
-  if (!loaded) {
+  const ctx = await loadBondNames(db, couple);
+
+  // CC-COUPLE-8 — direction resolution.
+  // Mode 1 → always b_guesses_a (B reads A, the legacy contract). Role
+  // body field is ignored.
+  // Mode 2 → role required; direction follows role.
+  let direction: CoupleGameDirection;
+  if (ctx.bond.mode2) {
+    const role = parseRole(body.role ?? null);
+    if (!role) {
+      return NextResponse.json(
+        { error: "role is required (\"a\" or \"b\") for two-way bonds" },
+        { status: 400 }
+      );
+    }
+    direction = directionForRole(role);
+  } else {
+    direction = "b_guesses_a";
+  }
+
+  // CC-COUPLE-8 — idempotent on a completed direction.
+  const existingBundle = normalizeGameResultsBundle(couple.game_results);
+  const existingForDirection = existingBundle?.[direction];
+  if (existingForDirection) {
+    const dispatched = await buildIntroOrReveal(
+      db,
+      couple,
+      direction === "a_guesses_b" ? "a" : "b"
+    );
+    return NextResponse.json(dispatched);
+  }
+
+  // CRITICAL — score against the SUBJECT's constitution, not always A's.
+  // a_guesses_b → subject = B; b_guesses_a → subject = A. Getting this
+  // wrong silently scores guesses against the wrong engine answers.
+  const subjectSessionId =
+    direction === "a_guesses_b"
+      ? couple.partner_b_session_id
+      : couple.partner_a_session_id;
+  if (!subjectSessionId) {
     return NextResponse.json(
-      { error: "Partner A session not found" },
+      { error: "subject session not found for this direction" },
       { status: 404 }
     );
   }
-  const { ic: icA } = loaded;
-  // CC-COUPLE-7 — bond-aware name + pronoun resolution for the reveal.
-  // Loads B's demo row when bonded so the reveal payload carries both
-  // names + the Mode 2 seam signal.
-  const ctx = await loadBondNames(db, couple);
+  const loaded = await loadPartnerSession(db, subjectSessionId);
+  if (!loaded) {
+    return NextResponse.json(
+      { error: "subject session not found" },
+      { status: 404 }
+    );
+  }
+  const { ic: subjectIc } = loaded;
 
-  // CC-COUPLE-5 — score against the round selector's items (the same
-  // set the page rendered to B). We trust the round derived from the
-  // token rather than the raw `rankedGuesses` keys — that way an item
-  // B's client never rendered can't be smuggled into the saved row.
+  // CC-COUPLE-5 — score against the round selector's items (same set
+  // the page rendered to the guesser). We trust the round derived from
+  // the token rather than the raw `rankedGuesses` keys — that way an
+  // item the client never rendered can't be smuggled into the saved row.
   const round = selectRound(couple.invite_token);
   const storedItems: CoupleGameItem[] = round.map((item) => {
     const rankedForItem = Array.isArray(ranked[item.itemId])
       ? ranked[item.itemId].filter((s) => typeof s === "string")
       : [];
-    const enginePredicted = item.predict(icA);
+    const enginePredicted = item.predict(subjectIc);
     return {
       itemId: item.itemId,
-      direction: "b_guesses_a",
-      // Sentinel "" when no engine prediction; surfaces as `unscored`.
+      direction,
       selfAnswer: enginePredicted ?? "",
-      // Pipe-encoded ranked top-3. Empty string when B ranked nothing.
       partnerGuess: encodeRankedGuess(rankedForItem),
-      // selfKnows intentionally omitted — Phase 3 self-pass arrives later.
       sourceSignal: item.sourceSignal,
     };
   });
@@ -656,8 +1056,15 @@ export async function POST(
     playedAt: new Date().toISOString(),
   };
 
+  // CC-COUPLE-8 — Mode 1 → markCompleted on first (only) save. Mode 2 →
+  // markCompleted only when this save makes both directions present.
+  const otherDirection: CoupleGameDirection =
+    direction === "a_guesses_b" ? "b_guesses_a" : "a_guesses_b";
+  const otherAlreadyPresent = Boolean(existingBundle?.[otherDirection]);
+  const markCompleted = ctx.bond.mode2 ? otherAlreadyPresent : true;
+
   try {
-    await saveGameResults(token, results);
+    await saveDirectionResults(token, direction, results, { markCompleted });
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "save failed" },
@@ -665,5 +1072,11 @@ export async function POST(
     );
   }
 
-  return NextResponse.json(buildRevealPayload(results, ctx));
+  // Re-dispatch through the central builder so the returned payload is
+  // exactly what a fresh GET would return (single reveal, awaiting, or
+  // compare).
+  const role: CoupleRole = direction === "a_guesses_b" ? "a" : "b";
+  return NextResponse.json(
+    await buildIntroOrReveal(db, await getCoupleSessionByToken(token) ?? couple, role)
+  );
 }
