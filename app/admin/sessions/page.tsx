@@ -42,6 +42,9 @@ import DeleteSessionButton from "./DeleteSessionButton";
 import CreateCoupleGameForm, {
   type RosterEntry,
 } from "./CreateCoupleGameForm";
+// CC-177 — Room Read game-create control. Reuses the same `RosterEntry`
+// shape the couple form consumes so the admin surface stays consistent.
+import CreateRoomReadGameForm from "./CreateRoomReadGameForm";
 
 const ALLOCATION_TENSION_IDS = new Set(["T-013", "T-014", "T-015"]);
 
@@ -505,6 +508,10 @@ export default async function SessionsPage({
           {/* CC-COUPLE-7 — admin Create-couple-game entry. Collapsed
               button until clicked, then expands inline. */}
           <CreateCoupleGameForm roster={coupleRoster} />
+          {/* CC-177 — admin Create-Room-Read-game entry. Collapsed
+              button until clicked, then expands inline. Same roster
+              shape as the couple control. */}
+          <CreateRoomReadGameForm roster={coupleRoster} />
           {/* CC-153 — entry into the admin import surface. Adjacent to
               Logout in the header so it's discoverable without
               scrolling the roster. The link target itself is

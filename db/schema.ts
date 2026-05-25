@@ -16,6 +16,8 @@ import {
   pgEnum,
   integer,
   boolean,
+  index,
+  unique,
 } from "drizzle-orm/pg-core";
 
 // 3-state enum capturing the user's relationship to each demographic field.
@@ -294,3 +296,208 @@ export const attachments = pgTable("attachments", {
     .notNull()
     .default(false),
 });
+
+// ─────────────────────────────────────────────────────────────────────
+// CC-176 — Room Read multiplayer mode persistence (5 tables).
+//
+// One "Room Read" session is a 4–10-player game across 4–10 Body Card
+// rounds. Players are existing `sessions` rows (their assessment
+// constitutions are the engine input). Engine picks are computed at
+// generation time and stored on `room_read_rounds` so reveals are
+// deterministic and never re-derive; the full `RoomReadGame` artifact
+// is also stored on the session row for diagnostic round-trip.
+//
+// HARD INVARIANT (mirrors `coupleSessions` §5): a player's guesses
+// live ONLY in the Room Read tables — NEVER merged into any
+// `sessions.answers`. The assessment engine is the source of truth
+// for cognitive shape; the game is a downstream consumer + a
+// calibration flywheel, never a writeback path.
+// ─────────────────────────────────────────────────────────────────────
+
+// `room_read_sessions` — the game container.
+//
+// `player_session_ids` is a jsonb array of `sessions.id` values
+// (4–10 entries) rather than a relational join table — membership is
+// validated in code (the array's shape is small, immutable for the
+// life of a game, and only read for token-as-auth routing).
+//
+// `generated_game` stores the full `RoomReadGame` artifact (cards +
+// per-round engine picks). The reveal path reads engine picks from
+// `room_read_rounds`; `generated_game` is the diagnostic round-trip
+// for "what did the generator emit on this game" (also used by the
+// `engine_shape_version` calibration validity check).
+//
+// `engine_shape_version` captures `ENGINE_SHAPE_VERSION` at game
+// generation. A game whose stored version drifts behind the current
+// `lib/staleShape.ts` value is logged but not invalidated; the
+// calibration aggregator gates on this version to keep flywheel
+// signal clean.
+export const roomReadSessions = pgTable("room_read_sessions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  join_token: text("join_token").notNull().unique(),
+  // Free-text admin label (mirrors how `ghostMappingAudit.admin_label`
+  // identifies the creator — there's no `admin` user table to FK to).
+  created_by_admin: text("created_by_admin"),
+  // jsonb array of `sessions.id` (4–10). Not relational — see header.
+  player_session_ids: jsonb("player_session_ids").notNull(),
+  round_count: integer("round_count").notNull(),
+  mode: text("mode").notNull().default("classic"),
+  scoring_mode: text("scoring_mode").notNull().default("engine_plus_room"),
+  status: text("status").notNull().default("draft"),
+  // ENGINE_SHAPE_VERSION at generation time. Calibration aggregator
+  // filters on this so events generated against a stale engine are
+  // separable from current-engine events.
+  engine_shape_version: integer("engine_shape_version"),
+  // The full `RoomReadGame` artifact emitted by `generateRoomReadGame`.
+  // Stored so the reveal path can serve a deterministic engine pick
+  // (already in `room_read_rounds`) AND so a stale-version inspect can
+  // diff the stored artifact against a re-derivation.
+  generated_game: jsonb("generated_game").notNull(),
+  created_at: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updated_at: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+// `room_read_rounds` — one row per round per game. Engine pick stored
+// at generation; never recomputed (the source-of-truth is `room_read_
+// sessions.generated_game` AND these per-round fields).
+//
+// `engine_matched_tags` is jsonb mirroring `EnginePick.matchedTags`
+// (`{ tag, contribution }[]` — top-3 contributors).
+export const roomReadRounds = pgTable("room_read_rounds", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  session_id: uuid("session_id")
+    .notNull()
+    .references(() => roomReadSessions.id, { onDelete: "cascade" }),
+  round_number: integer("round_number").notNull(),
+  theme: text("theme").notNull(),
+  card_id: text("card_id").notNull(),
+  status: text("status").notNull().default("pending"),
+  engine_pick_player_id: text("engine_pick_player_id").notNull(),
+  engine_runner_up_player_id: text("engine_runner_up_player_id"),
+  engine_confidence: text("engine_confidence").notNull(),
+  engine_is_split: boolean("engine_is_split").notNull().default(false),
+  engine_matched_tags: jsonb("engine_matched_tags").notNull(),
+  engine_reason: text("engine_reason").notNull(),
+  created_at: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+// `room_read_guesses` — one row per voter per round. UNIQUE(round_id,
+// voter_player_id) is the upsert key: voters can change their guess
+// up until the round is revealed (the route handler rejects post-
+// reveal writes; the constraint is the safety net).
+//
+// `voter_player_id` is a `sessions.id` that must be present in the
+// game's `player_session_ids` array — validated in code, not at the
+// DB layer (the constraint would require a join across jsonb).
+//
+// Vote shape:
+//   guessed_player_id  text NULL   — present for a normal vote
+//   guessed_special    text NULL   — "both" or "nobody" for special tiles
+// Exactly one of the two columns is non-null per row (enforced in code).
+export const roomReadGuesses = pgTable(
+  "room_read_guesses",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    session_id: uuid("session_id")
+      .notNull()
+      .references(() => roomReadSessions.id, { onDelete: "cascade" }),
+    round_id: uuid("round_id")
+      .notNull()
+      .references(() => roomReadRounds.id, { onDelete: "cascade" }),
+    voter_player_id: text("voter_player_id").notNull(),
+    guessed_player_id: text("guessed_player_id"),
+    guessed_special: text("guessed_special"),
+    created_at: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updated_at: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    voterRoundUnique: unique("room_read_guesses_round_voter_unique").on(
+      table.round_id,
+      table.voter_player_id
+    ),
+  })
+);
+
+// `room_read_scores` — one row per scored voter per revealed round.
+// `breakdown` jsonb mirrors `RoundScoreBreakdown` (the per-voter
+// matched/perfect/splitRead flags + points). Written once at reveal;
+// never mutated.
+export const roomReadScores = pgTable("room_read_scores", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  session_id: uuid("session_id")
+    .notNull()
+    .references(() => roomReadSessions.id, { onDelete: "cascade" }),
+  round_id: uuid("round_id")
+    .notNull()
+    .references(() => roomReadRounds.id, { onDelete: "cascade" }),
+  player_id: text("player_id").notNull(),
+  points: integer("points").notNull(),
+  breakdown: jsonb("breakdown").notNull(),
+  created_at: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+// `room_read_calibration_events` — THE flywheel table.
+//
+// Per `project_room_read_calibration_flywheel`: every revealed round
+// writes exactly one event. The aggregator (a later CC, NOT this one)
+// reads this table to attribute room-vs-engine disagreement to its
+// three buckets:
+//   1. Bad card           — aggregate BY card_id across games.
+//   2. Engine miscalibration — aggregate BY engine_pick_player_id +
+//                              matched tags across games.
+//   3. Genuine deeper-read — neither of the above; reads as noise in
+//      the first two aggregates.
+// `subject_self_confirm` (populated when CC-177's "plead your case"
+// step exists) weighs above peer votes — the engine-picked player's
+// own confirm/deny is the strongest single calibration signal.
+//
+// Two indexes (one per attribution path) keep both aggregates fast.
+export const roomReadCalibrationEvents = pgTable(
+  "room_read_calibration_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    session_id: uuid("session_id")
+      .notNull()
+      .references(() => roomReadSessions.id, { onDelete: "cascade" }),
+    round_id: uuid("round_id")
+      .notNull()
+      .references(() => roomReadRounds.id, { onDelete: "cascade" }),
+    card_id: text("card_id").notNull(),
+    theme: text("theme").notNull(),
+    engine_pick_player_id: text("engine_pick_player_id").notNull(),
+    engine_confidence: text("engine_confidence").notNull(),
+    engine_is_split: boolean("engine_is_split").notNull().default(false),
+    engine_matched_tags: jsonb("engine_matched_tags").notNull(),
+    // `{ playerIdOrSpecial: count }` — special keys: "__both__",
+    // "__nobody__". Never includes the engine pick as a key prefix.
+    room_vote_distribution: jsonb("room_vote_distribution").notNull(),
+    // Real player id, "__both__", or null when the room had no
+    // consensus (Identity Fog).
+    room_winner_player_id: text("room_winner_player_id"),
+    verdict: text("verdict").notNull(),
+    // Nullable now; populated when CC-177's plead-your-case step lands.
+    subject_self_confirm: jsonb("subject_self_confirm"),
+    engine_shape_version: integer("engine_shape_version"),
+    created_at: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    cardIdIdx: index("room_read_calibration_card_id_idx").on(table.card_id),
+    enginePickIdx: index("room_read_calibration_engine_pick_idx").on(
+      table.engine_pick_player_id
+    ),
+  })
+);
