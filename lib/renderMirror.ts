@@ -1645,9 +1645,17 @@ export function renderMirrorAsMarkdown(args: RenderArgs): string {
         out.push("");
         out.push(compressionNote);
       }
-    } else {
+    } else if (id !== "lens") {
       out.push(`*${card.cardHeader}*`);
     }
+    // CC-168.1 — Lens (high-confidence) header suppressed: its
+    // "leans toward X, supported by Y" line duplicated the CC-168
+    // Strength sentence ("you read through X and act through Y")
+    // back-to-back. The Strength carries the dom/aux read now. Other
+    // cards keep their distinct cardHeader; the low-confidence Lens
+    // hedge variants above (mirror-axis / disagree / generic) are
+    // untouched — they replace the header with their own contextualized
+    // prose, not a bare duplicate of the Strength sentence.
     out.push("");
     out.push(`**Strength** — ${card.gift.text}`);
     out.push("");

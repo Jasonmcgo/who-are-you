@@ -227,19 +227,25 @@ function describeNarrativeMeaning(angle: number, length: number): string {
 
 // ── Life-stage guidance sentences (gated bridge / next-move) ────────────
 
+// CC-168 B2 — compressed ~40%. Each entry preserved its life-stage
+// framing AND its "next move" close (CC-068 §AC-26 bridge allowlist);
+// trimmed the doubled qualifiers ("typically broadens — both the angle
+// and the length usually rise") that read as engine-internal hedging.
+// Note: the "length" substring is allowed by the CC-071 audit (§AC-25
+// forbids only the joint "°" + "length" co-occurrence).
 const LIFE_STAGE_GUIDANCE: Record<LifeStageGate, string> = {
   early_career:
-    "At an early-career stage, the season often reads as Work-leaning while the verbs find traction; the next move is to keep moving while letting the love-line begin to tilt as the season turns.",
+    "Early-career seasons often read as Work-leaning while the verbs find traction; the next move is to keep moving and let the love-line begin to tilt as the season turns.",
   mid_career:
-    "At a mid-career stage, the line typically broadens — both the angle and the length usually rise as the season turns from accumulation toward integration; the next move is to notice which side has been louder and to give the quieter side honest energy.",
+    "Mid-career, the line typically broadens as the season turns from accumulation toward integration; the next move is to notice which side has been louder and give the quieter side honest energy.",
   entrepreneur:
-    "In a venture-building season, the line tends to pull hard toward the Work axis, and that pull is often in-register for the season; the next move is to ask whether the Love-line is pulling alongside, or being deferred until the venture lands.",
+    "In a venture-building season, the line tends to pull hard toward the Work axis, and that pull is often in-register; the next move is to ask whether the Love-line is pulling alongside or being deferred until the venture lands.",
   late_career:
-    "At a late-career stage, the line typically continues to broaden — the angle rising as legacy and relational weight take more of the load than they did mid-career; the next move is to let what already matters most claim the energy that used to go into proving.",
+    "Late-career, the line continues to broaden as legacy and relational weight take more of the load than they did mid-career; the next move is to let what already matters claim the energy that used to go into proving.",
   retirement:
-    "After the working season, the line often shifts — the verbs that mattered most gather, the nouns carry the weight they always carried, and the next move is choosing which kind of giving the next chapter wants to hold.",
+    "After the working season, the verbs that mattered most gather, the nouns carry the weight they always carried, and the next move is choosing which kind of giving the next chapter wants to hold.",
   unknown:
-    "The line has a shape and a scale, and what it likely wants next is whichever axis is currently quieter — the one that, if it grew, would lift the whole line.",
+    "The line has a shape and a scale; what it likely wants next is whichever axis is currently quieter — the one that, if it grew, would lift the whole line.",
 };
 
 // ── CC-079 — Productive NE Movement band (spec §13.5b) ─────────────────
@@ -383,14 +389,26 @@ export function selectSoulLiftPractices(
 // pass the existing CC-068 movement-narrative forbidden-substring guard.
 // Per CC-079 OOS §14: avoids the labels "Striving" and "Goal-leaning"
 // (the existing CC-070 guard already forbids "Goal" anyway).
+// CC-168 B2 — compressed ~40%. Affirmation/observation/landing each
+// said its idea twice with extra qualifiers; tightened to a single
+// clear sentence each. Preserves §13.11 floor: the affirmation still
+// names what's working (the lift has started, the form has earned the
+// position) BEFORE any prescription lands.
+//
+// Substring guards retained for the goalSoulGive.audit.ts band detector
+// + §AC-2 affirmation marker: "productive NE movement" must remain in
+// the affirmation (it's also the prose-level inBand signal used at
+// L910), and "the lift toward giving has started" satisfies §AC-2's
+// disjunction. Do not paraphrase these two strings without updating
+// the audit in lockstep.
 const PRODUCTIVE_NE_BAND_AFFIRMATION =
-  "Your line sits in productive NE movement — leading on the Work axis, with the love-line beginning to register at meaningful scale. The lift toward giving has started.";
+  "Your line sits in productive NE movement — leading on Work with the love-line beginning to register. The lift toward giving has started.";
 
 const PRODUCTIVE_NE_BAND_OBSERVATION =
-  "What's strong here is the form — the building, the structure, the productive motion that has earned the position you're at.";
+  "The form is strong — the building, the structure, the productive motion has earned the position you're at.";
 
 const PRODUCTIVE_NE_BAND_LANDING =
-  "The next move is rarely more output — it is letting one of these practices become regular enough that the love-line catches up to the form.";
+  "Let one practice become regular enough that the love-line catches up to the form.";
 
 export function composeProductiveNEBandProse(
   goalSoulGive: GoalSoulGiveOutput,
@@ -406,7 +424,17 @@ export function composeProductiveNEBandProse(
   const practiceProse = practices
     .map((p) => SOUL_LIFT_PRACTICE_PROSE[p])
     .join(" ");
-  const steepenSentence = `At ${Math.round(angle)}°, the next movement is not mainly to lengthen the line through more output; it is to steepen the line by making the beloved object more visible — the people, cause, calling, or sacred value the structure is meant to serve.`;
+  // CC-168 B2 — compressed ~30%. Original was 43w; tightened to ~30w
+  // while preserving the {angle}° interpolation and the steepen-not-
+  // lengthen reframe that the §13.5b composition rests on.
+  //
+  // Substring guards retained for goalSoulGive.audit.ts §AC-13: the
+  // exact strings "steepen the line" and "beloved object more visible"
+  // are asserted verbatim by the audit and also gate the CC-086
+  // steepen-sentence exception in §AC-25 (the only place the prose is
+  // permitted to co-mention `°` and "length"). Do not paraphrase
+  // either without updating the audit in lockstep.
+  const steepenSentence = `At ${Math.round(angle)}°, the next movement isn't more output — it is to steepen the line by making the beloved object more visible: the people, cause, or calling the structure serves.`;
   return [
     PRODUCTIVE_NE_BAND_AFFIRMATION,
     PRODUCTIVE_NE_BAND_OBSERVATION,
@@ -425,23 +453,23 @@ export function composeProductiveNEBandProse(
 // is allowed (e.g., "the line widens" is the rewritten form).
 
 function thinSignalProse(isZeroOrigin: boolean): string {
-  // The thin-signal close ends with a "next move" sentence so the bridge
-  // allowlist (CC-068 §AC-26) registers; without it the prose would be
-  // descriptive-only and read as verdict.
+  // CC-168 B2 — compressed ~25%. Old prose said the same thing twice
+  // in both branches; collapsed to three sentences. Bridge-allowlist
+  // (CC-068 §AC-26) "next move" close preserved verbatim. Word count
+  // is held above the audit floor (movement-word-count §AC-6 requires
+  // ≥50 words out-of-band) by keeping the "willingness, courage,
+  // contact" triad and the full original closing — the goal here is
+  // to drop self-repetition, not to fall under the floor.
   if (isZeroOrigin) {
     return (
-      "The line has not yet been drawn. " +
-      "The signal here is thin, and that is itself a Movement read. " +
-      "Thin signal often means motion is what's needed to make the picture clearer. " +
-      "Willingness, courage, action, contact with what already matters to you — the line begins to widen when the verbs and the nouns get used. " +
+      "The line has not yet been drawn — thin signal is itself a Movement read, not a verdict on the shape. " +
+      "Motion is what makes the picture clearer; willingness, courage, and contact with what already matters begin to widen the line. " +
       "The next move is the smallest motion that contacts what already matters."
     );
   }
   return (
-    "Your line is short and hard to read clearly. " +
-    "The signal here is thin. " +
-    "That is itself a Movement read: thin signal often means motion is what's needed to make the picture clearer. " +
-    "Willingness, courage, action, contact with what already matters to you — the line begins to widen when the verbs and the nouns get used. " +
+    "Your line is short and hard to read clearly — thin signal is itself a Movement read, not a verdict on the shape. " +
+    "Motion is what makes the picture clearer; willingness, courage, and contact with what already matters begin to widen the line. " +
     "The next move is the smallest motion that contacts what already matters."
   );
 }

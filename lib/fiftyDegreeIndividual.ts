@@ -686,8 +686,20 @@ function composeBodyCards(inputs: ComposeFiftyDegreeInputs): string {
     lines.push("");
     lines.push(`*${fields.question}*`);
     lines.push("");
-    lines.push(`*${fields.readLede}*`);
-    lines.push("");
+    // CC-168.1 — Lens readLede suppressed in the Body Cards path. For
+    // Lens, `card.cardHeader` is "Your processing pattern leans toward
+    // X, supported by Y." — which CC-168's rewritten Strength sentence
+    // ("you read through X and act through Y") restated immediately
+    // below it. The Strength carries the dom/aux read now; the lede
+    // was a bare duplicate. Other cards keep their distinct lede
+    // (Compass: "When something has to give, you appear to protect
+    // …", Hands: openingLine, etc.) because those are not duplicates
+    // of any Strength text. Companion change to the Guide-side
+    // suppression at lib/renderMirror.ts:1648.
+    if (card.source !== "lens") {
+      lines.push(`*${fields.readLede}*`);
+      lines.push("");
+    }
     lines.push(`**Strength** — ${fields.strength}`);
     lines.push("");
     lines.push(`**Growth Edge** — ${fields.growthEdge}`);

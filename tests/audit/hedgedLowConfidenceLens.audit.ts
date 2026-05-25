@@ -49,7 +49,17 @@ function readFile(path: string): string | null {
 // Canonical phrases load-bearing for the audit.
 const BADGE_MARKER = "⚠ The engine's confidence in this Lens read is low.";
 const HEDGE_MARKER = "engine's read of your cognitive pattern is uncertain";
-const HIGH_CONF_MARKER = "leans toward";
+// CC-168.1 — was "leans toward". CC-168.1 deliberately suppressed the
+// "Your processing pattern leans toward X, supported by Y." line on
+// both the Guide-side SWOT loop (renderMirror.ts) and the Body Cards
+// path (fiftyDegreeIndividual.ts) because CC-168's rewritten Strength
+// sentence ("you read through X and act through Y") restated the same
+// dom/aux pair back-to-back. The anchor's job here is only to prove
+// the high-conf render produced (so the hedge-absent + badge-absent
+// checks below aren't trivially satisfied by an empty string); the
+// Body Cards Lens question line "How you read reality" is stable
+// across high-conf and low-conf shapes and survives CC-168.1.
+const HIGH_CONF_MARKER = "How you read reality";
 
 function loadCohortFixture(): {
   answers: Answer[];
@@ -197,9 +207,10 @@ function runAudit(): AssertionResult[] {
         }
   );
 
-  // ── 5: high-confidence regression anchor — "leans toward" Lens
-  //      cardHeader appears AND hedge marker absent in the cohort
-  //      fixture's natural render.
+  // ── 5: high-confidence regression anchor — HIGH_CONF_MARKER (a
+  //      stable, non-hedge substring from the Lens render — see the
+  //      constant's comment for the CC-168.1 rationale) appears AND
+  //      hedge marker absent in the cohort fixture's natural render.
   let highConfidenceRender = "";
   let highConfidenceConfidence: string = "";
   let highConfidenceErr: string | null = null;
@@ -211,21 +222,21 @@ function runAudit(): AssertionResult[] {
   } catch (e) {
     highConfidenceErr = e instanceof Error ? e.message : String(e);
   }
-  const leansTowardPresent =
+  const highConfAnchorPresent =
     highConfidenceRender.includes(HIGH_CONF_MARKER);
   const hedgeAbsent = !highConfidenceRender.includes(HEDGE_MARKER);
   const badgeAbsent = !highConfidenceRender.includes(BADGE_MARKER);
   results.push(
     highConfidenceErr === null &&
       highConfidenceConfidence === "high" &&
-      leansTowardPresent &&
+      highConfAnchorPresent &&
       hedgeAbsent &&
       badgeAbsent
       ? {
           ok: true,
           assertion:
             "high-confidence-regression-anchor-unchanged",
-          detail: `cohort fixture rendered with confidence=high, "leans toward" present, hedge + badge absent`,
+          detail: `cohort fixture rendered with confidence=high, anchor "${HIGH_CONF_MARKER}" present, hedge + badge absent`,
         }
       : {
           ok: false,
@@ -236,8 +247,8 @@ function runAudit(): AssertionResult[] {
               ? `render threw: ${highConfidenceErr}`
               : highConfidenceConfidence !== "high"
                 ? `cohort fixture natural confidence is "${highConfidenceConfidence}", expected "high"`
-                : !leansTowardPresent
-                  ? `"leans toward" missing in high-confidence render`
+                : !highConfAnchorPresent
+                  ? `anchor "${HIGH_CONF_MARKER}" missing in high-confidence render`
                   : !hedgeAbsent
                     ? `hedge marker leaked into high-confidence render`
                     : `badge marker leaked into high-confidence render`,

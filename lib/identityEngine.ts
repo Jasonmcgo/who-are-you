@@ -1375,7 +1375,12 @@ function detectAllocationOverlayTensions(
       // CC-116 — interpretation over recitation. Was "you marked at
       // least two categories"; now names the gap as a pattern inside
       // the named ranking.
-      user_prompt: `Inside the ${label} ranking, current flow and what you'd protect have separated in more than one place. The gap is wider than a single mismatched line.\n\n${getAllocationSharpQuestion("T-015", "", driveOutput)}`,
+      // CC-168 B3 — was `the ${label} ranking`. Every value in
+      // T015_RANKING_LABELS starts with "your" (e.g. "your inward,
+      // relational energy"), so prefixing with "the" produced "the
+      // your inward...". Dropped the article; the label carries its
+      // own possessive.
+      user_prompt: `Inside ${label} ranking, current flow and what you'd protect have separated in more than one place. The gap is wider than a single mismatched line.\n\n${getAllocationSharpQuestion("T-015", "", driveOutput)}`,
     };
   });
 }
@@ -4419,11 +4424,18 @@ function pickVariant(
   return pool[position % pool.length];
 }
 
+// CC-168 B1 — stems were "shows up here", "this card surfaces",
+// "is part of how this card lands", "in its native register" — all
+// self-referential tells that named the card-machinery instead of the
+// person. New stems lead with the named strength and hand straight off
+// to the body sentence without describing the section itself. Kept the
+// {NP} / {NP_LOWER} / {CAT_LABEL} placeholders so buildGiftStem's
+// interpolation stays intact across all 5 callers.
 const GIFT_STEM_POOL: string[] = [
-  "{NP} shows up here:",
-  "What this card surfaces is your tendency toward {NP_LOWER}:",
-  "{CAT_LABEL} is part of how this card lands:",
-  "In its native register, this card carries {NP_LOWER}:",
+  "{NP}:",
+  "{CAT_LABEL}, in your case:",
+  "Your strength reads as {NP_LOWER}:",
+  "What you carry is {NP_LOWER}:",
 ];
 
 const GROWTH_EDGE_STEM_POOL: string[] = [
@@ -5210,10 +5222,17 @@ export function deriveLensOutput(
   );
   const stem = buildGiftStem(cat, cardPos, context);
 
+  // CC-168 B1 — old body restated the dom/aux pair three times in a row
+  // ("your processing pattern leans toward X", then "you tend to read
+  // through X and execute through Y", then "the insight X gives you,
+  // followed through by Y"), plus the self-referential "operating in
+  // its native register" tell. Two-sentence version: open with what
+  // the person does (read through dom, act through aux), then name the
+  // in-health expression. Shape-aware via FUNCTION_VOICE; no archetype
+  // hardcoding.
   const giftText =
-    `${stem} your processing pattern leans toward ${FUNCTION_VOICE[dom]}. ` +
-    `When this is operating in its native register, you tend to read the situation through ${FUNCTION_VOICE[dom]} and execute through ${FUNCTION_VOICE[aux]} — a combination that gives the shape its characteristic move. ` +
-    `In health, this looks like the insight ${FUNCTION_VOICE[dom]} gives you, followed through by ${FUNCTION_VOICE[aux]}.`;
+    `${stem} you read through ${FUNCTION_VOICE[dom]} and act through ${FUNCTION_VOICE[aux]}. ` +
+    `In health, what ${FUNCTION_VOICE[dom]} sees actually reaches the room because ${FUNCTION_VOICE[aux]} carries it there.`;
 
   // CC-086 Site 3 — driver-keyed Lens growth-edge anchor. Pre-CC the
   // Lens card's Sentence 2 came from `blindSpotFor` keyed by
