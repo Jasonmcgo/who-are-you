@@ -284,6 +284,57 @@ function runAudit(): AssertionResult[] {
         }
   );
 
+  // ── CC-172: version-2 boundary — stored v1 routes to re-derivable ─
+  // After bumping ENGINE_SHAPE_VERSION 1 → 2, every previously-saved
+  // row carrying `engineShapeVersion: 1` MUST classify as
+  // `re-derivable` (not `fresh`), so the render path picks up the
+  // current typing (CC-134 / CC-159 / CC-161 / CC-171). A row whose
+  // stored constitution would otherwise pass the predicate but is at
+  // v1 is the exact case this assertion guards.
+  results.push(
+    ENGINE_SHAPE_VERSION >= 2
+      ? {
+          ok: true,
+          assertion: "stale-shape-version-is-at-least-2",
+          detail: `ENGINE_SHAPE_VERSION = ${ENGINE_SHAPE_VERSION} (CC-172 bump — propagates CC-134/CC-159/CC-161/CC-171 typing fixes to stored rows)`,
+        }
+      : {
+          ok: false,
+          assertion: "stale-shape-version-is-at-least-2",
+          detail: `ENGINE_SHAPE_VERSION = ${ENGINE_SHAPE_VERSION}; expected ≥ 2 after CC-172`,
+        }
+  );
+  const storedV1Verdict = detectStaleShape({
+    sessionId: "cc172-stored-v1",
+    engineShapeVersion: 1,
+    innerConstitution: freshConstitution,
+    answers: [
+      {
+        question_id: "Q-E1-outward",
+        card_id: "sacred",
+        question_text: "outward energy",
+        type: "ranking",
+        order: ["building", "solving", "restoring"],
+      },
+    ],
+  });
+  const storedV1Reason =
+    storedV1Verdict.branch === "re-derivable" ? storedV1Verdict.reason : "—";
+  results.push(
+    storedV1Verdict.branch === "re-derivable" &&
+      storedV1Verdict.reason === "version-mismatch"
+      ? {
+          ok: true,
+          assertion: "stale-shape-stored-v1-routes-to-re-derivable",
+          detail: `stored v1 bundle (predicate-passing) routes to branch=re-derivable reason=version-mismatch — the render path will re-derive via buildInnerConstitution`,
+        }
+      : {
+          ok: false,
+          assertion: "stale-shape-stored-v1-routes-to-re-derivable",
+          detail: `expected branch=re-derivable reason=version-mismatch; got branch=${storedV1Verdict.branch} reason=${storedV1Reason}. CC-172 bump may have regressed the propagation contract.`,
+        }
+  );
+
   // ── Bonus: isFreshConstitution predicate spot-check ──────────────
   results.push(
     isFreshConstitution(freshConstitution) === true &&

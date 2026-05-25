@@ -29,12 +29,26 @@
 
 import type { Answer, InnerConstitution } from "./types";
 
-// Bump this when any engine-output field consumed by the render path
-// changes shape (added required field, removed field, renamed field,
-// changed numeric range, changed enum union, etc.). Bumping this
+// Bump this whenever an engine change alters constitution OUTPUT
+// (typing, scores, derived fields) so stored bundles re-derive from
+// `answers` on read. Prose-only changes do NOT require a bump (the
+// render path's LLM caches already protect prose). Bumping this
 // constant marks every previously-saved row as stale-shape on next
-// read; the render path then triggers re-derivation from `answers`.
-export const ENGINE_SHAPE_VERSION = 1;
+// read; the render path then triggers re-derivation.
+//
+// History:
+//   v1 — initial. Through CC-138.x the engine output was stable from
+//        the v1 baseline.
+//   v2 — CC-172. CC-134 (top-pick convergence), CC-159 (aux-ambiguous
+//        clarifier), CC-161 (binary-path clarifier), and CC-171
+//        (perceiving-axis cross-signal correction) each shifted the
+//        Lens dominant for a portion of stored sessions but did not
+//        bump this constant — so the typing fixes never reached the
+//        live report / roster surfaces for already-saved rows. The
+//        v2 bump catches them all in one move; the render path
+//        re-derives stored v1 bundles via `buildInnerConstitution`
+//        and reflects the current typing canon.
+export const ENGINE_SHAPE_VERSION = 2;
 
 export type StaleShapeReason =
   | "fresh"
