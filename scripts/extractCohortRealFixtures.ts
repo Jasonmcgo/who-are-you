@@ -51,6 +51,12 @@ const COHORT_MAPPING: Array<{ uuid: string; filename: string; canonicalName: str
   { uuid: "c892e7ef-1170-45d8-a788-4c4e02e17b88", filename: "connor-real.json", canonicalName: "Connor" },
   { uuid: "ee1cc068-2736-45f6-a7ad-20fddc8d4c3f", filename: "keith-real.json",  canonicalName: "Keith"  },
   { uuid: "b232bb03-a99d-4c3b-b696-9c0ca5c9e6ed", filename: "brian-real.json",  canonicalName: "Brian"  },
+  // CC-SENSING-TYPING (2026-05-25) — Nat is the regression anchor for
+  // sensory/aesthetic introvert mistyping (perfect-pitch musician
+  // typed as Ni/Te conceptual architect). Her binaries: Q-TB-SI-SE→Si,
+  // Q-TB-FI-FE→Fi; PERC-ORDER and JUDG-ORDER both lead with the
+  // introvert. Q-T1–T8 skipped, Q-O1 #1 = beauty/music/design.
+  { uuid: "63d439a5-439a-472b-8620-8e8efea0b231", filename: "nat-real.json",    canonicalName: "Nat"    },
 ];
 
 async function main() {

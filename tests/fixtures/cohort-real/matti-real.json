@@ -1,9 +1,9 @@
 {
   "label": "Matti — real-person calibration anchor",
-  "_source": "Extracted from prod session 25ddf876-46b3-4218-ac1c-e47bd372a2d9 on 2026-05-22. Real-person answers from the named cohort user. Per feedback_cohort_fixtures_two_functions.md — this is a REAL-PERSON calibration anchor, not a synthetic shape-pattern diagnostic.",
+  "_source": "Extracted from prod session 25ddf876-46b3-4218-ac1c-e47bd372a2d9 on 2026-05-25. Real-person answers from the named cohort user. Per feedback_cohort_fixtures_two_functions.md — this is a REAL-PERSON calibration anchor, not a synthetic shape-pattern diagnostic.",
   "canonical_name": "Matti",
   "prod_session_id": "25ddf876-46b3-4218-ac1c-e47bd372a2d9",
-  "extracted_at": "2026-05-22T23:05:35.651Z",
+  "extracted_at": "2026-05-25T21:47:47.554Z",
   "answers": [
     {
       "type": "forced",

@@ -41,6 +41,12 @@ interface AnchorLock {
   fixture: string;
   canonName: string;
   expectedDominant: CognitiveFunctionId;
+  // CC-SENSING-TYPING — optional auxiliary-family check. Locks the
+  // OTHER axis (judging when dominant is perceiving, or vice versa).
+  // Used for Nat to lock both axes of her recovery: perceiving=Si
+  // (dom) AND judging=Feeler (aux). "feeler" matches Fi or Fe;
+  // "thinker" matches Ti or Te. Unset → only dominant is asserted.
+  expectedAuxFamily?: "feeler" | "thinker";
   rationale: string;
 }
 
@@ -80,6 +86,14 @@ const LOCKS: AnchorLock[] = [
     rationale:
       "Keith = intuitive Si (Si↔Ne, Si-led), same family as Harry. CC-171 cross-signal correction: his Q-T over-read a very live Ne (D&D DM + comic-canon nerd-podcast = divergent possibility-play) as bimodal Ni, which won top-pick — but the lived signature puts him on Si↔Ne (Stability #1, 'maintaining responsibilities', grips the plan-that-used-to-work under pressure, teaching/canon mastery; cross-signal Si=75 vs Ni=45). Owner-confirmed via biography (former middle-school teacher; runs a comic-movie + D&D podcast). NOTE: cross-signal-derived lock — Q-T-direct alone reads Se↔Ni for him, so this anchor doubles as the canonical 'Q-T over-reads Ne as Ni for intuitive-Si' calibration case.",
   },
+  {
+    fixture: "nat-real.json",
+    canonName: "Nat",
+    expectedDominant: "si",
+    expectedAuxFamily: "feeler",
+    rationale:
+      "Nat = CC-SENSING-TYPING binary-same-attitude-leaders recovery anchor. Owner-confirmed: perfect-pitch musician, deep introvert (Extraversion=43). Binary picks: Q-TB-SI-SE=si, Q-TB-NI-NE=ne, Q-TB-TI-TE=ti, Q-TB-FI-FE=fi, PERC-ORDER=si (Si leads), JUDG-ORDER=fi (Fi leads), Q-O1#1=aesthetic (beauty/music/design). Pre-CC-SENSING-TYPING she fell to the architect-halo default (Ni/Te) at lib/jungianStack.ts:584-602 because BOTH her leaders share attitude (Si+Fi both introverted), triggering the binary-attitude-violation fallback. CC-SENSING-TYPING Part B recovers her into the closest canonical stack honoring her perceiving + judging family picks: Si-Fe-Ti-Ne = ISFJ. Perceiving correctly Si; judging correctly a Feeler (Fe aux). This anchor doubles as the calibration case for the `binary-same-attitude-leaders-resolved` ConfidenceLowReason — the only fixture in the cohort that exercises that branch.",
+  },
 ];
 
 interface Outcome {
@@ -97,14 +111,32 @@ function runOne(lock: AnchorLock): Outcome {
     raw.metaSignals ?? [],
     null
   );
-  const actual = c.lens_stack.dominant;
-  const ok = actual === lock.expectedDominant;
+  const actualDom = c.lens_stack.dominant;
+  const actualAux = c.lens_stack.auxiliary;
+  const domOk = actualDom === lock.expectedDominant;
+  // CC-SENSING-TYPING — second-axis check for anchors that lock the
+  // judging-vs-perceiving family of the auxiliary too (Nat).
+  const auxOk =
+    lock.expectedAuxFamily === undefined
+      ? true
+      : lock.expectedAuxFamily === "feeler"
+        ? actualAux === "fi" || actualAux === "fe"
+        : actualAux === "ti" || actualAux === "te";
+  const ok = domOk && auxOk;
+  const auxClause =
+    lock.expectedAuxFamily === undefined
+      ? ""
+      : `, aux=${actualAux} (expected ${lock.expectedAuxFamily})`;
+  const lockName =
+    lock.expectedAuxFamily === undefined
+      ? `${lock.canonName}-lens-dom-equals-${lock.expectedDominant}`
+      : `${lock.canonName}-lens-dom-equals-${lock.expectedDominant}-aux-is-${lock.expectedAuxFamily}`;
   return {
     ok,
-    name: `${lock.canonName}-lens-dom-equals-${lock.expectedDominant}`,
+    name: lockName,
     detail: ok
-      ? `${lock.canonName} → dominant=${actual} ✓ (${lock.rationale})`
-      : `${lock.canonName} → dominant=${actual}, expected=${lock.expectedDominant}. ${lock.rationale}`,
+      ? `${lock.canonName} → dominant=${actualDom}${auxClause} ✓ (${lock.rationale})`
+      : `${lock.canonName} → dominant=${actualDom}${auxClause}, expected dom=${lock.expectedDominant}${lock.expectedAuxFamily ? `, aux=${lock.expectedAuxFamily}` : ""}. ${lock.rationale}`,
   };
 }
 

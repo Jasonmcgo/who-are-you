@@ -1,9 +1,9 @@
 {
   "label": "Daniel — real-person calibration anchor",
-  "_source": "Extracted from prod session d2e0fa2a-cd32-40f4-b73b-baad69f71f5f on 2026-05-22. Real-person answers from the named cohort user. Per feedback_cohort_fixtures_two_functions.md — this is a REAL-PERSON calibration anchor, not a synthetic shape-pattern diagnostic.",
+  "_source": "Extracted from prod session d2e0fa2a-cd32-40f4-b73b-baad69f71f5f on 2026-05-25. Real-person answers from the named cohort user. Per feedback_cohort_fixtures_two_functions.md — this is a REAL-PERSON calibration anchor, not a synthetic shape-pattern diagnostic.",
   "canonical_name": "Daniel",
   "prod_session_id": "d2e0fa2a-cd32-40f4-b73b-baad69f71f5f",
-  "extracted_at": "2026-05-22T23:05:35.131Z",
+  "extracted_at": "2026-05-25T21:47:47.024Z",
   "answers": [
     {
       "type": "forced",
@@ -615,24 +615,24 @@
     }
   ],
   "demographics": {
-    "name_value": null,
-    "name_state": "not_answered",
-    "gender_value": null,
-    "gender_state": "not_answered",
-    "age_decade": null,
-    "age_state": "not_answered",
+    "name_value": "Daniel",
+    "name_state": "specified",
+    "gender_value": "man",
+    "gender_state": "specified",
+    "age_decade": "1950s",
+    "age_state": "specified",
     "location_country": null,
     "location_region": null,
     "location_state": "not_answered",
-    "marital_status_value": null,
-    "marital_status_state": "not_answered",
+    "marital_status_value": "married",
+    "marital_status_state": "specified",
     "education_value": null,
     "education_state": "not_answered",
-    "political_value": null,
-    "political_state": "not_answered",
-    "religious_value": null,
-    "religious_state": "not_answered",
-    "profession_value": null,
-    "profession_state": "not_answered"
+    "political_value": "right",
+    "political_state": "specified",
+    "religious_value": "christianity",
+    "religious_state": "specified",
+    "profession_value": "entrepreneur",
+    "profession_state": "specified"
   }
 }

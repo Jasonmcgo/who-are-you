@@ -441,7 +441,17 @@ export type ConfidenceLowReason =
   //     binary-path resolver).
   | "binary-attitude-violation"
   | "binary-dominance-ambiguous"
-  | "binary-thin";
+  | "binary-thin"
+  // CC-SENSING-TYPING — the same-attitude-leaders case (Nat:
+  // perceivingLeader=Si intro, judgingLeader=Fi intro) used to
+  // fall to the architect-halo default (Ni/Te). aggregateLensStackBinary
+  // now recovers into the closest canonical stack honoring the
+  // user's perceiving + judging family picks (Si + F-family =
+  // ISFJ Si-Fe-Ti-Ne for Nat). Confidence stays low because the
+  // picks ARE structurally inconsistent at the canonical-stack
+  // level; this reason marks the recovered case so the hedge
+  // prose can distinguish it from a genuine attitude violation.
+  | "binary-same-attitude-leaders-resolved";
 
 export type GiftCategory =
   | "Pattern"

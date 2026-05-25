@@ -137,6 +137,19 @@ export type BlameLensTop = "individual" | "authority" | "system" | "nature" | "s
 interface ExtractedSignals {
   compassLabels: string[];
   oceanOpenness: number; // 0–100
+  // CC-SENSING-TYPING — the aesthetic subdimension of Openness, surfaced
+  // separately so Si/Se scorers can register "sensory openness" without
+  // double-counting the intellectual/architectural facets that already
+  // drive the Ni/Te scorers via the O aggregate. Source:
+  // lib/ocean.ts → dispositionSignalMix.opennessSubdimensions.aesthetic.
+  // Falls to 0 when ocean wasn't derived (thin-signal sessions).
+  oceanOpennessAesthetic: number; // 0–100
+  // CC-SENSING-TYPING — the strongest single aesthetic tell. When the
+  // user ranked "beauty/music/design" first on Q-O1, this is the
+  // strongest single signal of a sensory/aesthetic shape that the
+  // smoothed OCEAN aggregate can dilute. Boolean rather than weighted
+  // because the rank-1 pick is the binary fact the Si/Se scorers need.
+  qO1TopPickIsAesthetic: boolean;
   oceanConscientiousness: number;
   oceanExtraversion: number;
   oceanAgreeableness: number;
@@ -510,9 +523,25 @@ function extractAllSignals(
       agreeableness: 0,
       emotionalReactivity: 0,
     };
+  // CC-SENSING-TYPING — aesthetic subdimension + Q-O1 #1 pick.
+  // ocean.dispositionSignalMix is undefined on thin-signal sessions;
+  // both branches fall to 0 / false. The Q-O1 #1 lookup matches the
+  // engine's signal-id convention: Q-O1 ranking emits one
+  // `openness_*` signal per option with `rank` = position-in-ranking.
+  const aestheticIntensity =
+    constitution.ocean?.dispositionSignalMix?.opennessSubdimensions
+      ?.aesthetic ?? 0;
+  const qO1TopPickIsAesthetic = (constitution.signals ?? []).some(
+    (s) =>
+      s.rank === 1 &&
+      s.signal_id === "openness_aesthetic" &&
+      (s.source_question_ids?.includes("Q-O1") ?? false)
+  );
   return {
     compassLabels,
     oceanOpenness: intensities.openness,
+    oceanOpennessAesthetic: aestheticIntensity,
+    qO1TopPickIsAesthetic,
     oceanConscientiousness: intensities.conscientiousness,
     oceanExtraversion: intensities.extraversion,
     oceanAgreeableness: intensities.agreeableness,
@@ -779,6 +808,51 @@ function scoreNe(s: ExtractedSignals): { score: number; trace: string[] } {
 }
 
 function scoreSi(s: ExtractedSignals): { score: number; trace: string[] } {
+  // CC-SCORESI-DISPOSITION-DISCRIMINATOR — when an Ni/Te signature is
+  // present (workMap = Strategic/Architectural — the canonical Ni/Te
+  // workMap signature, established by Jason 2026-05-25), the two
+  // strongest VALUE/DISPOSITION Si components — Faith/Stability compass
+  // and Religious/mentor trust — are credit-suppressed. They are not
+  // Si-specific: faith/loyalty/family compass + religious-trust fires
+  // on devout Ni-Te shapes too (Jason: si=75 entirely from faith-and-
+  // discipline halo despite Q-T Ni-Te + Se>Si on Q-TB-SI-SE).
+  //
+  // The discriminator mirrors the CC-097B-CALIBRATION-V2 Agreeableness
+  // gates on scoreSe (~L848-863) that stopped Fe-drivers being misread
+  // as Se. Same shape: gate the false-positive value/disposition
+  // attractors on the discriminating cognitive-shape tell, keep the
+  // Si-specific components ungated.
+  //
+  // SCOPE — only compass (+25) and trust (+20) are gated. The other Si
+  // components stay untouched:
+  //   - keystone=belief-held-close-tradition-anchored (+15): genuinely
+  //     Si-specific (the tradition-anchor narrative shape).
+  //   - workMap=Operational/Stewardship (+10): the canon Si workMap.
+  //     Strategic/Architectural sessions don't fire this anyway, so
+  //     keeping it ungated is a no-op for the discriminator-trigger
+  //     cases and preserves true-Si stewards' Si floor.
+  //   - conscientiousness ≥ 90 (+15): disposition, but a real Si
+  //     stat-correlate that the Ni-Te overlap doesn't justify zeroing.
+  //   - cost_surface ≥ 4 (+10) and building+people ≥ 0.65 (+5): weak
+  //     credits left alone so the discriminator doesn't crater Si to
+  //     near-zero for the (rare) Si-rich Ni-Te session if such exists.
+  //
+  // EMPIRICAL EFFECT (cohort-real, 2026-05-25):
+  //   - Jason (workMap=Strategic, dom=Ni): si 75 → 30 (below ni=65). ✓
+  //   - Brian (workMap=Strategic, dom=Ni): si 45 → 25. ✓
+  //   - Jake (workMap=Strategic, dom=Ti): si 75 → 30. Note:
+  //     inferredDriver flips si→te; classification (`agree`) unchanged
+  //     because the disagree gap-floor (20) still isn't cleared.
+  //   - Keith/Harry/Daniel (workMap=Operational, true Si):
+  //     gate doesn't fire → si unchanged at 85 / 80 / 85. ✓
+  //
+  // The Ti gate uses ONLY workMapRegisterKey (not Knowledge-compass
+  // + Openness as an OR), because Keith's compass-top-4 contains
+  // Knowledge AND his Openness is high (O=85) — gating on
+  // Knowledge+highO would crater Keith's Si.
+  const niTeSignaturePresent =
+    s.workMapRegisterKey?.includes("strategic") === true ||
+    s.workMapRegisterKey?.includes("architect") === true;
   return scoreFromComponents([
     {
       // CC-097B-CALIBRATION Phase 2 — broadened Si compass condition.
@@ -792,22 +866,31 @@ function scoreSi(s: ExtractedSignals): { score: number; trace: string[] } {
       // Kevin (no Stability/Faith), Michele (Freedom+Truth+Compassion+
       // Justice, no Stability/Faith), Jason (Knowledge+Truth+Honor+
       // Justice, no Stability/Faith), Ashley (no Stability/Faith).
+      // CC-SCORESI-DISPOSITION-DISCRIMINATOR — gated to NOT fire when
+      // workMap signals an Ni/Te cognitive shape.
       fires:
+        !niTeSignaturePresent &&
         (compassContains(s.compassLabels, "Faith") ||
           compassContains(s.compassLabels, "Stability")) &&
         (compassContains(s.compassLabels, "Honor") ||
           compassContains(s.compassLabels, "Loyalty") ||
           compassContains(s.compassLabels, "Family")),
       weight: 25,
-      label: "si: compass∈{Faith,Stability}+(Honor|Loyalty|Family)",
+      label:
+        "si: compass∈{Faith,Stability}+(Honor|Loyalty|Family) && !workMap∈{Strategic,Architectural}",
     },
     {
+      // CC-SCORESI-DISPOSITION-DISCRIMINATOR — religious/mentor trust
+      // is a values-overlay signal that fires on devout shapes of any
+      // cognitive type. Gated the same way as the compass component.
       fires:
-        trustRegisterIncludes(s.trustTopLabels, "Religious") ||
-        trustRegisterIncludes(s.trustTopLabels, "Small Business") ||
-        trustRegisterIncludes(s.trustTopLabels, "mentor"),
+        !niTeSignaturePresent &&
+        (trustRegisterIncludes(s.trustTopLabels, "Religious") ||
+          trustRegisterIncludes(s.trustTopLabels, "Small Business") ||
+          trustRegisterIncludes(s.trustTopLabels, "mentor")),
       weight: 20,
-      label: "si: trust∈{Religious,SmallBusiness,mentor}",
+      label:
+        "si: trust∈{Religious,SmallBusiness,mentor} && !workMap∈{Strategic,Architectural}",
     },
     {
       fires: s.keystoneRegister === "belief-held-close-tradition-anchored",
@@ -838,6 +921,24 @@ function scoreSi(s: ExtractedSignals): { score: number; trace: string[] } {
         0.65,
       weight: 5,
       label: "si: building+people>=0.65",
+    },
+    {
+      // CC-SENSING-TYPING — aesthetic openness lift. Pre-CC the
+      // sensing functions had no path to the measured aesthetic
+      // subdimension; sensory shapes defaulted to the conceptual
+      // (Ni/Te) read. Bounded +10 nudge fires when the user either
+      // (a) ranked "beauty/music/design" first on Q-O1 (the strongest
+      // single aesthetic tell) or (b) carries high aesthetic
+      // subdimension (>=60). Weight is held to 10 so the nudge can't
+      // by itself flip a genuine intuitive — the existing
+      // perceiving-axis binaries + the other +25/+20/+15 Si components
+      // still dominate the read. Same component lands on scoreSe
+      // below; which side wins is left to the existing
+      // perceiving-binary resolver.
+      fires:
+        s.qO1TopPickIsAesthetic || s.oceanOpennessAesthetic >= 60,
+      weight: 10,
+      label: "si: aesthetic openness (Q-O1#1=aesthetic OR subdim>=60)",
     },
   ]);
 }
@@ -899,6 +1000,17 @@ function scoreSe(s: ExtractedSignals): { score: number; trace: string[] } {
       fires: s.costSurfaceCount >= 4,
       weight: 5,
       label: "se: cost_surface>=4",
+    },
+    {
+      // CC-SENSING-TYPING — aesthetic openness lift, mirrored on Si.
+      // See the scoreSi component for rationale. Both Si and Se carry
+      // the same +10 nudge because the aesthetic signal is sensing-
+      // family generic — the perceiving binary (Q-TB-SI-SE) decides
+      // which sensing function actually wins.
+      fires:
+        s.qO1TopPickIsAesthetic || s.oceanOpennessAesthetic >= 60,
+      weight: 10,
+      label: "se: aesthetic openness (Q-O1#1=aesthetic OR subdim>=60)",
     },
   ]);
 }

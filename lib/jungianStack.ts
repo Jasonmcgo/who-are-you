@@ -582,8 +582,45 @@ export function aggregateLensStackBinary(signals: Signal[]): LensStack {
         }
       }
     } else {
-      // Both leaders share attitude — not a canonical stack.
-      reasons.push("binary-attitude-violation");
+      // CC-SENSING-TYPING — both leaders share attitude (Nat:
+      // perceivingLeader=Si intro, judgingLeader=Fi intro). Pre-CC the
+      // engine pushed binary-attitude-violation here and left dom/aux
+      // null, which fell through to the architect-halo default below
+      // (`dominant ?? "ni"`, `auxiliary ?? "te"`) — publishing Ni/Te
+      // over the user's explicit Si/Fi picks. Recover into the
+      // closest canonical stack instead: prefer the perceivingLeader
+      // as dom (perceiving is the "how you take in reality" identity
+      // anchor), then pick the canonical extraverted aux from
+      // VALID_AUX_BY_DOMINANT[dom] that matches the judgingLeader's
+      // family (F → Fe, T → Te for intro-dom; F → Fi, T → Ti for
+      // extra-dom). The resulting stack still keeps confidence=low
+      // because the picks ARE structurally inconsistent at the
+      // canonical-stack level — but the published dominant now
+      // respects the binary picks instead of inverting them. Flagged
+      // with a distinct reason so the hedge prose can distinguish
+      // recovered cases from genuinely-contaminated ones.
+      //
+      // Empirical effect (cohort, 2026-05-25): Nat (perc=Si, judg=Fi,
+      // both intro) → dom=Si, aux=Fe (ISFJ) — perceiving correctly
+      // Si and judging correctly a Feeler. No architect-cohort
+      // regression because the same-attitude-LEADERS case only fires
+      // when BOTH leaders share attitude, which architects
+      // (Jason/Brian/Brad/etc.) do not exhibit.
+      const judgingIsFeeler =
+        judgingLeader === "fi" || judgingLeader === "fe";
+      const candidateAuxes = VALID_AUX_BY_DOMINANT[perceivingLeader] ?? [];
+      const recoveredAux = candidateAuxes.find((a) =>
+        judgingIsFeeler ? a === "fe" || a === "fi" : a === "te" || a === "ti"
+      );
+      if (recoveredAux) {
+        dominant = perceivingLeader;
+        auxiliary = recoveredAux;
+        reasons.push("binary-same-attitude-leaders-resolved");
+      } else {
+        // No canonical aux matches the leader-family. Genuinely
+        // unrecoverable — keep the original violation flag.
+        reasons.push("binary-attitude-violation");
+      }
     }
   }
 

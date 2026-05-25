@@ -1,9 +1,9 @@
 {
   "label": "Ashley — real-person calibration anchor",
-  "_source": "Extracted from prod session bbd5300a-7b57-4408-a787-67cea202e772 on 2026-05-22. Real-person answers from the named cohort user. Per feedback_cohort_fixtures_two_functions.md — this is a REAL-PERSON calibration anchor, not a synthetic shape-pattern diagnostic.",
+  "_source": "Extracted from prod session bbd5300a-7b57-4408-a787-67cea202e772 on 2026-05-25. Real-person answers from the named cohort user. Per feedback_cohort_fixtures_two_functions.md — this is a REAL-PERSON calibration anchor, not a synthetic shape-pattern diagnostic.",
   "canonical_name": "Ashley",
   "prod_session_id": "bbd5300a-7b57-4408-a787-67cea202e772",
-  "extracted_at": "2026-05-22T23:05:35.488Z",
+  "extracted_at": "2026-05-25T21:47:47.358Z",
   "answers": [
     {
       "type": "forced",
@@ -633,7 +633,7 @@
     }
   ],
   "demographics": {
-    "name_value": "#1 Daughter",
+    "name_value": "Ashley",
     "name_state": "specified",
     "gender_value": "woman",
     "gender_state": "specified",
