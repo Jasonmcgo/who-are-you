@@ -182,6 +182,13 @@ export function renderElaborativeLabel(
   if (bucket === "security") {
     if (archetype === "danielType") return "Security through structure";
     if (surfaceTop === "grips_old_plan") return "Security through what worked";
+    // CC-185 — for the cohort whose top-1 is grips_control routed to
+    // security via Part A's explicit-surface-beats-archetype rule, the
+    // generic "Security Grip" label was too thin. Surface-keyed
+    // variant matches the existing grips_old_plan precedent.
+    if (surfaceTop === "grips_control") return "Security through control";
+    if (surfaceTop === "grips_security") return "Security through certainty";
+    if (surfaceTop === "grips_certainty") return "Security through certainty";
     return "Security Grip";
   }
   if (bucket === "safety") {
@@ -239,10 +246,26 @@ export function generateUnderlyingQuestion(
   if (bucket === "security") {
     if (archetype === "danielType")
       return "Will the system I built hold what I'm responsible for?";
-    if (archetype === "cindyType")
-      return "Will the people who depend on me be safe if I let go?";
     if (archetype === "jasonType")
       return "Will the structure I'm carrying still stand if I rest?";
+    // CC-185 — surface-flavored question for the cindyType + classical-
+    // defensive route (Nat-shape, Kevin-shape). The care-flavored
+    // "Will the people who depend on me be safe if I let go?" doesn't
+    // fit a user whose explicit grip is grips_old_plan / grips_control;
+    // their underlying register is about a FOUNDATION holding, not a
+    // relationship surviving.
+    if (
+      archetype === "cindyType" &&
+      isClassicalDefensiveSurface(surfaceTop)
+    ) {
+      if (surfaceTop === "grips_old_plan")
+        return "Will the foundation I've built still hold what I'm carrying?";
+      if (surfaceTop === "grips_control")
+        return "Can I hold the shape of this securely enough to trust?";
+      return "Will what I've built hold without my constant attention?";
+    }
+    if (archetype === "cindyType")
+      return "Will the people who depend on me be safe if I let go?";
     return "Will what I've built hold without my constant attention?";
   }
   if (bucket === "safety") {
@@ -431,11 +454,24 @@ export function classifyGripPattern(
       ]);
     }
     if (archetype === "cindyType") {
-      return decide("belonging", hasFamily ? "high" : "medium", [
+      // CC-185 Part A — explicit classical-defensive grip-surface
+      // (grips_control / grips_security / grips_certainty /
+      // grips_old_plan) wins over the cindyType archetype's belonging-
+      // through-care default. Pre-CC-185 this branch hard-routed to
+      // `belonging` and conflated Fi-Se artists (Nat) and Fi-aux
+      // caregivers with Fe-care shapes whose grip primal really is
+      // belonging. The general rule, not a Nat-specific override:
+      // when a person's Q-GRIP1 rank-1 is an explicit security/
+      // defensive grip, route to the security primal regardless of
+      // archetype. The bucket label is sharpened by surface
+      // (`renderElaborativeLabel` produces "Security through what
+      // worked" for grips_old_plan, "Control as protection" for
+      // grips_control via the existing branches).
+      return decide("security", hasFamily ? "high" : "medium", [
         `surface=${top1} (classical-defensive)`,
         `archetype=cindyType`,
         `compass family=${hasFamily}`,
-        "rendered as control-as-protective-overreach",
+        "CC-185: explicit security/defensive surface beats archetype's belonging default",
       ]);
     }
     // Unmapped archetype — fall through to compass-only routing.

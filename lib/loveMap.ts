@@ -514,11 +514,43 @@ const belongingHeartPredicate: RegisterPredicate = (inp) => {
 const loyalistPredicate: RegisterPredicate = (inp) => {
   const { signals, lensStack } = inp;
   const fiDriver = lensInPairs(lensStack, ["FiNe", "FiSe"]) ? 1 : 0;
-  const valueGate =
-    rankAtMost(signals, "justice_priority", 3) ||
-    rankAtMost(signals, "truth_priority", 3)
+  // CC-185 Part B — loosen the value-gate and the verbal-expression
+  // gate for Fi-DRIVER shapes. Pre-CC the Loyalist register was
+  // value-gated to Justice/Truth top-3 + lifted by love_verbal_
+  // expression specifically; Fi-driver shapes whose values cluster
+  // around Family / Compassion / Stability / etc. (e.g. an Fi-Se
+  // artist like Nat) scored ~0 here and the care/Family registers
+  // (Companion, Parental Heart) swept the love map. The Loyalist
+  // register isn't "Justice + verbal-expression only" — it's
+  // values-rooted authenticity, full stop. For non-Fi-driver shapes
+  // the original gate is preserved (the value-gate restricts the
+  // register from over-firing on Fe-care shapes that happen to rank
+  // Justice/Truth).
+  let valueGate: 0 | 1;
+  if (fiDriver === 1) {
+    // Fi expresses through whatever value the person actually holds;
+    // ANY top-3 compass value passes the gate.
+    valueGate = rankAtMost(signals, "truth_priority", 3) ||
+      rankAtMost(signals, "justice_priority", 3) ||
+      rankAtMost(signals, "family_priority", 3) ||
+      rankAtMost(signals, "compassion_priority", 3) ||
+      rankAtMost(signals, "loyalty_priority", 3) ||
+      rankAtMost(signals, "stability_priority", 3) ||
+      rankAtMost(signals, "knowledge_priority", 3) ||
+      rankAtMost(signals, "freedom_priority", 3) ||
+      rankAtMost(signals, "faith_priority", 3) ||
+      rankAtMost(signals, "honor_priority", 3) ||
+      rankAtMost(signals, "mercy_priority", 3) ||
+      rankAtMost(signals, "peace_priority", 3)
       ? 1
       : 0;
+  } else {
+    valueGate =
+      rankAtMost(signals, "justice_priority", 3) ||
+      rankAtMost(signals, "truth_priority", 3)
+        ? 1
+        : 0;
+  }
   const convictionFires =
     hasSignal(signals, "holds_internal_conviction") ||
     hasSignal(signals, "high_conviction_under_risk")
@@ -527,17 +559,23 @@ const loyalistPredicate: RegisterPredicate = (inp) => {
   const closeStakes = rankAtMost(signals, "close_relationships_stakes_priority", 3)
     ? 1
     : 0;
-  // CC-143 §Task 3 — Q-L1 lift. love_verbal_expression (naming the
-  // person, saying what they mean to you) is the canonical loyalist
-  // marker — loyalist love expressed through explicit commitment +
-  // articulation, not silent presence.
+  // CC-143 §Task 3 — Q-L1 lift. love_verbal_expression is the
+  // CANONICAL loyalist marker for non-Fi-driver shapes (loyalist love
+  // expressed through explicit commitment + articulation). CC-185 Part
+  // B — for Fi-driver shapes, drop the verbal-expression requirement:
+  // an Fi-Se artist's loyalty often expresses through what their
+  // hands make, what they protect, what they show — not through
+  // explicit naming. The lift is REPLACED by a base fiDriver-only
+  // contribution that lets a values-anchored Fi shape register here
+  // even without a Q-L1 = "naming the person" pick.
   const directLift = loveDirectLift(signals, ["love_verbal_expression"]);
+  const fiBaseLift = fiDriver === 1 ? 0.2 : 0;
   const inferred =
     fiDriver * 0.3 +
     valueGate * 0.2 +
     convictionFires * 0.2 +
     closeStakes * 0.1;
-  return Math.min(1, inferred + directLift * 0.3);
+  return Math.min(1, inferred + directLift * 0.3 + fiBaseLift);
 };
 
 const openHeartPredicate: RegisterPredicate = (inp) => {

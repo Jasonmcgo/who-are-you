@@ -8097,6 +8097,28 @@ const GIFT_DANGER_LINES: Record<
   },
 };
 
+// CC-185 Part C — auxiliary-aware gift/danger overrides keyed on
+// `${dominant}|${auxiliary}`. The pre-CC-185 table was dominant-only,
+// which produced byte-identical exec-read lines for Fi-Se (Nat,
+// aesthetic artist) and Fi-Ne (Megan, possibility-tilted) — every
+// Fi-dominant got "moral seriousness / moral seriousness without
+// curiosity." The auxiliary changes WHAT the shape's values build
+// through (Se → present-tense / aesthetic / what your hands make;
+// Ne → possibility / what your values might become), and the exec
+// read should name that difference. Lookup falls back to the
+// dominant-only table when no pair entry exists — additive, no
+// existing shape's text moves unless a pair entry covers it.
+const GIFT_DANGER_LINES_BY_PAIR: Record<
+  string,
+  { gift: string; danger: string }
+> = {
+  "fi|se": {
+    gift: "values made visible through what you make",
+    danger:
+      "values made visible only after the moment they were meant for has passed",
+  },
+};
+
 // "Not X, but Y" thesis templates keyed by (dominant function, top compass
 // signal_id). Pre-authored common combinations; falls back to a generic
 // (function-only) template when no specific pairing is matched.
@@ -8256,13 +8278,49 @@ const THESIS_FALLBACK_BY_FUNCTION: Record<
   },
 };
 
+// CC-185 Part C — auxiliary-aware thesis fallback. Mirrors
+// `GIFT_DANGER_LINES_BY_PAIR`: when the dominant + auxiliary form a
+// register with a distinct "interior-translates-outward" mechanism,
+// the thesis line can name it. Fi-Se is the aesthetic-artist case
+// (the interior compass translates through what the hands make and
+// the senses register); Fi-Ne is the possibility-translator (the
+// existing dom-only entry is closer to this register and stays the
+// fallback). Look-up order in `thesisFor` is: dominant + topCompass
+// (THESIS_TEMPLATES) → pair (THESIS_FALLBACK_BY_PAIR) → dominant
+// (THESIS_FALLBACK_BY_FUNCTION). Additive — non-pair shapes are
+// untouched.
+const THESIS_FALLBACK_BY_PAIR: Record<string, ThesisTemplate> = {
+  "fi|se": {
+    // `composeThesisLine` prefixes with "You are a ", so the
+    // descriptor must read naturally after "a" — "values-built"
+    // starts on a consonant sound while still naming the aesthetic-
+    // artist register explicitly. (The existing dom-only "interior-
+    // compass shape" reads "a interior" too — a pre-CC-185 grammar
+    // wart we're not widening here.)
+    shapeDescriptor: "values-built aesthetic shape",
+    assumedX: "feeling more",
+    structuralY:
+      "letting what your hands and senses make carry the values into the world",
+  },
+};
+
 function thesisFor(
   lensStack: LensStack,
   topCompass: SignalRef[]
 ): ThesisTemplate {
+  // Lookup order: dominant + topCompass (most specific) → pair (CC-185
+  // Part C, dominant + auxiliary) → dominant-only fallback. Most shapes
+  // hit the first or last; pair entries cover the cases where the
+  // auxiliary materially changes the register (Fi-Se aesthetic-artist
+  // vs Fi-Ne possibility-translator).
   const compassTop = topCompass[0]?.signal_id;
-  const key = compassTop ? `${lensStack.dominant}|${compassTop}` : "";
-  return THESIS_TEMPLATES[key] ?? THESIS_FALLBACK_BY_FUNCTION[lensStack.dominant];
+  const compassKey = compassTop ? `${lensStack.dominant}|${compassTop}` : "";
+  const pairKey = `${lensStack.dominant}|${lensStack.auxiliary}`;
+  return (
+    THESIS_TEMPLATES[compassKey] ??
+    THESIS_FALLBACK_BY_PAIR[pairKey] ??
+    THESIS_FALLBACK_BY_FUNCTION[lensStack.dominant]
+  );
 }
 
 // CC-PROSE-1 Layer 1 — Executive Read.
@@ -8394,8 +8452,12 @@ export function composeClosingReadProse(
 // stay in lockstep automatically. No new strings introduced — both helpers
 // lift verbatim from existing engine maps.
 export function composeGiftDangerLine(constitution: InnerConstitution): string {
+  // CC-185 Part C — pair-keyed override first, dom-only fallback
+  // second. See `GIFT_DANGER_LINES_BY_PAIR` for rationale.
   const dom = constitution.lens_stack.dominant;
-  const gd = GIFT_DANGER_LINES[dom];
+  const aux = constitution.lens_stack.auxiliary;
+  const pairKey = `${dom}|${aux}`;
+  const gd = GIFT_DANGER_LINES_BY_PAIR[pairKey] ?? GIFT_DANGER_LINES[dom];
   return `Your gift is ${gd.gift}. Your danger is ${gd.danger}.`;
 }
 
