@@ -79,6 +79,27 @@ const TENSION_BAND_HI = 0.10;
  *  territory anyway); above the outer edge the gap is a clear blowout. */
 const TENSION_FAR = 0.20;
 
+/**
+ * CC-ROOMREAD-CARD-FIT — weak-fit floor for the engine's top score.
+ *
+ * Cards are scored as `Σ weight × player.signal[tag]`. With weights
+ * typically 0.4–1.0 and signals normalized 0..1, a "strong match"
+ * scores ≥ ~0.4 (a player with mid signal on the dominant tag plus a
+ * smaller contribution from a second tag). Below this floor, even the
+ * top player barely fits — the card has no real target in the sub-pool.
+ *
+ * When a candidate's `enginePick.score < WEAK_FIT_FLOOR`, the card is
+ * demoted in the ranking (sorted AFTER all strong-fit candidates),
+ * irrespective of its `qualityRank` — so a card that fits someone in
+ * the sub-pool always beats a weak-fit card that happens to have a
+ * higher tension/confidence bonus. If EVERY candidate is weak-fit
+ * (the canonical Si-flavored-card-in-a-room-with-no-Si-player case),
+ * the round still picks the best of the weak-fit options and records
+ * a `weak-fit-no-strong-match` fallback event so the operator can
+ * narrow the card library or grow the room.
+ */
+export const WEAK_FIT_FLOOR = 0.25;
+
 export interface GenerateRoomReadGameArgs {
   players: PlayerGameSignals[];
   roundCount: number;
@@ -114,7 +135,7 @@ export function generateRoomReadGame(
     roundNumber: number;
     theme: BodyCardTheme;
     targetPlayerId: string;
-    reason: "all-eligible-targets-at-cap";
+    reason: "all-eligible-targets-at-cap" | "weak-fit-no-strong-match";
   }> = [];
 
   for (let i = 0; i < roundCount; i++) {
@@ -190,10 +211,20 @@ export function generateRoomReadGame(
         (card.confidenceBoost ?? 0) +
         enginePick.score +
         tensionBonus;
-      return { card, enginePick, qualityRank };
+      // CC-ROOMREAD-CARD-FIT — weak-fit flag. A card whose engine top
+      // score for the sub-pool is below the floor has no strong match
+      // in the room; demote it below all strong-fit candidates so a
+      // card that fits SOMEONE wins. Tension/confidenceBoost can't
+      // rescue a weak-fit card.
+      const weakFit = enginePick.score < WEAK_FIT_FLOOR;
+      return { card, enginePick, qualityRank, weakFit };
     });
 
     scoredCandidates.sort((a, b) => {
+      // CC-ROOMREAD-CARD-FIT — strong-fit candidates always beat
+      // weak-fit candidates, regardless of qualityRank. Within each
+      // group, the existing qualityRank order applies.
+      if (a.weakFit !== b.weakFit) return a.weakFit ? 1 : -1;
       if (b.qualityRank !== a.qualityRank) return b.qualityRank - a.qualityRank;
       // Deterministic tiebreak on card id so identical ranks pick
       // the same card every run.
@@ -207,6 +238,18 @@ export function generateRoomReadGame(
         theme,
         targetPlayerId: chosen.enginePick.playerId,
         reason: "all-eligible-targets-at-cap",
+      });
+    }
+    // CC-ROOMREAD-CARD-FIT — chosen card is weak-fit (means: EVERY
+    // candidate in this theme/sub-pool was weak-fit, otherwise a
+    // strong-fit candidate would have sorted above). Log so the
+    // operator sees which themes have no real target in the room.
+    if (chosen.weakFit) {
+      fallbackEvents.push({
+        roundNumber: i + 1,
+        theme,
+        targetPlayerId: chosen.enginePick.playerId,
+        reason: "weak-fit-no-strong-match",
       });
     }
     usedCardIds.add(chosen.card.id);

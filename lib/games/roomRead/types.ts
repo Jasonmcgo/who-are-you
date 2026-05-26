@@ -109,7 +109,19 @@ export type RoomReadGame = {
     roundNumber: number;
     theme: BodyCardTheme;
     targetPlayerId: string;
-    reason: "all-eligible-targets-at-cap";
+    /**
+     * CC-ROOMREAD-EVEN-DISTRIBUTION — `"all-eligible-targets-at-cap"`:
+     *   no eligible (under-cap) player exists for any candidate; the
+     *   round fell back to picking from the full pool. Signals a card-
+     *   library variety gap.
+     * CC-ROOMREAD-CARD-FIT — `"weak-fit-no-strong-match"`: every
+     *   candidate card's engine pick scored below `WEAK_FIT_FLOOR` for
+     *   the sub-pool, so the round chose the best weak-fit card. Signals
+     *   that the room genuinely has no strong match for any card in
+     *   that theme/sub-pool (the canonical example: an Si-flavored card
+     *   in a room with no Si player).
+     */
+    reason: "all-eligible-targets-at-cap" | "weak-fit-no-strong-match";
   }>;
 };
 

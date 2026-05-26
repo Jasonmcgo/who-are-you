@@ -21,14 +21,23 @@ import type {
 
 const HIGH_CONFIDENCE_GAP = 0.12;
 const MEDIUM_CONFIDENCE_GAP = 0.06;
-/** CC-175.1 — split threshold. When the top-vs-runner-up gap falls
- *  BELOW this value, the engine is genuinely torn between the two
- *  players ("both, for different reasons"). Set tighter than the
- *  `low`-confidence floor (0.06) so a split is a near dead-heat at
- *  the TOP, not merely "low confidence". The scoring layer pays a
- *  +3 split-read bonus to a player who reads the engine's split via
- *  the special "both" tile. */
-export const SPLIT_EPS = 0.03;
+/** CC-175.1 / CC-ROOMREAD-CARD-FIT — split threshold. When the
+ *  top-vs-runner-up gap falls BELOW this value, the engine is
+ *  genuinely torn between the two players ("both, for different
+ *  reasons"). Conceptually anchored at the lower edge of the
+ *  "debatable" tension band (`TENSION_BAND_LO = 0.04` in
+ *  `generate.ts`): a gap below the debatable band is a near-tie and
+ *  surfaces as a split; a gap inside the band is a single pick with
+ *  the runner-up tension bonus; a gap above is a clean blowout.
+ *  Tighter than the `low`-confidence floor (0.06) so a split is a
+ *  near dead-heat at the TOP, not merely "low confidence". The
+ *  scoring layer pays a +3 split-read bonus to a player who reads
+ *  the engine's split via the special "both" tile.
+ *
+ *  CC-ROOMREAD-CARD-FIT (2026-05-26) widened from 0.03 → 0.04 so
+ *  splits fire on the cohort more often (live observation: confident
+ *  single picks were landing where a split was warranted). */
+export const SPLIT_EPS = 0.04;
 
 export function scoreCardForPlayer(
   card: RoomReadCard,

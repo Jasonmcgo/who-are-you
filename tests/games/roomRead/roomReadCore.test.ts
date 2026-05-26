@@ -577,6 +577,47 @@ check("split-stays-false-on-clear-card", () => {
   return null;
 });
 
+// CC-ROOMREAD-CARD-FIT — split widened to 0.04 (lower edge of the
+// debatable tension band). Pin the new threshold with a gap that would
+// have stayed single at the old 0.03 cap but now reads as a split.
+check("split-fires-at-widened-threshold-035", () => {
+  // pattern_reader weight = 1.0, so signal=0.45 vs 0.415 → gap=0.035.
+  // Under the old SPLIT_EPS=0.03 this stayed a single pick; under 0.04
+  // it surfaces as a split.
+  const card = findCard("lens_problem_behind_problem");
+  const players: PlayerGameSignals[] = [
+    { playerId: "alpha", displayName: "Alpha", signals: { pattern_reader: 0.45 } },
+    { playerId: "beta", displayName: "Beta", signals: { pattern_reader: 0.415 } },
+    { playerId: "gamma", displayName: "Gamma", signals: { pattern_reader: 0.1 } },
+    { playerId: "delta", displayName: "Delta", signals: { pattern_reader: 0.0 } },
+  ];
+  const pick = getEnginePick(card, players);
+  const gap = pick.score - (pick.runnerUp?.score ?? 0);
+  if (!pick.isSplit) {
+    return `expected isSplit=true at widened threshold (gap=${gap.toFixed(4)}, SPLIT_EPS=${SPLIT_EPS})`;
+  }
+  return null;
+});
+
+// CC-ROOMREAD-CARD-FIT — gaps in the 0.04..0.10 "debatable" tension band
+// still single-pick (split only fires BELOW the band).
+check("split-stays-false-in-debatable-band", () => {
+  // pattern_reader weight = 1.0; signal=0.50 vs 0.43 → gap=0.07,
+  // squarely inside TENSION_BAND_LO..TENSION_BAND_HI.
+  const card = findCard("lens_problem_behind_problem");
+  const players: PlayerGameSignals[] = [
+    { playerId: "alpha", displayName: "Alpha", signals: { pattern_reader: 0.50 } },
+    { playerId: "beta", displayName: "Beta", signals: { pattern_reader: 0.43 } },
+    { playerId: "gamma", displayName: "Gamma", signals: { pattern_reader: 0.1 } },
+    { playerId: "delta", displayName: "Delta", signals: { pattern_reader: 0.0 } },
+  ];
+  const pick = getEnginePick(card, players);
+  if (pick.isSplit) {
+    return `expected isSplit=false in debatable band (gap=${(pick.score - (pick.runnerUp?.score ?? 0)).toFixed(4)})`;
+  }
+  return null;
+});
+
 // ─────────────────────────────────────────────────────────────────────
 // CC-175.1 · split scoring + "both" tile
 // ─────────────────────────────────────────────────────────────────────
@@ -944,6 +985,134 @@ check("even-distribution-fallback-events-absent-on-cohort-steady-state", () => {
       .map((e) => `R${e.roundNumber}:${e.theme}→${e.targetPlayerId}`)
       .join(", ");
     return `fallback fired unexpectedly on 5p/8r cohort: ${events} (broaden card library for the affected themes)`;
+  }
+  return null;
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// CC-ROOMREAD-CARD-FIT · weak-fit demotion + fallback diagnostic
+// ─────────────────────────────────────────────────────────────────────
+
+check("weak-fit-fallback-fires-when-room-has-no-strong-match", () => {
+  // 4 players with weak signals on every tag — every card's engine
+  // pick scores under WEAK_FIT_FLOOR for this room. Generation should
+  // still produce a full round set (it doesn't throw), and every round
+  // should be tagged with the `weak-fit-no-strong-match` fallback
+  // reason. Surfaces the "no Si player → don't strand the round on a
+  // false-positive Si pick" requirement at the diagnostic layer.
+  const weakSignals: PlayerGameSignals[] = [
+    {
+      playerId: "p1",
+      displayName: "P1",
+      signals: { pattern_reader: 0.05, deep_seeing: 0.04 },
+    },
+    {
+      playerId: "p2",
+      displayName: "P2",
+      signals: { pattern_reader: 0.04, deep_seeing: 0.03 },
+    },
+    {
+      playerId: "p3",
+      displayName: "P3",
+      signals: { pattern_reader: 0.03, deep_seeing: 0.02 },
+    },
+    {
+      playerId: "p4",
+      displayName: "P4",
+      signals: { pattern_reader: 0.02, deep_seeing: 0.01 },
+    },
+  ];
+  const game = generateRoomReadGame({
+    players: weakSignals,
+    roundCount: 4,
+    mode: "classic",
+  });
+  if (game.rounds.length !== 4) {
+    return `expected 4 rounds, got ${game.rounds.length}`;
+  }
+  const weakFitFallbacks = (game.fallbackEvents ?? []).filter(
+    (e) => e.reason === "weak-fit-no-strong-match"
+  );
+  if (weakFitFallbacks.length === 0) {
+    return `expected ≥1 weak-fit-no-strong-match event; got ${
+      (game.fallbackEvents ?? []).length
+    } events total`;
+  }
+  // Sanity: every round's engine pick score is below WEAK_FIT_FLOOR
+  // for this room (else the demotion wouldn't have fired).
+  for (const r of game.rounds) {
+    if (r.enginePick.score >= 0.25) {
+      return `round ${r.roundNumber} score=${r.enginePick.score.toFixed(3)} is NOT below floor — demotion would not fire`;
+    }
+  }
+  return null;
+});
+
+check("weak-fit-demotion-prefers-strong-fit-over-weak-fit-with-tension", () => {
+  // Two players, no other context: we craft a sub-pool of 2 with one
+  // strong-fit profile (mid-signal on multiple tags → composite score
+  // well above WEAK_FIT_FLOOR) and a near-zero-signal counterweight.
+  // Other "weak-fit" candidate cards in the same theme would otherwise
+  // win on tension bonus alone (near-tie at very low absolute scores);
+  // demotion forces the strong-fit card to the top regardless.
+  //
+  // The generator runs through every theme in BODY_CARD_ORDER, so we
+  // can't isolate one theme directly — instead we assert that any
+  // round whose chosen pick scores below WEAK_FIT_FLOOR is correctly
+  // logged in fallbackEvents (no silent weak picks).
+  const players: PlayerGameSignals[] = [
+    {
+      playerId: "strong-fit",
+      displayName: "Strong",
+      signals: {
+        // Pump the lens / hands / voice / gravity / fire / trust / path
+        // tag families enough that at least one theme's card scores
+        // well above the floor for this player.
+        pattern_reader: 0.8,
+        deep_seeing: 0.7,
+        precedent_memory: 0.7,
+        steadiness: 0.6,
+        discernment: 0.5,
+        long_arc_thinking: 0.5,
+        connector: 0.5,
+        emotional_containment: 0.4,
+        boundary_awareness: 0.4,
+      },
+    },
+    {
+      playerId: "blank-1",
+      displayName: "Blank1",
+      signals: {},
+    },
+    {
+      playerId: "blank-2",
+      displayName: "Blank2",
+      signals: {},
+    },
+    {
+      playerId: "blank-3",
+      displayName: "Blank3",
+      signals: {},
+    },
+  ];
+  const game = generateRoomReadGame({
+    players,
+    roundCount: 4,
+    mode: "classic",
+  });
+  for (const r of game.rounds) {
+    if (r.enginePick.score < 0.25) {
+      const fb = (game.fallbackEvents ?? []).find(
+        (e) =>
+          e.roundNumber === r.roundNumber &&
+          e.reason === "weak-fit-no-strong-match"
+      );
+      if (!fb) {
+        return `round ${r.roundNumber} chose weak-fit (score=${r.enginePick.score.toFixed(
+          3
+        )}) without logging weak-fit-no-strong-match`;
+      }
+    }
   }
   return null;
 });
