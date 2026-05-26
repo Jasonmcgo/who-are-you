@@ -77,3 +77,11 @@ tsconfig.tsbuildinfo
 # ever lands inside the repo by accident.
 *.dump
 /who-are-you-backups/
+
+# Room Read admin report dumps (scripts/adminReportDump.ts output). Real
+# user PII — names, demographics, full reports. Never commit.
+cohort-report-dump*.md
+
+# Throwaway scratch scripts (one-off verifiers / walks). Keepers get a
+# real name; anything named _scratch_* stays local.
+scripts/_scratch_*
