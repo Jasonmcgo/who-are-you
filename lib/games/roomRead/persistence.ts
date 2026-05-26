@@ -568,11 +568,14 @@ async function buildRoomReadRecap(args: {
 
     // Verdict — prefer the canonical stored value; recompute as a
     // belt-and-suspenders fallback if the event row is somehow missing.
+    // CC-184 — pass `isSplit` so the fallback path also routes torn
+    // engine picks to the "split" verdict.
     const verdict: ReturnType<typeof getVerdict> =
       (cal?.verdict as ReturnType<typeof getVerdict> | undefined) ??
       getVerdict({
         roomWinnerPlayerId: roomWinnerRaw ?? undefined,
         enginePickPlayerId,
+        isSplit: round.engine_is_split,
       });
 
     // Per-player points for THIS round. Players who scored zero are
@@ -628,8 +631,13 @@ export interface SubmitGuessArgs {
   joinToken: string;
   roundId: string;
   voterPlayerId: string;
+  // CC-184 — a guess is one of: (a) single player, (b) pair (name the
+  // two), (c) "nobody" abstain. Exactly one of the three is expected.
+  // The route handler validates the shape; this function enforces the
+  // exactly-one rule + the per-id "player is in the game" check.
   guessedPlayerId?: string;
-  guessedSpecial?: "both" | "nobody";
+  guessedPlayerIds?: readonly [string, string];
+  guessedSpecial?: "nobody";
 }
 
 export interface GuessAck {
@@ -639,13 +647,32 @@ export interface GuessAck {
 }
 
 export async function submitGuess(args: SubmitGuessArgs): Promise<GuessAck> {
-  if (!args.guessedPlayerId && !args.guessedSpecial) {
-    throw new Error("Room Read: guess requires guessedPlayerId or guessedSpecial");
-  }
-  if (args.guessedPlayerId && args.guessedSpecial) {
+  // CC-184 — count which of the three guess shapes is set; reject
+  // none and multiple. The "both" special is gone; pair guesses use
+  // `guessedPlayerIds` now.
+  const supplied =
+    (args.guessedPlayerId ? 1 : 0) +
+    (args.guessedPlayerIds ? 1 : 0) +
+    (args.guessedSpecial ? 1 : 0);
+  if (supplied === 0) {
     throw new Error(
-      "Room Read: guess accepts exactly one of guessedPlayerId / guessedSpecial"
+      "Room Read: guess requires guessedPlayerId, guessedPlayerIds, or guessedSpecial"
     );
+  }
+  if (supplied > 1) {
+    throw new Error(
+      "Room Read: guess accepts exactly one of guessedPlayerId / guessedPlayerIds / guessedSpecial"
+    );
+  }
+  if (args.guessedPlayerIds) {
+    if (args.guessedPlayerIds.length !== 2) {
+      throw new Error(
+        "Room Read: guessedPlayerIds must be a length-2 tuple of player ids"
+      );
+    }
+    if (args.guessedPlayerIds[0] === args.guessedPlayerIds[1]) {
+      throw new Error("Room Read: guessedPlayerIds must name two DIFFERENT players");
+    }
   }
 
   const db = getDb();
@@ -663,6 +690,13 @@ export async function submitGuess(args: SubmitGuessArgs): Promise<GuessAck> {
   }
   if (args.guessedPlayerId && !playerIds.includes(args.guessedPlayerId)) {
     throw new Error("Room Read: guessed player is not in this game");
+  }
+  if (args.guessedPlayerIds) {
+    for (const id of args.guessedPlayerIds) {
+      if (!playerIds.includes(id)) {
+        throw new Error("Room Read: guessed player is not in this game");
+      }
+    }
   }
 
   const roundRows = await db
@@ -684,6 +718,13 @@ export async function submitGuess(args: SubmitGuessArgs): Promise<GuessAck> {
     throw new Error("Room Read: round is not open for voting");
   }
 
+  // CC-184 — column layout for the row:
+  //   single guess:  guessed_player_id   = id  | guessed_player_id_2 = null
+  //   pair guess:    guessed_player_id   = id1 | guessed_player_id_2 = id2
+  //   "nobody":      guessed_special     = "nobody" | both id columns null
+  const primaryId =
+    args.guessedPlayerIds?.[0] ?? args.guessedPlayerId ?? null;
+  const secondaryId = args.guessedPlayerIds?.[1] ?? null;
   // Upsert on (round_id, voter_player_id). drizzle's onConflictDoUpdate
   // hits the unique constraint we declared in schema.ts.
   await db
@@ -692,13 +733,15 @@ export async function submitGuess(args: SubmitGuessArgs): Promise<GuessAck> {
       session_id: sess.id,
       round_id: args.roundId,
       voter_player_id: args.voterPlayerId,
-      guessed_player_id: args.guessedPlayerId ?? null,
+      guessed_player_id: primaryId,
+      guessed_player_id_2: secondaryId,
       guessed_special: args.guessedSpecial ?? null,
     })
     .onConflictDoUpdate({
       target: [roomReadGuesses.round_id, roomReadGuesses.voter_player_id],
       set: {
-        guessed_player_id: args.guessedPlayerId ?? null,
+        guessed_player_id: primaryId,
+        guessed_player_id_2: secondaryId,
         guessed_special: args.guessedSpecial ?? null,
         updated_at: sql`now()`,
       },
@@ -722,7 +765,17 @@ export async function submitGuess(args: SubmitGuessArgs): Promise<GuessAck> {
  */
 export type RevealVoteChoice =
   | { kind: "player"; playerId: string; displayName: string }
-  | { kind: "special"; value: "both" | "nobody" };
+  | {
+      // CC-184 — pair guess. The voter named the two on a split card
+      // (or, anti-hedge'd on a normal round; the scorer handles each
+      // shape — see calculateCardScores).
+      kind: "pair";
+      playerIds: readonly [
+        { playerId: string; displayName: string },
+        { playerId: string; displayName: string }
+      ];
+    }
+  | { kind: "special"; value: "nobody" };
 
 export interface RevealVote {
   voterPlayerId: string;
@@ -848,26 +901,62 @@ export async function revealRound(args: {
       );
     }
   }
-  const guesses: RoomGuess[] = guessRows.map((g) =>
-    g.guessed_special === "both" || g.guessed_special === "nobody"
-      ? { kind: "special" as const, value: g.guessed_special }
-      : { kind: "player" as const, playerId: g.guessed_player_id ?? "" }
-  );
+  // CC-184 — map persisted rows into the new RoomGuess shape:
+  //   - "nobody"               → { kind: "special", value: "nobody" }
+  //   - both ids present       → { kind: "pair", playerIds: [a, b] }
+  //   - single id present      → { kind: "player", playerId: a }
+  //   - everything else        → ignored (zero-info legacy row, e.g.
+  //                              pre-CC-184 blind "both" with no ids).
+  const guesses: RoomGuess[] = [];
+  for (const g of guessRows) {
+    if (g.guessed_special === "nobody") {
+      guesses.push({ kind: "special", value: "nobody" });
+      continue;
+    }
+    if (g.guessed_player_id && g.guessed_player_id_2) {
+      guesses.push({
+        kind: "pair",
+        playerIds: [g.guessed_player_id, g.guessed_player_id_2],
+      });
+      continue;
+    }
+    if (g.guessed_player_id) {
+      guesses.push({ kind: "player", playerId: g.guessed_player_id });
+      continue;
+    }
+    // Legacy blind-"both" row (guessed_special === "both" + no ids) or
+    // a truly malformed row — treat as zero info; don't push.
+  }
   const roomWinner = getRoomWinner(guesses);
 
-  // Vote distribution for the calibration log — counts per key.
-  // "both" → "__both__", "nobody" → "__nobody__"; player ids stay raw.
+  // Vote distribution for the calibration log + reveal payload —
+  // CC-184: counts per PLAYER ID. A pair guess contributes 1 to each
+  // named id (matching the room-winner tally). "nobody" abstains go
+  // under "__nobody__" so the calibration log can still see them.
+  // Legacy blind-"both" rows go under ROOM_WINNER_BOTH_SENTINEL for
+  // historical inspection (the live scorer no longer reads it).
   const distribution: Record<string, number> = {};
-  for (const g of guessRows) {
-    let key: string;
-    if (g.guessed_special === "both") {
-      key = ROOM_WINNER_BOTH_SENTINEL;
-    } else if (g.guessed_special === "nobody") {
-      key = "__nobody__";
-    } else {
-      key = g.guessed_player_id ?? "__unknown__";
-    }
+  const bumpKey = (key: string): void => {
     distribution[key] = (distribution[key] ?? 0) + 1;
+  };
+  for (const g of guessRows) {
+    if (g.guessed_special === "nobody") {
+      bumpKey("__nobody__");
+      continue;
+    }
+    if (g.guessed_player_id && g.guessed_player_id_2) {
+      bumpKey(g.guessed_player_id);
+      bumpKey(g.guessed_player_id_2);
+      continue;
+    }
+    if (g.guessed_player_id) {
+      bumpKey(g.guessed_player_id);
+      continue;
+    }
+    if (g.guessed_special === "both") {
+      // Legacy zero-info row preserved for historical inspection.
+      bumpKey(ROOM_WINNER_BOTH_SENTINEL);
+    }
   }
 
   // Build the EnginePick from the stored round row (no re-derivation).
@@ -899,13 +988,23 @@ export async function revealRound(args: {
     breakdown: RoundScoreBreakdown;
   }[] = [];
   for (const g of guessRows) {
+    // CC-184 — map the persisted row shape into the scorer's input.
+    // Same precedence as the RoomGuess builder above: nobody → special;
+    // both ids → pair; single id → player; legacy blind "both" → 0
+    // (no fields set → calculateCardScores returns 0 by absence).
+    const guessedPlayerIds: readonly [string, string] | undefined =
+      g.guessed_player_id && g.guessed_player_id_2
+        ? [g.guessed_player_id, g.guessed_player_id_2]
+        : undefined;
+    const guessedPlayerId =
+      !guessedPlayerIds && g.guessed_player_id
+        ? g.guessed_player_id
+        : undefined;
     const breakdown = calculateCardScores({
       voterPlayerId: g.voter_player_id,
-      guessedPlayerId: g.guessed_player_id ?? undefined,
-      guessedSpecial:
-        g.guessed_special === "both" || g.guessed_special === "nobody"
-          ? g.guessed_special
-          : undefined,
+      guessedPlayerId,
+      guessedPlayerIds,
+      guessedSpecial: g.guessed_special === "nobody" ? "nobody" : undefined,
       roomWinnerPlayerId: roomWinner,
       enginePick,
     });
@@ -920,6 +1019,9 @@ export async function revealRound(args: {
   const verdict = getVerdict({
     roomWinnerPlayerId: roomWinner,
     enginePickPlayerId: enginePick.playerId,
+    // CC-184 — surface the engine's split state so the verdict mapper
+    // can short-circuit to "split" (never "obvious" on a torn round).
+    isSplit: enginePick.isSplit,
   });
 
   // Persist scores + flip round status + write the calibration event
@@ -992,6 +1094,7 @@ function buildRevealVotes(
   guessRows: typeof roomReadGuesses.$inferSelect[] | Array<{
     voter_player_id: string;
     guessed_player_id: string | null;
+    guessed_player_id_2: string | null;
     guessed_special: string | null;
   }>,
   playerById: Map<string, string>
@@ -1002,8 +1105,28 @@ function buildRevealVotes(
   return sorted.map((g) => {
     const voterName = playerById.get(g.voter_player_id) ?? "Player";
     let choice: RevealVoteChoice;
-    if (g.guessed_special === "both" || g.guessed_special === "nobody") {
-      choice = { kind: "special", value: g.guessed_special };
+    // CC-184 precedence:
+    //   "nobody"           → special
+    //   both ids present   → pair (name-the-two)
+    //   single id present  → player
+    //   pre-CC blind "both" with no ids → fall back to "nobody"
+    //                        (zero-info row; legacy "both" is retired)
+    if (g.guessed_special === "nobody") {
+      choice = { kind: "special", value: "nobody" };
+    } else if (g.guessed_player_id && g.guessed_player_id_2) {
+      choice = {
+        kind: "pair",
+        playerIds: [
+          {
+            playerId: g.guessed_player_id,
+            displayName: playerById.get(g.guessed_player_id) ?? "Player",
+          },
+          {
+            playerId: g.guessed_player_id_2,
+            displayName: playerById.get(g.guessed_player_id_2) ?? "Player",
+          },
+        ],
+      };
     } else if (g.guessed_player_id) {
       choice = {
         kind: "player",
@@ -1011,10 +1134,9 @@ function buildRevealVotes(
         displayName: playerById.get(g.guessed_player_id) ?? "Player",
       };
     } else {
-      // Defensive: a guess row with neither a player id nor a recognized
-      // special value shouldn't exist (submitGuess validates), but if it
-      // did we fall back to the "nobody" semantic — that's the only
-      // option that means "no specific player chosen."
+      // Defensive: legacy "both"-special row with no ids, or a truly
+      // malformed row. Render as "nobody" (the only option that says
+      // "no specific player chosen") rather than dropping the voter.
       choice = { kind: "special", value: "nobody" };
     }
     return {
@@ -1051,17 +1173,28 @@ async function buildRevealPayloadForAlreadyRevealedRound(input: {
 
   // Distribution recomputed from guess rows (canonical source of truth
   // for the room vote — same code path as the first-reveal branch).
+  // CC-184 — per-player tally; pair guesses contribute 1 to each named id.
   const distribution: Record<string, number> = {};
-  for (const g of guessRows) {
-    let key: string;
-    if (g.guessed_special === "both") {
-      key = ROOM_WINNER_BOTH_SENTINEL;
-    } else if (g.guessed_special === "nobody") {
-      key = "__nobody__";
-    } else {
-      key = g.guessed_player_id ?? "__unknown__";
-    }
+  const bumpKey = (key: string): void => {
     distribution[key] = (distribution[key] ?? 0) + 1;
+  };
+  for (const g of guessRows) {
+    if (g.guessed_special === "nobody") {
+      bumpKey("__nobody__");
+      continue;
+    }
+    if (g.guessed_player_id && g.guessed_player_id_2) {
+      bumpKey(g.guessed_player_id);
+      bumpKey(g.guessed_player_id_2);
+      continue;
+    }
+    if (g.guessed_player_id) {
+      bumpKey(g.guessed_player_id);
+      continue;
+    }
+    if (g.guessed_special === "both") {
+      bumpKey(ROOM_WINNER_BOTH_SENTINEL);
+    }
   }
 
   // Engine pick rehydrated from the stored round row (no re-derivation;

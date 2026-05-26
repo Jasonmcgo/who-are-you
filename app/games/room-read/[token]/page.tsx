@@ -101,12 +101,21 @@ interface RoundScoreBreakdownPayload {
   points: number;
 }
 
-// CC-178 — per-voter vote choice on the reveal payload. Surfaces ONLY
-// post-reveal; the open-round GET payload omits these entirely (leak
-// guard). Mirrors `RevealVote`/`RevealVoteChoice` in persistence.ts.
+// CC-178 / CC-184 — per-voter vote choice on the reveal payload.
+// Surfaces ONLY post-reveal; the open-round GET payload omits these
+// entirely (leak guard). Mirrors `RevealVote`/`RevealVoteChoice` in
+// persistence.ts; CC-184 added the `pair` variant (name-the-two) and
+// retired the `"both"` blind special.
 type RevealVoteChoicePayload =
   | { kind: "player"; playerId: string; displayName: string }
-  | { kind: "special"; value: "both" | "nobody" };
+  | {
+      kind: "pair";
+      playerIds: readonly [
+        { playerId: string; displayName: string },
+        { playerId: string; displayName: string }
+      ];
+    }
+  | { kind: "special"; value: "nobody" };
 
 interface RevealVotePayload {
   voterPlayerId: string;
@@ -122,7 +131,8 @@ interface RevealedRoundPayload {
   enginePick: EnginePickPayload;
   roomWinnerPlayerId: string | undefined;
   roomVoteDistribution: Record<string, number>;
-  verdict: "obvious" | "human_override" | "identity_fog";
+  // CC-184 added the "split" verdict — engine was torn, no "obvious".
+  verdict: "obvious" | "human_override" | "identity_fog" | "split";
   scores: {
     playerId: string;
     displayName: string;
@@ -134,6 +144,10 @@ interface RevealedRoundPayload {
 }
 
 // Persistence sentinels — mirrored from `lib/games/roomRead/types.ts`.
+// CC-184 retired the blind "both" tile (replaced by pick-two pair
+// voting); the constant stays defined so legacy distribution rows
+// can be rendered, but the live vote pipeline no longer uses it as
+// a `pick` state.
 const ROOM_WINNER_BOTH_SENTINEL = "__both__";
 const ROOM_WINNER_NOBODY_SENTINEL = "__nobody__";
 
@@ -168,6 +182,17 @@ function verdictCopy(
   enginePick: EnginePickPayload
 ): { kicker: string; body: string } {
   const name = enginePick.displayName;
+  // CC-184 — split-aware verdict. The engine was torn between
+  // `enginePick.playerId` (top) and `enginePick.runnerUp?.playerId`
+  // (second). Name the two and surface the scoring play.
+  if (verdict === "split") {
+    const second = enginePick.runnerUp?.displayName;
+    const pair = second ? `${name} and ${second}` : name;
+    return {
+      kicker: "Split Read",
+      body: `The engine was torn between ${pair}. Naming both was the play — pair points beat single picks here.`,
+    };
+  }
   if (verdict === "obvious") {
     // CC-178 — name the subject. The agreement copy was vague ("agree
     // on what?" complaint). Now reads "agree: this is {name}."
@@ -260,6 +285,13 @@ export default function RoomReadGamePage({
   const [identity, setIdentity] = useState<string | null>(null);
   // The active vote pick — a player id, "__both__", or "__nobody__".
   const [pick, setPick] = useState<string | null>(null);
+  // CC-184 — pick-two pair voting. Active when `pairIds` is a non-null
+  // array (the user tapped "Both / Multiple" to enter pair mode). The
+  // array length is 0/1/2: submission requires exactly 2. When `pairIds`
+  // is non-null, `pick` is cleared (the two states are mutually
+  // exclusive — single vs pair). Tapping "Both / Multiple" again with
+  // `pairIds.length < 2` exits pair mode; tapping Nobody clears both.
+  const [pairIds, setPairIds] = useState<string[] | null>(null);
   const [voteSubmit, setVoteSubmit] = useState<VoteSubmitState>({ kind: "idle" });
   const [reveal, setReveal] = useState<RevealState>({ kind: "none" });
   const [confirm, setConfirm] = useState<ConfirmState>({ kind: "hidden" });
@@ -407,20 +439,31 @@ export default function RoomReadGamePage({
   }
 
   async function handleSubmitVote() {
-    if (!identity || !pick) return;
+    if (!identity) return;
     if (load.kind !== "ready") return;
     const round = load.data.currentRound;
     if (!round || round.status !== "open") return;
 
+    // CC-184 — the body shape depends on which mode the voter is in:
+    //   pair mode (pairIds length === 2)  → guessedPlayerIds: [a, b]
+    //   "nobody" tile                     → guessedSpecial: "nobody"
+    //   single player tile                → guessedPlayerId: id
+    // Anything else is "not ready to submit" — the submit button is
+    // also disabled in those states, this is belt-and-suspenders.
+    let body: Record<string, unknown> | null = null;
+    if (pairIds && pairIds.length === 2) {
+      body = {
+        voterPlayerId: identity,
+        guessedPlayerIds: [pairIds[0], pairIds[1]],
+      };
+    } else if (pick === ROOM_WINNER_NOBODY_SENTINEL) {
+      body = { voterPlayerId: identity, guessedSpecial: "nobody" };
+    } else if (pick) {
+      body = { voterPlayerId: identity, guessedPlayerId: pick };
+    }
+    if (!body) return;
+
     setVoteSubmit({ kind: "submitting" });
-    const isSpecial =
-      pick === ROOM_WINNER_BOTH_SENTINEL || pick === ROOM_WINNER_NOBODY_SENTINEL;
-    const body = isSpecial
-      ? {
-          voterPlayerId: identity,
-          guessedSpecial: pick === ROOM_WINNER_BOTH_SENTINEL ? "both" : "nobody",
-        }
-      : { voterPlayerId: identity, guessedPlayerId: pick };
     try {
       const res = await fetch(
         `/api/games/room-read/${token}/rounds/${round.roundId}/guess`,
@@ -478,6 +521,8 @@ export default function RoomReadGamePage({
       });
       setReveal({ kind: "none" });
       setPick(null);
+      // CC-184 — clear pair state on round advance too.
+      setPairIds(null);
       setConfirm({ kind: "hidden" });
       void refetch();
     } catch {
@@ -570,13 +615,51 @@ export default function RoomReadGamePage({
     );
   }
 
+  // CC-184 — pick-two pair-vote handlers. Encapsulated here so the
+  // VotingScreen only sees high-level intent transitions, not raw
+  // state setters that could leave pair/pick in an inconsistent shape.
+  function handleSingleTilePick(playerId: string): void {
+    if (pairIds !== null) {
+      // We're in pair mode — tapping a player tile toggles them
+      // into / out of the pair-selection (cap at 2). Tapping a third
+      // tile while at 2 is a no-op (visual cue: at-cap).
+      setPairIds((prev) => {
+        if (prev === null) return prev;
+        const has = prev.includes(playerId);
+        if (has) return prev.filter((id) => id !== playerId);
+        if (prev.length >= 2) return prev;
+        return [...prev, playerId];
+      });
+    } else {
+      // Single-pick mode — set the pick, ensure pair state stays null.
+      setPick(playerId);
+    }
+  }
+  function handlePairTileTap(): void {
+    // Toggle into / out of pair mode. Entering clears the single pick;
+    // exiting clears the partial selection.
+    if (pairIds === null) {
+      setPick(null);
+      setPairIds([]);
+    } else {
+      setPairIds(null);
+    }
+  }
+  function handleNobodyTilePick(): void {
+    setPairIds(null);
+    setPick(ROOM_WINNER_NOBODY_SENTINEL);
+  }
+
   // Voting / waiting screen.
   return (
     <VotingScreen
       state={state}
       identity={identity}
       pick={pick}
-      onPick={setPick}
+      pairIds={pairIds}
+      onPickSingle={handleSingleTilePick}
+      onPairTileTap={handlePairTileTap}
+      onPickNobody={handleNobodyTilePick}
       onSubmitVote={handleSubmitVote}
       voteSubmit={voteSubmit}
       onReveal={handleReveal}
@@ -795,7 +878,10 @@ function VotingScreen({
   state,
   identity,
   pick,
-  onPick,
+  pairIds,
+  onPickSingle,
+  onPairTileTap,
+  onPickNobody,
   onSubmitVote,
   voteSubmit,
   onReveal,
@@ -805,7 +891,13 @@ function VotingScreen({
   state: RoomReadStatePayload;
   identity: string;
   pick: string | null;
-  onPick: (value: string) => void;
+  // CC-184 — pick-two pair state. Non-null array = pair mode is active;
+  // length 0/1/2 reflects the in-progress selection. The submit button
+  // unlocks at length === 2.
+  pairIds: string[] | null;
+  onPickSingle: (playerId: string) => void;
+  onPairTileTap: () => void;
+  onPickNobody: () => void;
   onSubmitVote: () => void;
   voteSubmit: VoteSubmitState;
   onReveal: () => void;
@@ -947,50 +1039,96 @@ function VotingScreen({
         >
           Your read
         </p>
+        {/* CC-184 — pick-two helper banner. Visible only when the
+            voter has tapped the "Both / Multiple" tile and is now
+            choosing which two players. Tells them the rule + how to
+            exit (re-tap the tile). */}
+        {pairIds !== null ? (
+          <p
+            className="font-serif italic"
+            style={{
+              fontSize: 13,
+              color: "var(--ink-soft)",
+              margin: 0,
+              lineHeight: 1.5,
+            }}
+          >
+            Naming two: pick the two players the engine is torn between
+            ({pairIds.length}/2). Tap the &ldquo;Both / Multiple&rdquo;
+            tile again to exit pair mode.
+          </p>
+        ) : null}
         <div className="flex flex-col" style={{ gap: 6 }}>
-          {state.players.map((p) => (
-            <VoteTile
-              key={p.playerId}
-              label={p.displayName}
-              selected={pick === p.playerId}
-              onClick={() => onPick(p.playerId)}
-            />
-          ))}
+          {state.players.map((p) => {
+            // CC-184 — selection logic depends on mode:
+            //   pair mode → tile shows selected when included in pairIds
+            //   single mode → tile shows selected when pick === playerId
+            const selectedInPair =
+              pairIds !== null && pairIds.includes(p.playerId);
+            const selectedSingle = pairIds === null && pick === p.playerId;
+            return (
+              <VoteTile
+                key={p.playerId}
+                label={p.displayName}
+                selected={selectedInPair || selectedSingle}
+                onClick={() => onPickSingle(p.playerId)}
+              />
+            );
+          })}
           <VoteTile
-            label="Both / Multiple, but for different reasons"
-            selected={pick === ROOM_WINNER_BOTH_SENTINEL}
-            onClick={() => onPick(ROOM_WINNER_BOTH_SENTINEL)}
+            label={
+              pairIds !== null
+                ? `Naming two… (${pairIds.length}/2) — tap to exit`
+                : "Both / Multiple, but for different reasons"
+            }
+            selected={pairIds !== null}
+            onClick={onPairTileTap}
             variant="special"
           />
           <VoteTile
             label="Nobody, thankfully"
-            selected={pick === ROOM_WINNER_NOBODY_SENTINEL}
-            onClick={() => onPick(ROOM_WINNER_NOBODY_SENTINEL)}
+            selected={pick === ROOM_WINNER_NOBODY_SENTINEL && pairIds === null}
+            onClick={onPickNobody}
             variant="special"
           />
         </div>
       </section>
 
+      {/* CC-184 — submit is enabled when EITHER:
+          - a single tile is selected (pick set), or
+          - the pair selection is complete (pairIds.length === 2).
+          Pair mode with fewer than 2 selected is "not ready yet." */}
       <div className="flex flex-col" style={{ gap: 8 }}>
-        <button
-          type="button"
-          onClick={onSubmitVote}
-          disabled={!pick || voteSubmit.kind === "submitting"}
-          data-focus-ring
-          className="font-mono uppercase"
-          style={{
-            fontSize: 12,
-            letterSpacing: "0.12em",
-            background: pick ? "var(--umber)" : "var(--ink-faint)",
-            color: "var(--paper, #fff)",
-            border: "1px solid var(--umber)",
-            padding: "12px 18px",
-            cursor: pick ? "pointer" : "not-allowed",
-            alignSelf: "flex-start",
-          }}
-        >
-          {voteSubmit.kind === "submitting" ? "submitting…" : "Submit Read"}
-        </button>
+        {(() => {
+          const ready =
+            (pairIds !== null && pairIds.length === 2) ||
+            (pairIds === null && pick !== null);
+          return (
+            <button
+              type="button"
+              onClick={onSubmitVote}
+              disabled={!ready || voteSubmit.kind === "submitting"}
+              data-focus-ring
+              className="font-mono uppercase"
+              style={{
+                fontSize: 12,
+                letterSpacing: "0.12em",
+                background: ready ? "var(--umber)" : "var(--ink-faint)",
+                color: "var(--paper, #fff)",
+                border: "1px solid var(--umber)",
+                padding: "12px 18px",
+                cursor: ready ? "pointer" : "not-allowed",
+                alignSelf: "flex-start",
+              }}
+            >
+              {voteSubmit.kind === "submitting"
+                ? "submitting…"
+                : pairIds !== null && pairIds.length === 2
+                ? "Submit Pair"
+                : "Submit Read"}
+            </button>
+          );
+        })()}
         {voteSubmit.kind === "error" ? (
           <p
             className="font-serif italic"
@@ -1342,8 +1480,12 @@ function RevealScreen({
             .sort((a, b) => b[1] - a[1])
             .map(([key, count]) => {
               const label =
+                // CC-184 — `__both__` is a LEGACY pre-CC-184 bucket
+                // (blind-"both" rows with no player ids). New games
+                // never produce this key; if it ever surfaces on an
+                // old session, label it clearly as legacy.
                 key === ROOM_WINNER_BOTH_SENTINEL
-                  ? "Both / Multiple"
+                  ? "Both / Multiple (legacy, pre-CC-184)"
                   : key === ROOM_WINNER_NOBODY_SENTINEL
                   ? "Nobody, thankfully"
                   : playerById.get(key) ?? key;
@@ -1398,12 +1540,18 @@ function RevealScreen({
             style={{ gap: 2, margin: 0, padding: 0, listStyle: "none" }}
           >
             {reveal.votes.map((v) => {
-              const choiceLabel =
-                v.choice.kind === "special"
-                  ? v.choice.value === "both"
-                    ? "Both / Multiple"
-                    : "Nobody, thankfully"
-                  : v.choice.displayName;
+              // CC-184 — three voter choice shapes:
+              //   player  → "<name>"
+              //   pair    → "<a> & <b>" (the named two)
+              //   special → "Nobody, thankfully"
+              let choiceLabel: string;
+              if (v.choice.kind === "player") {
+                choiceLabel = v.choice.displayName;
+              } else if (v.choice.kind === "pair") {
+                choiceLabel = `${v.choice.playerIds[0].displayName} & ${v.choice.playerIds[1].displayName}`;
+              } else {
+                choiceLabel = "Nobody, thankfully";
+              }
               return (
                 <li
                   key={v.voterPlayerId}
@@ -1454,7 +1602,11 @@ function RevealScreen({
         >
           {reveal.enginePick.displayName}
           {reveal.enginePick.isSplit
-            ? " — and the runner-up too (split read)"
+            ? // CC-184 — name the runner-up explicitly so the user
+              // sees the two targets the pair scoring was against.
+              reveal.enginePick.runnerUp
+              ? ` and ${reveal.enginePick.runnerUp.displayName} (split read)`
+              : " (split read)"
             : ""}
         </p>
         <p

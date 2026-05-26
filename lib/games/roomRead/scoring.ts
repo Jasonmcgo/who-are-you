@@ -1,68 +1,108 @@
-// CC-175 / CC-175.1 — Room Read per-round scoring + room-vote tally.
+// CC-175 / CC-175.1 / CC-184 — Room Read per-round scoring + room-vote tally.
 //
-// Scoring rules (CC-175.1 adds the split-card / Both-tile path):
+// SCORING RULES (CC-184 rewrite):
 //
 //   NORMAL round (`enginePick.isSplit === false`)
-//     +2  guess == engine pick
+//     +2  guess == engine pick (single-player guess only)
 //     +2  guess == room winner
 //     +1  perfect read (guess == engine == room)
-//     A `guessedSpecial` vote ("both" / "nobody") scores 0 — the
-//     engine had a clear pick to match against.
+//     CC-184 anti-hedge guard: a PAIR guess on a normal round earns
+//       0 engine credit (no commit) — room-match may still apply if
+//       either named player matches the room winner.
+//     A "nobody" tile vote scores 0 on both engine and room.
 //     Max: 5.
 //
 //   SPLIT round (`enginePick.isSplit === true`)
-//     +3  `guessedSpecial === "both"` (`splitRead = true`) — the
-//         player correctly read that the engine itself is torn.
-//     +2  room match (when the room's plurality is also the "both"
-//         tile — see `ROOM_WINNER_BOTH_SENTINEL` below).
-//     There is no single engine pick on a split card, so the +2
-//     engine-match and +1 perfect-read paths do not apply.
-//     `guessedSpecial === "nobody"` and player-id guesses score 0.
-//     Max: 5 (3 + 2).
+//     Targets = { enginePick.playerId, enginePick.runnerUp.playerId }.
+//     Engine = number of correctly-named targets, plus a +1 bonus
+//       when BOTH are named:
+//         0 correct  → 0
+//         1 correct  → +1
+//         2 correct  → +2 + 1 bonus = 3
+//     Room  = +2 when any named player equals the room winner.
+//     "nobody" tile vote scores 0.
+//     A single-player guess that hits one target also scores +1
+//       (single-id guesses are valid on splits; the pair-guess +1
+//       bonus only fires when BOTH are named via `guessedPlayerIds`).
+//     Max: 3 + 2 = 5.
 //
-// `getRoomWinner` returns the plurality winner across all guesses
-// (player ids OR the "both" sentinel). Tie → `undefined` (Identity
-// Fog). "nobody" votes are ignored — they're votable for UX but carry
-// no engine signal in MVP and don't influence the plurality.
+// PRE-CC-184: a blind `guessedSpecial="both"` paid +3 on a split. That
+// path is gone — voters now name the two via `guessedPlayerIds`.
+// Legacy persistence rows with `guessed_special="both"` and no player
+// ids load as zero-info guesses (0 points) by CC-184 design.
+//
+// `getRoomWinner` (CC-184) tallies per PLAYER: a single guess = 1 vote
+// for the named player; a pair guess = 1 vote for EACH named player;
+// "nobody" is ignored. Top-voted player wins; tie → undefined
+// (Identity Fog). The pre-CC `ROOM_WINNER_BOTH_SENTINEL` bucket is
+// retired.
 
-import {
-  ROOM_WINNER_BOTH_SENTINEL,
-  type RoundGuessInputs,
-  type RoundScoreBreakdown,
-} from "./types";
+import type { RoundGuessInputs, RoundScoreBreakdown } from "./types";
 
 export function calculateCardScores(
   inputs: RoundGuessInputs
 ): RoundScoreBreakdown {
-  const { guessedPlayerId, guessedSpecial, roomWinnerPlayerId, enginePick } =
-    inputs;
+  const {
+    guessedPlayerId,
+    guessedPlayerIds,
+    guessedSpecial,
+    roomWinnerPlayerId,
+    enginePick,
+  } = inputs;
+
+  // Normalize the voter's named players into an ordered list of ids.
+  // - single guess → [id]
+  // - pair guess   → [id1, id2]
+  // - "nobody" / nothing → []
+  const namedPlayerIds: readonly string[] =
+    guessedPlayerIds && guessedPlayerIds.length === 2
+      ? guessedPlayerIds
+      : guessedPlayerId
+      ? [guessedPlayerId]
+      : [];
 
   if (enginePick.isSplit) {
-    // ── Split card ───────────────────────────────────────────────
-    const isBothGuess = guessedSpecial === "both";
-    const roomAlsoBoth = roomWinnerPlayerId === ROOM_WINNER_BOTH_SENTINEL;
-    const splitRead = isBothGuess;
-    const matchedRoom = isBothGuess && roomAlsoBoth;
-    // No engine-match path on a split — there is no single engine pick.
-    // perfect-read (+1) does not stack on a split (engine-match doesn't
-    // apply) — explicitly leave the breakdown's `perfectRead` false.
-    const points = (splitRead ? 3 : 0) + (matchedRoom ? 2 : 0);
+    // ── Split card — name-the-two scoring ──────────────────────────
+    const target1 = enginePick.playerId;
+    const target2 = enginePick.runnerUp?.playerId;
+    const targets = new Set<string>([target1]);
+    if (target2) targets.add(target2);
+
+    // De-duplicate the named players against the targets so two
+    // identical ids in `guessedPlayerIds` (the submitGuess validator
+    // forbids it, but defensive) can't double-count one target.
+    const correctlyNamed = new Set<string>();
+    for (const id of namedPlayerIds) {
+      if (targets.has(id)) correctlyNamed.add(id);
+    }
+    const splitNamedCorrect = correctlyNamed.size;
+    // +1 bonus iff BOTH targets named correctly via a pair guess.
+    // The bonus is gated on BOTH targets being present (covered by
+    // splitNamedCorrect === 2) AND there actually being two targets
+    // to name (a degenerate split with no runner-up shouldn't ever
+    // ship, but the gate is defensive).
+    const namedBoth = splitNamedCorrect === 2 && targets.size === 2;
+    const enginePoints = splitNamedCorrect + (namedBoth ? 1 : 0);
+
+    // Room match: any named player equals the room's plurality winner.
+    const matchedRoom =
+      roomWinnerPlayerId !== undefined &&
+      namedPlayerIds.includes(roomWinnerPlayerId);
+
     return {
-      matchedEngine: false,
+      matchedEngine: splitNamedCorrect > 0,
       matchedRoom,
       perfectRead: false,
-      splitRead,
-      points,
+      splitRead: namedBoth,
+      splitNamedCorrect,
+      points: enginePoints + (matchedRoom ? 2 : 0),
     };
   }
 
   // ── Normal card ────────────────────────────────────────────────
-  // A special-tile vote ("both" / "nobody") on a non-split card scores
-  // 0 — the engine had a clear pick and the voter didn't choose any
-  // real player. Falling through to the player-id comparisons would
-  // never match (special sentinels aren't real player ids), but the
-  // explicit early-return makes the intent local-readable.
-  if (guessedSpecial !== undefined) {
+  // A "nobody" tile vote on a non-split card scores 0 — no engine
+  // signal to match against.
+  if (guessedSpecial === "nobody") {
     return {
       matchedEngine: false,
       matchedRoom: false,
@@ -72,15 +112,29 @@ export function calculateCardScores(
     };
   }
 
+  // CC-184 anti-hedge guard: a pair guess on a NORMAL (single-pick)
+  // round earns 0 engine credit — the voter didn't commit to the
+  // one answer. Room-match may still apply if either named player
+  // matches the room winner.
+  if (guessedPlayerIds && guessedPlayerIds.length === 2) {
+    const matchedRoom =
+      roomWinnerPlayerId !== undefined &&
+      namedPlayerIds.includes(roomWinnerPlayerId);
+    return {
+      matchedEngine: false,
+      matchedRoom,
+      perfectRead: false,
+      splitRead: false,
+      points: matchedRoom ? 2 : 0,
+    };
+  }
+
+  // Single-player guess on a normal round — pre-CC-184 path, intact.
   const matchedEngine = guessedPlayerId === enginePick.playerId;
   const matchedRoom =
     roomWinnerPlayerId !== undefined &&
-    roomWinnerPlayerId !== ROOM_WINNER_BOTH_SENTINEL &&
     guessedPlayerId === roomWinnerPlayerId;
-  // Perfect read: guess == engine AND guess == room. When the room
-  // had no consensus, perfect-read cannot fire (matchedRoom is false).
   const perfectRead = matchedEngine && matchedRoom;
-
   const points =
     (matchedEngine ? 2 : 0) +
     (matchedRoom ? 2 : 0) +
@@ -95,45 +149,54 @@ export function calculateCardScores(
   };
 }
 
-/** Per-voter guess shape consumed by `getRoomWinner`. Either a real
- *  player id OR the special "both" / "nobody" tile. */
+/** Per-voter guess shape consumed by `getRoomWinner`.
+ *
+ *  CC-184 — the `"both"` special is gone; voters name the two via
+ *  the new `pair` kind. A pair contributes 1 vote for EACH named
+ *  player; a single contributes 1 for one player; `"nobody"` is
+ *  ignored.
+ */
 export type RoomGuess =
   | { kind: "player"; playerId: string }
-  | { kind: "special"; value: "both" | "nobody" };
+  | { kind: "pair"; playerIds: readonly [string, string] }
+  | { kind: "special"; value: "nobody" };
 
 /** Compute the plurality winner across a list of guesses. Returns:
  *    - a real player id (a player won the plurality outright),
- *    - `ROOM_WINNER_BOTH_SENTINEL` ("both" tile won the plurality),
  *    - `undefined` when no clear plurality exists:
- *        * no guesses submitted, OR
+ *        * no guesses submitted,
+ *        * only "nobody" abstain votes,
  *        * the top two candidates are tied (Identity Fog).
  *
- *  "nobody" votes are votable for UX (CC-177 surfaces it as a tile)
- *  but DO NOT count toward the plurality in MVP — there's no engine
- *  signal it maps to. They're filtered out before counting.
+ *  CC-184 — pair guesses contribute 1 vote to EACH named player. A
+ *  player named in two different ballots (e.g. by Alice's single
+ *  guess + Bob's pair) accumulates 2 votes. "nobody" votes are
+ *  votable for UX but DO NOT count toward the plurality (no engine
+ *  signal it maps to in MVP).
  *
  *  Backward-compatible string-array input: `string[]` is still
- *  accepted and treated as player-id votes. CC-175's tests rely on
- *  this shape; the richer `RoomGuess[]` shape is the path the
- *  CC-176 API layer will use. */
+ *  accepted and treated as player-id votes; pre-CC-184 tests use
+ *  this shape.
+ */
 export function getRoomWinner(
   guesses: readonly RoomGuess[] | readonly string[]
 ): string | undefined {
   if (guesses.length === 0) return undefined;
 
   const counts = new Map<string, number>();
+  const bump = (playerId: string): void => {
+    counts.set(playerId, (counts.get(playerId) ?? 0) + 1);
+  };
   for (const g of guesses) {
     if (typeof g === "string") {
-      counts.set(g, (counts.get(g) ?? 0) + 1);
+      bump(g);
       continue;
     }
     if (g.kind === "player") {
-      counts.set(g.playerId, (counts.get(g.playerId) ?? 0) + 1);
-    } else if (g.value === "both") {
-      counts.set(
-        ROOM_WINNER_BOTH_SENTINEL,
-        (counts.get(ROOM_WINNER_BOTH_SENTINEL) ?? 0) + 1
-      );
+      bump(g.playerId);
+    } else if (g.kind === "pair") {
+      bump(g.playerIds[0]);
+      bump(g.playerIds[1]);
     }
     // "nobody" — intentionally ignored for plurality (see header note).
   }

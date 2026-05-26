@@ -125,35 +125,53 @@ export type RoomReadGame = {
   }>;
 };
 
-/** Sentinel returned by `getRoomWinner` when the room's plurality is
- *  the special "both" tile (i.e. a majority of voters picked the
- *  split-tile option). Distinct from a real `playerId` so the scorer
- *  can match a `guessedSpecial="both"` vote against the room outcome
- *  without colliding with any real player id. */
+/** Pre-CC-184 sentinel — `getRoomWinner` used to return this when the
+ *  blind "both" tile won the plurality on a split card. CC-184 retired
+ *  the blind tile in favor of name-the-two (the pair guess records two
+ *  player ids), and `getRoomWinner` now tallies per-player. This
+ *  constant is retained ONLY so legacy `roomVoteDistribution` records
+ *  written before the migration can still be inspected; the scorer no
+ *  longer consults it.
+ */
 export const ROOM_WINNER_BOTH_SENTINEL = "__both__";
 
-/** Per-card scoring inputs (one player's guess + the room's vote). */
+/** Per-card scoring inputs (one player's guess + the room's vote).
+ *
+ *  CC-184 — a guess is now one of:
+ *    (a) single player   — `guessedPlayerId` set
+ *    (b) pair (name-the-two on a split) — `guessedPlayerIds` set
+ *    (c) "nobody" abstain — `guessedSpecial = "nobody"`
+ *  The blind `guessedSpecial = "both"` shape is gone; on a split the
+ *  voter names the two players via `guessedPlayerIds`.
+ */
 export type RoundGuessInputs = {
   /** The voter / scorer in the room. */
   voterPlayerId: string;
-  /** Who the voter said best fits this card. Present for a normal
-   *  player vote; absent when the voter picked a special tile. */
+  /** Single-player guess: who the voter said best fits this card.
+   *  Mutually exclusive with `guessedPlayerIds` and `guessedSpecial`. */
   guessedPlayerId?: string;
-  /** CC-175.1 — special-tile vote. Present (instead of
-   *  `guessedPlayerId`) when the voter picked "both" or "nobody". The
-   *  scorer treats:
-   *    - "both" on a split card  → +3 (`splitRead = true`)
-   *    - "both" on a non-split card → 0 (engine had a clear pick)
-   *    - "nobody" in both cases → 0 (no engine signal it maps to in MVP) */
-  guessedSpecial?: "both" | "nobody";
-  /** The room's plurality winner for this card. May be:
-   *    - a real player id (a player won the plurality),
-   *    - `ROOM_WINNER_BOTH_SENTINEL` (the "both" tile won),
-   *    - `undefined` when the vote was tied / empty (Identity Fog). */
+  /** CC-184 — pair guess (name-the-two). Length-2 tuple of player ids;
+   *  the two ids must differ. On a split card, each id that matches
+   *  one of the engine's two targets earns +1; both correct earns
+   *  +2 + a +1 bonus = 3. On a NORMAL (single-pick) round, a pair
+   *  guess earns 0 engine credit (anti-hedge guard) — room-match may
+   *  still apply if one of the named players matches the room winner. */
+  guessedPlayerIds?: readonly [string, string];
+  /** CC-175.1 — "nobody" abstain. CC-184 retired the "both" variant
+   *  (replaced by `guessedPlayerIds`). The scorer treats "nobody" as
+   *  a zero-info guess (0 points) on both split and normal rounds. */
+  guessedSpecial?: "nobody";
+  /** The room's plurality winner for this card.
+   *  - A real player id  → that player won the plurality.
+   *  - `undefined`       → tie or empty (Identity Fog).
+   *  CC-184: no longer returns `ROOM_WINNER_BOTH_SENTINEL` — pair
+   *  guesses now contribute 1 vote per named player to the per-player
+   *  tally. */
   roomWinnerPlayerId: string | undefined;
   /** The engine's pick for this card — the full `EnginePick` so the
-   *  scorer can read `isSplit` (a split round disables engine-match
-   *  scoring and enables the +3 split-read path). */
+   *  scorer can read `isSplit` (a split round routes through the
+   *  name-the-two scoring path; the runner-up's playerId is the
+   *  second target). */
   enginePick: EnginePick;
 };
 
@@ -162,21 +180,31 @@ export type RoundScoreBreakdown = {
   matchedEngine: boolean;
   matchedRoom: boolean;
   perfectRead: boolean;
-  /** CC-175.1 — true when the voter played `guessedSpecial="both"` on
-   *  a split card (`enginePick.isSplit === true`). Contributes +3 to
-   *  `points`. */
+  /** CC-184 — true when the voter named BOTH split targets correctly
+   *  via `guessedPlayerIds`. Contributes +2 + a +1 bonus = 3 to
+   *  `points`. Per-spec replacement for the old blind-"both" splitRead.
+   *  False when only one target was named, when the guess was a
+   *  single-player vote (even if it happened to be one of the two), or
+   *  when the round wasn't a split. */
   splitRead: boolean;
-  /** Total points: 0..5 for normal rounds (+2 engine match, +2 room
-   *  match, +1 perfect-read), 0..5 for split rounds (+3 splitRead, +2
-   *  room match if room also pluralities "both" — perfect-read does
-   *  not stack on split because engine-match doesn't apply). */
+  /** CC-184 — count of correct named targets on a split. 0 on normal
+   *  rounds. Surfaced so the reveal UI can distinguish "named one"
+   *  (+1) from "named two" (+3). */
+  splitNamedCorrect?: number;
+  /** Total points:
+   *    NORMAL round: 0..5 (+2 engine, +2 room, +1 perfect-read).
+   *    SPLIT round (CC-184): 0..5 (+1 per correct named target, +1
+   *    bonus on both-correct, +2 room-match).
+   */
   points: number;
 };
 
-/** The three computable round verdicts the UI surfaces. The actual
- *  copy variants ("Engine Dissent" etc.) belong to CC-177 — core just
- *  emits the categorical outcome. */
+/** The four computable round verdicts the UI surfaces. The actual
+ *  copy variants ("Engine Dissent" etc.) belong to CC-177/CC-184 —
+ *  core just emits the categorical outcome. CC-184 added "split" so
+ *  a torn-engine round never renders as "obvious." */
 export type RoundVerdict =
-  | "obvious" // room == engine
-  | "human_override" // room != engine, room has consensus
-  | "identity_fog"; // room had no consensus
+  | "obvious" // room == engine, NOT a split
+  | "human_override" // room != engine, room has consensus, NOT a split
+  | "identity_fog" // room had no consensus
+  | "split"; // CC-184 — engine was torn (isSplit); name-the-two was the play

@@ -1,10 +1,15 @@
-// CC-176 — Public Room Read guess upsert (token-as-auth).
+// CC-176 / CC-184 — Public Room Read guess upsert (token-as-auth).
 //
 // Path: `/api/games/room-read/[token]/rounds/[roundId]/guess`.
 //
 // POST body — exactly one of:
-//   { voterPlayerId: string; guessedPlayerId: string }
-//   { voterPlayerId: string; guessedSpecial: "both" | "nobody" }
+//   { voterPlayerId: string; guessedPlayerId: string }                   // single
+//   { voterPlayerId: string; guessedPlayerIds: [string, string] }        // CC-184 pair
+//   { voterPlayerId: string; guessedSpecial: "nobody" }                  // abstain
+//
+// CC-184 — the blind `guessedSpecial: "both"` shape is RETIRED. The
+// pick-two UI sends `guessedPlayerIds`; the route rejects "both" with
+// a clear migration error.
 //
 // UNIQUE(round_id, voter_player_id) enforces "one vote per voter per
 // round" — the upsert lets a voter change their guess up until the
@@ -17,6 +22,7 @@ import { submitGuess } from "../../../../../../../../lib/games/roomRead/persiste
 interface PostBody {
   voterPlayerId?: unknown;
   guessedPlayerId?: unknown;
+  guessedPlayerIds?: unknown;
   guessedSpecial?: unknown;
 }
 
@@ -43,20 +49,53 @@ export async function POST(
 
   const guessedPlayerId =
     typeof body.guessedPlayerId === "string" ? body.guessedPlayerId : undefined;
-  const guessedSpecial =
-    body.guessedSpecial === "both" || body.guessedSpecial === "nobody"
-      ? body.guessedSpecial
-      : undefined;
 
-  if (!guessedPlayerId && !guessedSpecial) {
+  // CC-184 — accept the new pair shape. Coerce to a length-2 tuple of
+  // strings; anything else falls through as undefined and triggers the
+  // "exactly one of" validation below.
+  let guessedPlayerIds: [string, string] | undefined;
+  if (
+    Array.isArray(body.guessedPlayerIds) &&
+    body.guessedPlayerIds.length === 2 &&
+    typeof body.guessedPlayerIds[0] === "string" &&
+    typeof body.guessedPlayerIds[1] === "string"
+  ) {
+    guessedPlayerIds = [body.guessedPlayerIds[0], body.guessedPlayerIds[1]];
+  }
+
+  // CC-184 — reject the retired "both" special with a migration-clear
+  // error message rather than silently dropping it.
+  if (body.guessedSpecial === "both") {
     return NextResponse.json(
-      { error: "guess requires guessedPlayerId or guessedSpecial" },
+      {
+        error:
+          "guessedSpecial 'both' is retired (CC-184). Send guessedPlayerIds: [id1, id2] to name the two on a split card.",
+      },
       { status: 400 }
     );
   }
-  if (guessedPlayerId && guessedSpecial) {
+  const guessedSpecial =
+    body.guessedSpecial === "nobody" ? body.guessedSpecial : undefined;
+
+  const supplied =
+    (guessedPlayerId ? 1 : 0) +
+    (guessedPlayerIds ? 1 : 0) +
+    (guessedSpecial ? 1 : 0);
+  if (supplied === 0) {
     return NextResponse.json(
-      { error: "guess accepts exactly one of guessedPlayerId / guessedSpecial" },
+      {
+        error:
+          "guess requires guessedPlayerId, guessedPlayerIds, or guessedSpecial",
+      },
+      { status: 400 }
+    );
+  }
+  if (supplied > 1) {
+    return NextResponse.json(
+      {
+        error:
+          "guess accepts exactly one of guessedPlayerId / guessedPlayerIds / guessedSpecial",
+      },
       { status: 400 }
     );
   }
@@ -67,6 +106,7 @@ export async function POST(
       roundId,
       voterPlayerId,
       guessedPlayerId,
+      guessedPlayerIds,
       guessedSpecial,
     });
     return NextResponse.json(ack);
@@ -80,7 +120,9 @@ export async function POST(
       message.includes("not in this game") ||
       message.includes("requires") ||
       message.includes("accepts exactly one") ||
-      message.includes("not open for voting")
+      message.includes("not open for voting") ||
+      message.includes("two DIFFERENT players") ||
+      message.includes("length-2 tuple")
     ) {
       status = 400;
     }

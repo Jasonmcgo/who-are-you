@@ -622,103 +622,230 @@ check("split-stays-false-in-debatable-band", () => {
 // CC-175.1 · split scoring + "both" tile
 // ─────────────────────────────────────────────────────────────────────
 
-check("split-both-vote-scores-plus-3", () => {
-  // Split card, room had no consensus (Identity Fog). Voter played
-  // "both" — should earn +3 (splitRead).
+// ─────────────────────────────────────────────────────────────────────
+// CC-184 · cross-card scoring — name the two, score per hit
+// ─────────────────────────────────────────────────────────────────────
+//
+// The pre-CC-184 split-card path paid +3 for the blind "both" tile.
+// CC-184 retired that path: voters now name the two players via a
+// pair guess. Scoring is per-correct-hit (+1 each, +1 bonus on both),
+// plus the existing +2 room-match. Max on a split = 5.
+
+// Helper — synthesize a SPLIT EnginePick with a specific runner-up so
+// the scorer has two known targets (T1 = top, T2 = runner-up).
+function fakeSplitEnginePick(top: string, runnerUp: string): EnginePick {
+  return {
+    playerId: top,
+    displayName: top,
+    score: 0.5,
+    confidence: "low",
+    isSplit: true,
+    matchedTags: [],
+    reason: top,
+    runnerUp: { playerId: runnerUp, displayName: runnerUp, score: 0.49 },
+  };
+}
+
+check("cc184-split-name-one-correct-scores-plus-1", () => {
+  // Split between alice + bob. Voter names alice (one of the two) via
+  // a single-player guess. Room had no consensus. Expect +1 engine.
   const s = calculateCardScores({
     voterPlayerId: "v",
-    guessedSpecial: "both",
+    guessedPlayerId: "alice",
     roomWinnerPlayerId: undefined,
-    enginePick: fakeEnginePick("alice", true),
+    enginePick: fakeSplitEnginePick("alice", "bob"),
   });
-  if (!s.splitRead) return `splitRead should be true, got ${JSON.stringify(s)}`;
-  if (s.matchedEngine) return `matchedEngine should be false on a split`;
-  if (s.perfectRead) return `perfectRead should not stack on a split`;
-  if (s.points !== 3) return `expected 3 points, got ${s.points}`;
+  if (s.splitRead) return `splitRead must NOT fire on single-id (no pair commit)`;
+  if (s.splitNamedCorrect !== 1)
+    return `expected splitNamedCorrect=1, got ${s.splitNamedCorrect}`;
+  if (!s.matchedEngine) return `matchedEngine should be true (1 hit)`;
+  if (s.points !== 1) return `expected 1 point, got ${s.points}`;
   return null;
 });
 
-check("non-split-both-vote-scores-zero", () => {
-  // Same "both" guess on a non-split card → 0 (engine had a clear pick).
+check("cc184-split-name-both-correct-scores-3", () => {
+  // Voter names alice + bob via a pair guess; both match the engine's
+  // two targets. +1 per hit + +1 bonus = 3.
   const s = calculateCardScores({
     voterPlayerId: "v",
-    guessedSpecial: "both",
+    guessedPlayerIds: ["alice", "bob"],
+    roomWinnerPlayerId: undefined,
+    enginePick: fakeSplitEnginePick("alice", "bob"),
+  });
+  if (!s.splitRead) return `splitRead should be true on named-both`;
+  if (s.splitNamedCorrect !== 2)
+    return `expected splitNamedCorrect=2, got ${s.splitNamedCorrect}`;
+  if (s.points !== 3) return `expected 3 points (+2 +1 bonus), got ${s.points}`;
+  return null;
+});
+
+check("cc184-split-name-both-correct-with-room-match-scores-5", () => {
+  // Both correct (+2 +1 bonus = 3) + alice is the room winner (+2) = 5.
+  const s = calculateCardScores({
+    voterPlayerId: "v",
+    guessedPlayerIds: ["alice", "bob"],
     roomWinnerPlayerId: "alice",
-    enginePick: fakeEnginePick("alice", false),
-  });
-  if (s.splitRead) return `splitRead should be false on non-split`;
-  if (s.points !== 0) return `expected 0 points, got ${s.points}`;
-  return null;
-});
-
-check("split-room-also-both-scores-5", () => {
-  // Split card + voter plays "both" + room plurality is also "both"
-  // → +3 (splitRead) + +2 (room match) = 5. perfect-read +1 does NOT
-  // double-count (engine-match doesn't apply on a split).
-  const s = calculateCardScores({
-    voterPlayerId: "v",
-    guessedSpecial: "both",
-    roomWinnerPlayerId: ROOM_WINNER_BOTH_SENTINEL,
-    enginePick: fakeEnginePick("alice", true),
+    enginePick: fakeSplitEnginePick("alice", "bob"),
   });
   if (!s.splitRead) return `splitRead should be true`;
-  if (!s.matchedRoom) return `matchedRoom should be true (room=both)`;
-  if (s.perfectRead) return `perfectRead must not fire on split (engine-match doesn't apply)`;
-  if (s.points !== 5) return `expected 5 points (3+2), got ${s.points}`;
+  if (!s.matchedRoom) return `matchedRoom should be true (alice = room winner)`;
+  if (s.points !== 5)
+    return `expected 5 points (3 engine + 2 room), got ${s.points}`;
   return null;
 });
 
-check("split-nobody-vote-scores-zero", () => {
-  const s = calculateCardScores({
-    voterPlayerId: "v",
-    guessedSpecial: "nobody",
-    roomWinnerPlayerId: ROOM_WINNER_BOTH_SENTINEL,
-    enginePick: fakeEnginePick("alice", true),
-  });
-  if (s.splitRead) return `splitRead should be false on "nobody"`;
-  if (s.points !== 0) return `expected 0 points, got ${s.points}`;
-  return null;
-});
-
-check("split-player-id-guess-scores-zero", () => {
-  // Voting a specific player on a split card scores 0 — no engine pick
-  // to match on a split. (UI/CC-177 may surface a "we couldn't say —
-  // both" hint to nudge toward the both tile.)
+check("cc184-split-name-one-with-room-match-scores-3", () => {
+  // Single-id guess: alice = one target (+1) and alice = room winner
+  // (+2) → 3. No pair bonus because only one named.
   const s = calculateCardScores({
     voterPlayerId: "v",
     guessedPlayerId: "alice",
     roomWinnerPlayerId: "alice",
-    enginePick: fakeEnginePick("alice", true),
+    enginePick: fakeSplitEnginePick("alice", "bob"),
+  });
+  if (s.splitRead) return `splitRead must be false on single-id`;
+  if (s.points !== 3) return `expected 3 points (+1 +2 room), got ${s.points}`;
+  return null;
+});
+
+check("cc184-split-pair-one-wrong-scores-1", () => {
+  // Pair guess [alice, charlie]: alice is a target (+1), charlie is
+  // not. No both-correct bonus. Room had no consensus → 1 total.
+  const s = calculateCardScores({
+    voterPlayerId: "v",
+    guessedPlayerIds: ["alice", "charlie"],
+    roomWinnerPlayerId: undefined,
+    enginePick: fakeSplitEnginePick("alice", "bob"),
+  });
+  if (s.splitRead) return `splitRead must be false when both-correct didn't fire`;
+  if (s.splitNamedCorrect !== 1)
+    return `expected splitNamedCorrect=1, got ${s.splitNamedCorrect}`;
+  if (s.points !== 1) return `expected 1 point, got ${s.points}`;
+  return null;
+});
+
+check("cc184-split-pair-both-wrong-scores-0", () => {
+  const s = calculateCardScores({
+    voterPlayerId: "v",
+    guessedPlayerIds: ["charlie", "dana"],
+    roomWinnerPlayerId: undefined,
+    enginePick: fakeSplitEnginePick("alice", "bob"),
   });
   if (s.points !== 0) return `expected 0 points, got ${s.points}`;
   return null;
 });
 
-// ─────────────────────────────────────────────────────────────────────
-// CC-175.1 · getRoomWinner with "both" tile
-// ─────────────────────────────────────────────────────────────────────
-
-check("room-winner-both-plurality-returns-sentinel", () => {
-  const winner = getRoomWinner([
-    { kind: "special", value: "both" },
-    { kind: "special", value: "both" },
-    { kind: "special", value: "both" },
-    { kind: "player", playerId: "alice" },
-    { kind: "player", playerId: "bob" },
-  ]);
-  return winner === ROOM_WINNER_BOTH_SENTINEL
-    ? null
-    : `expected ROOM_WINNER_BOTH_SENTINEL, got ${winner}`;
+check("cc184-split-nobody-vote-scores-zero", () => {
+  const s = calculateCardScores({
+    voterPlayerId: "v",
+    guessedSpecial: "nobody",
+    roomWinnerPlayerId: undefined,
+    enginePick: fakeSplitEnginePick("alice", "bob"),
+  });
+  if (s.points !== 0) return `expected 0 points, got ${s.points}`;
+  return null;
 });
 
-check("room-winner-both-vs-player-tie-returns-undefined", () => {
+check("cc184-normal-pair-guess-no-engine-credit-anti-hedge", () => {
+  // Anti-hedge guard: a pair guess on a NORMAL (single-pick) round
+  // earns 0 engine credit even if one of the named players IS the
+  // engine pick — the voter didn't commit. Room-match may still apply.
+  const s = calculateCardScores({
+    voterPlayerId: "v",
+    guessedPlayerIds: ["alice", "bob"], // alice IS the engine pick
+    roomWinnerPlayerId: undefined,
+    enginePick: fakeEnginePick("alice", false),
+  });
+  if (s.matchedEngine)
+    return `matchedEngine must be false on a pair guess on a normal round`;
+  if (s.points !== 0)
+    return `expected 0 points (no commit), got ${s.points}`;
+  return null;
+});
+
+check("cc184-normal-pair-guess-room-match-still-applies", () => {
+  // Pair guess on a normal round: alice is named AND alice is room
+  // winner → +2 room. Engine credit is suppressed (anti-hedge).
+  const s = calculateCardScores({
+    voterPlayerId: "v",
+    guessedPlayerIds: ["alice", "bob"],
+    roomWinnerPlayerId: "alice",
+    enginePick: fakeEnginePick("alice", false),
+  });
+  if (s.matchedEngine) return `matchedEngine should be false (anti-hedge)`;
+  if (!s.matchedRoom) return `matchedRoom should be true (alice = room)`;
+  if (s.points !== 2) return `expected 2 points (room only), got ${s.points}`;
+  return null;
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// CC-184 · getRoomWinner — per-player tally, no blind-both bucket
+// ─────────────────────────────────────────────────────────────────────
+
+check("cc184-room-winner-pair-vote-counts-each-named-player", () => {
+  // Three pair votes [alice, bob] + 1 single charlie vote: alice has
+  // 3 votes, bob has 3 votes, charlie has 1. Tie at the top → undefined.
   const winner = getRoomWinner([
-    { kind: "special", value: "both" },
-    { kind: "special", value: "both" },
-    { kind: "player", playerId: "alice" },
+    { kind: "pair", playerIds: ["alice", "bob"] },
+    { kind: "pair", playerIds: ["alice", "bob"] },
+    { kind: "pair", playerIds: ["alice", "bob"] },
+    { kind: "player", playerId: "charlie" },
+  ]);
+  if (winner !== undefined)
+    return `expected undefined (alice 3 / bob 3 tie), got ${winner}`;
+  return null;
+});
+
+check("cc184-room-winner-pair-plus-single-resolves", () => {
+  // Two pair [alice, bob] + 1 single alice → alice 3, bob 2 → alice wins.
+  const winner = getRoomWinner([
+    { kind: "pair", playerIds: ["alice", "bob"] },
+    { kind: "pair", playerIds: ["alice", "bob"] },
     { kind: "player", playerId: "alice" },
   ]);
-  return winner === undefined ? null : `expected undefined (tie), got ${winner}`;
+  if (winner !== "alice") return `expected alice, got ${winner}`;
+  return null;
+});
+
+check("cc184-room-winner-never-returns-sentinel-anymore", () => {
+  // Sanity: getRoomWinner must never return ROOM_WINNER_BOTH_SENTINEL
+  // post-CC-184 — pair guesses contribute per-player. A pure pair
+  // election resolves either as one of the named players (no ties)
+  // or as undefined (alice and bob tied).
+  const winner = getRoomWinner([
+    { kind: "pair", playerIds: ["alice", "bob"] },
+    { kind: "pair", playerIds: ["alice", "bob"] },
+  ]);
+  if (winner === ROOM_WINNER_BOTH_SENTINEL)
+    return `getRoomWinner returned the legacy ROOM_WINNER_BOTH_SENTINEL — should be undefined or a named player`;
+  if (winner !== undefined) return `expected undefined (alice 2 / bob 2 tie), got ${winner}`;
+  return null;
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// CC-184 · verdict — split short-circuit
+// ─────────────────────────────────────────────────────────────────────
+
+check("cc184-verdict-split-fires-on-isSplit-regardless-of-room", () => {
+  // Even when the room plurality is the engine's top pick, the verdict
+  // must be "split" (not "obvious") because the engine itself was torn.
+  const v = getVerdict({
+    roomWinnerPlayerId: "alice",
+    enginePickPlayerId: "alice",
+    isSplit: true,
+  });
+  return v === "split" ? null : `expected "split", got "${v}"`;
+});
+
+check("cc184-verdict-isSplit-false-keeps-obvious-mapping", () => {
+  // No regression: when isSplit=false, the room==engine path still
+  // emits "obvious".
+  const v = getVerdict({
+    roomWinnerPlayerId: "alice",
+    enginePickPlayerId: "alice",
+    isSplit: false,
+  });
+  return v === "obvious" ? null : `expected "obvious", got "${v}"`;
 });
 
 check("room-winner-nobody-votes-ignored-for-plurality", () => {

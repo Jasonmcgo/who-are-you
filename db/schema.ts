@@ -412,6 +412,14 @@ export const roomReadGuesses = pgTable(
       .references(() => roomReadRounds.id, { onDelete: "cascade" }),
     voter_player_id: text("voter_player_id").notNull(),
     guessed_player_id: text("guessed_player_id"),
+    // CC-184 — cross-card scoring: name the two. When a player picks
+    // the "Both / Multiple" tile on a split card, the upsert writes
+    // BOTH named player ids: the primary in `guessed_player_id` and
+    // the second in `guessed_player_id_2`. A single-player guess
+    // leaves this nullable column NULL. The new migration is
+    // additive — pre-CC-184 rows ("both" specials and single-player
+    // guesses) continue to load.
+    guessed_player_id_2: text("guessed_player_id_2"),
     guessed_special: text("guessed_special"),
     created_at: timestamp("created_at", { withTimezone: true })
       .notNull()
