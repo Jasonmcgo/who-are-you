@@ -84,6 +84,8 @@ interface WarmTotalPayload {
 interface RevealPayload {
   status: "completed";
   personName: string;
+  subjectName: string;
+  guesserName: string | null;
   partnerAName: string;
   partnerBName: string | null;
   bond: BondInfo;
@@ -669,8 +671,16 @@ function RolePickButton({
 }
 
 function RevealScreen({ data }: { data: RevealPayload }) {
-  const { warmTotal, items, personName, partnerAName, partnerBName, bond } =
-    data;
+  const {
+    warmTotal,
+    items,
+    personName,
+    partnerAName,
+    partnerBName,
+    subjectName,
+    guesserName,
+    bond,
+  } = data;
   // CC-COUPLE-7 — prefer the bond-resolved partnerAName; the legacy
   // `personName` alias matches it but keeps any downstream consumer of
   // the older field happy.
@@ -702,9 +712,9 @@ function RevealScreen({ data }: { data: RevealPayload }) {
           {/* CC-COUPLE-7 — when the bond carries B's name, address it
               warmly ("How clearly Brad read Michele"); otherwise keep
               the original second-person phrasing. */}
-          {partnerBName
-            ? `How clearly ${partnerBName} read ${aName === "your partner" ? "your partner" : aName}`
-            : `How clearly you read ${aName === "your partner" ? "your partner" : aName}`}
+          {guesserName
+            ? `How clearly ${guesserName} read ${subjectName}`
+            : `How clearly you read ${subjectName === "your partner" ? "your partner" : subjectName}`}
         </h1>
       </header>
 

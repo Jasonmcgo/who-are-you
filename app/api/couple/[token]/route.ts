@@ -151,6 +151,10 @@ interface RevealPayload {
   status: "completed";
   /** Subject display name. Alias of subjectName for back-compat. */
   personName: string;
+  /** CC-COUPLE-8 — explicit subject for this reveal direction. */
+  subjectName: string;
+  /** CC-COUPLE-8 — explicit reader for this reveal direction; null on Mode 1. */
+  guesserName: string | null;
   /** CC-COUPLE-7 — bond-resolved subject name (was `personName`). */
   partnerAName: string;
   /** CC-COUPLE-7 — bond-resolved guesser name; null on legacy one-sided invites. */
@@ -550,6 +554,12 @@ function buildRevealPayload(
   ctx: RevealBuildContext
 ): RevealPayload {
   const { subjectName: personName, subjectPronouns: pronouns } = ctx;
+  const guesserName =
+    ctx.partnerBName === null
+      ? null
+      : ctx.direction === "a_guesses_b"
+        ? ctx.partnerAName
+        : ctx.partnerBName;
   const resolvedItems: ResolvedItem[] = [];
   const tierResults: { tier: RankedRevealTier; points: number }[] = [];
 
@@ -601,6 +611,8 @@ function buildRevealPayload(
   return {
     status: "completed",
     personName,
+    subjectName: ctx.subjectName,
+    guesserName,
     partnerAName: ctx.partnerAName,
     partnerBName: ctx.partnerBName,
     bond: ctx.bond,
