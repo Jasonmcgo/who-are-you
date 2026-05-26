@@ -17600,15 +17600,103 @@
     ]
   },
   {
-    "id": "lens_spot_the_wrong_note_in_the_room_before",
+    "id": "lens_the_overlooked_decoration",
     "theme": "lens",
     "modes": [
       "classic"
     ],
-    "prompt": "Who’s more likely to spot the wrong note in the room before anyone realizes the song has changed?",
+    "prompt": "Who's more likely to read the room through the one object, color, silence, or facial expression everyone else treated as decoration?",
     "tags": [
       {
-        "tag": "precedent_memory",
+        "tag": "deep_seeing",
+        "weight": 1.0
+      },
+      {
+        "tag": "emotional_perception",
+        "weight": 0.5
+      },
+      {
+        "tag": "pattern_reader",
+        "weight": 0.4
+      }
+    ]
+  },
+  {
+    "id": "lens_feels_wrong_in_the_hands",
+    "theme": "lens",
+    "modes": [
+      "classic"
+    ],
+    "prompt": "Who's more likely to notice the moral problem because the whole thing simply feels wrong in their hands?",
+    "tags": [
+      {
+        "tag": "emotional_perception",
+        "weight": 1.0
+      },
+      {
+        "tag": "deep_seeing",
+        "weight": 0.5
+      },
+      {
+        "tag": "meaning_making",
+        "weight": 0.4
+      }
+    ]
+  },
+  {
+    "id": "lens_offended_beauty_and_houseplants",
+    "theme": "lens",
+    "modes": [
+      "classic"
+    ],
+    "prompt": "Who's more likely to spot that the 'practical solution' has quietly offended beauty, honesty, and several innocent houseplants?",
+    "tags": [
+      {
+        "tag": "discernment",
+        "weight": 1.0
+      },
+      {
+        "tag": "high_openness",
+        "weight": 0.5
+      },
+      {
+        "tag": "emotional_perception",
+        "weight": 0.4
+      }
+    ]
+  },
+  {
+    "id": "lens_see_now_decide_later",
+    "theme": "lens",
+    "modes": [
+      "classic"
+    ],
+    "prompt": "Who's more likely to see exactly what is happening in the moment, then need three hours alone to decide what it meant?",
+    "tags": [
+      {
+        "tag": "improviser",
+        "weight": 1.0
+      },
+      {
+        "tag": "emotional_perception",
+        "weight": 0.5
+      },
+      {
+        "tag": "meaning_making",
+        "weight": 0.4
+      }
+    ]
+  },
+  {
+    "id": "lens_real_thing_over_theory",
+    "theme": "lens",
+    "modes": [
+      "classic"
+    ],
+    "prompt": "Who's more likely to trust the real thing in front of them over the impressive theory currently ruining the furniture?",
+    "tags": [
+      {
+        "tag": "improviser",
         "weight": 1.0
       },
       {
@@ -17622,100 +17710,56 @@
     ]
   },
   {
-    "id": "lens_spot_the_small_dissonance_everyone_else_calls_mood",
-    "theme": "lens",
-    "modes": [
-      "classic"
-    ],
-    "prompt": "Who’s more likely to spot the small dissonance everyone else calls mood?",
-    "tags": [
-      {
-        "tag": "precedent_memory",
-        "weight": 1.0
-      },
-      {
-        "tag": "emotional_perception",
-        "weight": 0.5
-      },
-      {
-        "tag": "deep_seeing",
-        "weight": 0.4
-      }
-    ]
-  },
-  {
-    "id": "lens_say_the_truth_hiding_in_timing_tone_and",
-    "theme": "lens",
-    "modes": [
-      "classic"
-    ],
-    "prompt": "Who’s more likely to say the truth hiding in timing, tone, and silence?",
-    "tags": [
-      {
-        "tag": "precedent_memory",
-        "weight": 1.0
-      },
-      {
-        "tag": "emotional_perception",
-        "weight": 0.5
-      },
-      {
-        "tag": "deep_seeing",
-        "weight": 0.4
-      }
-    ]
-  },
-  {
-    "id": "lens_trust_the_person_whose_quiet_has_become_too",
-    "theme": "lens",
-    "modes": [
-      "classic"
-    ],
-    "prompt": "Who’s more likely to trust the person whose quiet has become too quiet?",
-    "tags": [
-      {
-        "tag": "precedent_memory",
-        "weight": 1.0
-      },
-      {
-        "tag": "emotional_perception",
-        "weight": 0.5
-      },
-      {
-        "tag": "deep_seeing",
-        "weight": 0.4
-      }
-    ]
-  },
-  {
-    "id": "lens_spot_the_pattern_you_only_notice_if_you",
-    "theme": "lens",
-    "modes": [
-      "classic"
-    ],
-    "prompt": "Who’s more likely to spot the pattern you only notice if you are not performing for the room?",
-    "tags": [
-      {
-        "tag": "pattern_reader",
-        "weight": 1.0
-      },
-      {
-        "tag": "long_arc_thinking",
-        "weight": 0.5
-      },
-      {
-        "tag": "deep_seeing",
-        "weight": 0.4
-      }
-    ]
-  },
-  {
-    "id": "compass_protect_family_with_the_seriousness_of_a_sacred",
+    "id": "compass_family_border_collie",
     "theme": "compass",
     "modes": [
       "classic"
     ],
-    "prompt": "Who’s more likely to protect family with the seriousness of a sacred chord?",
+    "prompt": "Who's more likely to protect Family with the intensity of a border collie assigned to national security?",
+    "tags": [
+      {
+        "tag": "protective_care",
+        "weight": 1.0
+      },
+      {
+        "tag": "loyalty",
+        "weight": 0.5
+      },
+      {
+        "tag": "faith_truth_loyalty",
+        "weight": 0.4
+      }
+    ]
+  },
+  {
+    "id": "compass_freedom_vs_clipboard",
+    "theme": "compass",
+    "modes": [
+      "classic"
+    ],
+    "prompt": "Who's more likely to defend freedom to act while quietly resenting the clipboard trying to supervise their soul?",
+    "tags": [
+      {
+        "tag": "freedom_grip",
+        "weight": 1.0
+      },
+      {
+        "tag": "conviction",
+        "weight": 0.5
+      },
+      {
+        "tag": "boundary_awareness",
+        "weight": 0.4
+      }
+    ]
+  },
+  {
+    "id": "compass_honest_over_decorative",
+    "theme": "compass",
+    "modes": [
+      "classic"
+    ],
+    "prompt": "Who's more likely to choose the honest thing, even if the room was clearly hoping for something more decorative?",
     "tags": [
       {
         "tag": "truth_teller",
@@ -17732,15 +17776,477 @@
     ]
   },
   {
-    "id": "compass_protect_freedom_without_making_too_much_noise_about",
+    "id": "compass_loyalty_written_notice",
     "theme": "compass",
     "modes": [
       "classic"
     ],
-    "prompt": "Who’s more likely to protect freedom without making too much noise about it?",
+    "prompt": "Who's more likely to guard loyalty so fiercely that betrayal must submit written notice before entering?",
     "tags": [
       {
+        "tag": "loyalty",
+        "weight": 1.0
+      },
+      {
+        "tag": "protective_care",
+        "weight": 0.5
+      },
+      {
+        "tag": "conviction",
+        "weight": 0.4
+      }
+    ]
+  },
+  {
+    "id": "compass_inner_truth_no_press_release",
+    "theme": "compass",
+    "modes": [
+      "classic"
+    ],
+    "prompt": "Who's more likely to protect their inner truth, then wonder why everyone else needed a press release?",
+    "tags": [
+      {
+        "tag": "faith_truth_loyalty",
+        "weight": 1.0
+      },
+      {
+        "tag": "conviction",
+        "weight": 0.5
+      },
+      {
+        "tag": "truth_teller",
+        "weight": 0.4
+      }
+    ]
+  },
+  {
+    "id": "hands_beautiful_just_a_little_thing",
+    "theme": "hands",
+    "modes": [
+      "classic"
+    ],
+    "prompt": "Who's more likely to make something beautiful, useful, and durable, then pretend it was 'just a little thing'?",
+    "tags": [
+      {
+        "tag": "high_openness",
+        "weight": 1.0
+      },
+      {
+        "tag": "practical_order",
+        "weight": 0.5
+      },
+      {
+        "tag": "competence_mask",
+        "weight": 0.4
+      }
+    ]
+  },
+  {
+    "id": "hands_care_into_a_civilization",
+    "theme": "hands",
+    "modes": [
+      "classic"
+    ],
+    "prompt": "Who's more likely to turn care into a meal, a room, a design choice, a fixed problem, and possibly a small civilization?",
+    "tags": [
+      {
+        "tag": "useful_devotion",
+        "weight": 1.0
+      },
+      {
+        "tag": "practical_order",
+        "weight": 0.6
+      },
+      {
+        "tag": "protective_care",
+        "weight": 0.4
+      }
+    ]
+  },
+  {
+    "id": "hands_build_rather_than_wait",
+    "theme": "hands",
+    "modes": [
+      "classic"
+    ],
+    "prompt": "Who's more likely to build the thing with their hands because apparently waiting for everyone to understand the values was taking too long?",
+    "tags": [
+      {
+        "tag": "practical_order",
+        "weight": 1.0
+      },
+      {
+        "tag": "conviction",
+        "weight": 0.5
+      },
+      {
+        "tag": "structurer",
+        "weight": 0.4
+      }
+    ]
+  },
+  {
+    "id": "hands_adjust_until_work_looks_nervous",
+    "theme": "hands",
+    "modes": [
+      "classic"
+    ],
+    "prompt": "Who's more likely to keep adjusting the work until the work begins to look nervous?",
+    "tags": [
+      {
+        "tag": "perfection_pressure",
+        "weight": 1.0
+      },
+      {
+        "tag": "high_conscientiousness",
+        "weight": 0.5
+      },
+      {
+        "tag": "competence_mask",
+        "weight": 0.4
+      }
+    ]
+  },
+  {
+    "id": "hands_inside_visible_call_it_art",
+    "theme": "hands",
+    "modes": [
+      "classic"
+    ],
+    "prompt": "Who's more likely to make the inside visible through the outside, then act surprised when people call it art?",
+    "tags": [
+      {
+        "tag": "high_openness",
+        "weight": 1.0
+      },
+      {
+        "tag": "meaning_making",
+        "weight": 0.5
+      },
+      {
+        "tag": "practical_order",
+        "weight": 0.4
+      }
+    ]
+  },
+  {
+    "id": "voice_lit_candle_through_curtains",
+    "theme": "voice",
+    "modes": [
+      "classic"
+    ],
+    "prompt": "Who's more likely to say the true thing carefully, as if carrying a lit candle through a room full of curtains?",
+    "tags": [
+      {
+        "tag": "truth_teller",
+        "weight": 1.0
+      },
+      {
+        "tag": "emotional_containment",
+        "weight": 0.5
+      },
+      {
+        "tag": "discernment",
+        "weight": 0.4
+      }
+    ]
+  },
+  {
+    "id": "voice_quiet_when_mortgage_enters",
+    "theme": "voice",
+    "modes": [
+      "classic"
+    ],
+    "prompt": "Who's more likely to go quiet at work because the conviction is alive, but the mortgage has entered the conversation?",
+    "tags": [
+      {
+        "tag": "conviction",
+        "weight": 1.0
+      },
+      {
+        "tag": "security_grip",
+        "weight": 0.5
+      },
+      {
+        "tag": "cost_bearing",
+        "weight": 0.4
+      }
+    ]
+  },
+  {
+    "id": "voice_gentle_did_not_bend",
+    "theme": "voice",
+    "modes": [
+      "classic"
+    ],
+    "prompt": "Who's more likely to express a belief gently enough that only later does everyone realize they did not actually bend?",
+    "tags": [
+      {
+        "tag": "conviction",
+        "weight": 1.0
+      },
+      {
+        "tag": "emotional_containment",
+        "weight": 0.5
+      },
+      {
+        "tag": "truth_teller",
+        "weight": 0.4
+      }
+    ]
+  },
+  {
+    "id": "voice_held_tongue_files_grievance",
+    "theme": "voice",
+    "modes": [
+      "classic"
+    ],
+    "prompt": "Who's more likely to hold their tongue so long the tongue files a workplace grievance?",
+    "tags": [
+      {
+        "tag": "emotional_containment",
+        "weight": 1.0
+      },
+      {
+        "tag": "conviction",
+        "weight": 0.5
+      },
+      {
+        "tag": "hidden_burden",
+        "weight": 0.4
+      }
+    ]
+  },
+  {
+    "id": "voice_defend_the_recharge",
+    "theme": "voice",
+    "modes": [
+      "classic"
+    ],
+    "prompt": "Who's more likely to defend their need to recharge daily as if civilization itself depends on the battery reaching 100%?",
+    "tags": [
+      {
+        "tag": "boundary_awareness",
+        "weight": 1.0
+      },
+      {
+        "tag": "conviction",
+        "weight": 0.5
+      },
+      {
         "tag": "freedom_grip",
+        "weight": 0.4
+      }
+    ]
+  },
+  {
+    "id": "gravity_person_who_acted_explains",
+    "theme": "gravity",
+    "modes": [
+      "classic"
+    ],
+    "prompt": "Who's more likely to assume the person who acted should probably explain why the system is now smoking?",
+    "tags": [
+      {
+        "tag": "responsibility_load",
+        "weight": 1.0
+      },
+      {
+        "tag": "discernment",
+        "weight": 0.5
+      },
+      {
+        "tag": "conviction",
+        "weight": 0.4
+      }
+    ]
+  },
+  {
+    "id": "gravity_family_load_competence_mask",
+    "theme": "gravity",
+    "modes": [
+      "classic"
+    ],
+    "prompt": "Who's more likely to carry the family load with enough competence that everyone forgets competence is not the same as weightlessness?",
+    "tags": [
+      {
+        "tag": "responsibility_load",
+        "weight": 1.0
+      },
+      {
+        "tag": "competence_mask",
+        "weight": 0.6
+      },
+      {
+        "tag": "hidden_burden",
+        "weight": 0.4
+      }
+    ]
+  },
+  {
+    "id": "gravity_stable_privately_resent",
+    "theme": "gravity",
+    "modes": [
+      "classic"
+    ],
+    "prompt": "Who's more likely to take responsibility for keeping things stable, then privately resent that stability has such poor manners?",
+    "tags": [
+      {
+        "tag": "responsibility_load",
+        "weight": 1.0
+      },
+      {
+        "tag": "hidden_burden",
+        "weight": 0.5
+      },
+      {
+        "tag": "steadiness",
+        "weight": 0.4
+      }
+    ]
+  },
+  {
+    "id": "gravity_hold_foundation_considered_helping",
+    "theme": "gravity",
+    "modes": [
+      "classic"
+    ],
+    "prompt": "Who's more likely to hold the foundation together while asking, quite reasonably, whether the foundation has considered helping?",
+    "tags": [
+      {
+        "tag": "responsibility_load",
+        "weight": 1.0
+      },
+      {
+        "tag": "burden_responsibility_grip",
+        "weight": 0.6
+      },
+      {
+        "tag": "hidden_burden",
+        "weight": 0.4
+      }
+    ]
+  },
+  {
+    "id": "gravity_accountability_belongs_somewhere",
+    "theme": "gravity",
+    "modes": [
+      "classic"
+    ],
+    "prompt": "Who's more likely to believe accountability belongs somewhere specific, not floating vaguely in the air like a motivational poster?",
+    "tags": [
+      {
+        "tag": "responsibility_load",
+        "weight": 1.0
+      },
+      {
+        "tag": "discernment",
+        "weight": 0.5
+      },
+      {
+        "tag": "conviction",
+        "weight": 0.4
+      }
+    ]
+  },
+  {
+    "id": "trust_family_first_expert_second",
+    "theme": "trust",
+    "modes": [
+      "classic"
+    ],
+    "prompt": "Who's more likely to trust family first, the expert second, and everyone else after they have stopped performing?",
+    "tags": [
+      {
+        "tag": "loyalty",
+        "weight": 1.0
+      },
+      {
+        "tag": "discernment",
+        "weight": 0.5
+      },
+      {
+        "tag": "faithful_reliability",
+        "weight": 0.4
+      }
+    ]
+  },
+  {
+    "id": "trust_journalism_remembered_the_mission",
+    "theme": "trust",
+    "modes": [
+      "classic"
+    ],
+    "prompt": "Who's more likely to listen to journalism and nonprofits because at least someone in the room appears to have remembered the mission?",
+    "tags": [
+      {
+        "tag": "discernment",
+        "weight": 1.0
+      },
+      {
+        "tag": "conviction",
+        "weight": 0.5
+      },
+      {
+        "tag": "faith_truth_loyalty",
+        "weight": 0.4
+      }
+    ]
+  },
+  {
+    "id": "trust_close_enough_honest_enough",
+    "theme": "trust",
+    "modes": [
+      "classic"
+    ],
+    "prompt": "Who's more likely to trust the person close enough to see the mess and honest enough to name it?",
+    "tags": [
+      {
+        "tag": "loyalty",
+        "weight": 1.0
+      },
+      {
+        "tag": "truth_teller",
+        "weight": 0.5
+      },
+      {
+        "tag": "discernment",
+        "weight": 0.4
+      }
+    ]
+  },
+  {
+    "id": "trust_confident_answer_not_admitting",
+    "theme": "trust",
+    "modes": [
+      "classic"
+    ],
+    "prompt": "Who's more likely to hear a confident answer and immediately wonder what it is trying not to admit?",
+    "tags": [
+      {
+        "tag": "discernment",
+        "weight": 1.0
+      },
+      {
+        "tag": "deep_seeing",
+        "weight": 0.5
+      },
+      {
+        "tag": "boundary_awareness",
+        "weight": 0.4
+      }
+    ]
+  },
+  {
+    "id": "trust_expert_interrupt_certainty",
+    "theme": "trust",
+    "modes": [
+      "classic"
+    ],
+    "prompt": "Who's more likely to let an outside expert interrupt their certainty, provided the expert has not confused credentials with wisdom?",
+    "tags": [
+      {
+        "tag": "discernment",
         "weight": 1.0
       },
       {
@@ -17754,63 +18260,41 @@
     ]
   },
   {
-    "id": "compass_protect_knowledge_that_stays_humble_enough_to_listen",
-    "theme": "compass",
+    "id": "fire_practical_fast_light_panic",
+    "theme": "fire",
     "modes": [
       "classic"
     ],
-    "prompt": "Who’s more likely to protect knowledge that stays humble enough to listen?",
+    "prompt": "Who's more likely to protect what matters by getting very practical very fast, with only a light dusting of inner panic?",
     "tags": [
       {
-        "tag": "faithful_reliability",
+        "tag": "crisis_action",
         "weight": 1.0
       },
       {
-        "tag": "loyalty",
+        "tag": "practical_order",
         "weight": 0.5
       },
       {
-        "tag": "protective_care",
+        "tag": "calm_containment",
         "weight": 0.4
       }
     ]
   },
   {
-    "id": "compass_say_truth_in_a_room_that_would_prefer",
-    "theme": "compass",
+    "id": "fire_return_to_what_worked",
+    "theme": "fire",
     "modes": [
       "classic"
     ],
-    "prompt": "Who’s more likely to say truth in a room that would prefer background music?",
+    "prompt": "Who's more likely to return to the plan that worked before, because novelty under threat is how idiots get eaten?",
     "tags": [
       {
-        "tag": "truth_teller",
+        "tag": "control_certainty_grip",
         "weight": 1.0
       },
       {
-        "tag": "conviction",
-        "weight": 0.5
-      },
-      {
-        "tag": "cost_bearing",
-        "weight": 0.4
-      }
-    ]
-  },
-  {
-    "id": "compass_protect_loyalty_without_needing_the_spotlight_to_verify",
-    "theme": "compass",
-    "modes": [
-      "classic"
-    ],
-    "prompt": "Who’s more likely to protect loyalty without needing the spotlight to verify it?",
-    "tags": [
-      {
-        "tag": "loyalty",
-        "weight": 1.0
-      },
-      {
-        "tag": "faithful_reliability",
+        "tag": "precedent_memory",
         "weight": 0.5
       },
       {
@@ -17820,125 +18304,59 @@
     ]
   },
   {
-    "id": "hands_build_the_small_careful_act_that_makes_the",
-    "theme": "hands",
+    "id": "fire_conviction_diplomatic_tissue_paper",
+    "theme": "fire",
     "modes": [
       "classic"
     ],
-    "prompt": "Who’s more likely to build the small careful act that makes the whole piece hold together?",
+    "prompt": "Who's more likely to hold conviction internally while presenting the room with the diplomatic version, wrapped in tissue paper?",
     "tags": [
       {
-        "tag": "practical_order",
+        "tag": "emotional_containment",
         "weight": 1.0
       },
       {
-        "tag": "faithful_reliability",
-        "weight": 0.5
+        "tag": "conviction",
+        "weight": 0.6
       },
-      {
-        "tag": "quiet_sacrifice",
-        "weight": 0.4
-      }
-    ]
-  },
-  {
-    "id": "hands_build_care_so_quiet_people_only_notice_when",
-    "theme": "hands",
-    "modes": [
-      "classic"
-    ],
-    "prompt": "Who’s more likely to build care so quiet people only notice when it is absent?",
-    "tags": [
-      {
-        "tag": "practical_order",
-        "weight": 1.0
-      },
-      {
-        "tag": "faithful_reliability",
-        "weight": 0.5
-      },
-      {
-        "tag": "quiet_sacrifice",
-        "weight": 0.4
-      }
-    ]
-  },
-  {
-    "id": "hands_build_precision_into_beauty_without_announcing_the_labor",
-    "theme": "hands",
-    "modes": [
-      "classic"
-    ],
-    "prompt": "Who’s more likely to build precision into beauty without announcing the labor?",
-    "tags": [
-      {
-        "tag": "practical_order",
-        "weight": 1.0
-      },
-      {
-        "tag": "faithful_reliability",
-        "weight": 0.5
-      },
-      {
-        "tag": "quiet_sacrifice",
-        "weight": 0.4
-      }
-    ]
-  },
-  {
-    "id": "hands_build_the_harmony_part_everyone_misses_until_it",
-    "theme": "hands",
-    "modes": [
-      "classic"
-    ],
-    "prompt": "Who’s more likely to build the harmony part everyone misses until it is gone?",
-    "tags": [
-      {
-        "tag": "practical_order",
-        "weight": 1.0
-      },
-      {
-        "tag": "faithful_reliability",
-        "weight": 0.5
-      },
-      {
-        "tag": "quiet_sacrifice",
-        "weight": 0.4
-      }
-    ]
-  },
-  {
-    "id": "hands_something_faithful_tuned_and_slightly_under_credited",
-    "theme": "hands",
-    "modes": [
-      "classic"
-    ],
-    "prompt": "Who’s more likely to something faithful, tuned, and slightly under-credited?",
-    "tags": [
-      {
-        "tag": "practical_order",
-        "weight": 1.0
-      },
-      {
-        "tag": "faithful_reliability",
-        "weight": 0.5
-      },
-      {
-        "tag": "quiet_sacrifice",
-        "weight": 0.4
-      }
-    ]
-  },
-  {
-    "id": "voice_say_truth_softly_enough_that_the_careless_listener",
-    "theme": "voice",
-    "modes": [
-      "classic"
-    ],
-    "prompt": "Who’s more likely to say truth softly enough that the careless listener might miss the courage?",
-    "tags": [
       {
         "tag": "truth_teller",
+        "weight": 0.4
+      }
+    ]
+  },
+  {
+    "id": "fire_over_plan_so_floor_doesnt_wobble",
+    "theme": "fire",
+    "modes": [
+      "classic"
+    ],
+    "prompt": "Who's more likely to over-plan because the people they love should not have to feel the floor wobble?",
+    "tags": [
+      {
+        "tag": "protective_care",
+        "weight": 1.0
+      },
+      {
+        "tag": "control_certainty_grip",
+        "weight": 0.5
+      },
+      {
+        "tag": "security_grip",
+        "weight": 0.4
+      }
+    ]
+  },
+  {
+    "id": "fire_calm_private_trial",
+    "theme": "fire",
+    "modes": [
+      "classic"
+    ],
+    "prompt": "Who's more likely to stay calm through the crisis while silently preparing a private trial for everyone's choices?",
+    "tags": [
+      {
+        "tag": "calm_containment",
         "weight": 1.0
       },
       {
@@ -17946,465 +18364,91 @@
         "weight": 0.5
       },
       {
-        "tag": "conviction",
-        "weight": 0.4
-      }
-    ]
-  },
-  {
-    "id": "voice_say_one_precise_sentence_after_long_internal_tuning",
-    "theme": "voice",
-    "modes": [
-      "classic"
-    ],
-    "prompt": "Who’s more likely to say one precise sentence after long internal tuning?",
-    "tags": [
-      {
-        "tag": "verbal_processing",
-        "weight": 1.0
-      },
-      {
-        "tag": "conviction",
-        "weight": 0.5
-      },
-      {
-        "tag": "connector",
-        "weight": 0.4
-      }
-    ]
-  },
-  {
-    "id": "voice_say_i_m_okay_in_a_key_that",
-    "theme": "voice",
-    "modes": [
-      "classic"
-    ],
-    "prompt": "Who’s more likely to say 'I'm okay' in a key that strongly suggests further inquiry?",
-    "tags": [
-      {
-        "tag": "social_warmth",
-        "weight": 1.0
-      },
-      {
         "tag": "emotional_containment",
-        "weight": 0.5
-      },
-      {
-        "tag": "relational_repair",
         "weight": 0.4
       }
     ]
   },
   {
-    "id": "voice_notice_the_thing_that_matters_once_the_room",
-    "theme": "voice",
-    "modes": [
-      "classic"
-    ],
-    "prompt": "Who’s more likely to notice the thing that matters once the room has stopped interrupting itself?",
-    "tags": [
-      {
-        "tag": "social_warmth",
-        "weight": 1.0
-      },
-      {
-        "tag": "emotional_containment",
-        "weight": 0.5
-      },
-      {
-        "tag": "relational_repair",
-        "weight": 0.4
-      }
-    ]
-  },
-  {
-    "id": "voice_say_a_quiet_conviction_that_has_been_rehearsing",
-    "theme": "voice",
-    "modes": [
-      "classic"
-    ],
-    "prompt": "Who’s more likely to say a quiet conviction that has been rehearsing longer than anyone knows?",
-    "tags": [
-      {
-        "tag": "social_warmth",
-        "weight": 1.0
-      },
-      {
-        "tag": "emotional_containment",
-        "weight": 0.5
-      },
-      {
-        "tag": "relational_repair",
-        "weight": 0.4
-      }
-    ]
-  },
-  {
-    "id": "gravity_carry_loyalty_like_a_bass_note_steady_and",
-    "theme": "gravity",
-    "modes": [
-      "classic"
-    ],
-    "prompt": "Who’s more likely to carry loyalty like a bass note, steady and mostly unnoticed?",
-    "tags": [
-      {
-        "tag": "responsibility_load",
-        "weight": 1.0
-      },
-      {
-        "tag": "hidden_burden",
-        "weight": 0.5
-      },
-      {
-        "tag": "quiet_sacrifice",
-        "weight": 0.4
-      }
-    ]
-  },
-  {
-    "id": "gravity_carry_the_burden_of_caring_deeply_while_speaking",
-    "theme": "gravity",
-    "modes": [
-      "classic"
-    ],
-    "prompt": "Who’s more likely to carry the burden of caring deeply while speaking sparingly?",
-    "tags": [
-      {
-        "tag": "responsibility_load",
-        "weight": 1.0
-      },
-      {
-        "tag": "hidden_burden",
-        "weight": 0.5
-      },
-      {
-        "tag": "quiet_sacrifice",
-        "weight": 0.4
-      }
-    ]
-  },
-  {
-    "id": "gravity_protect_family_freedom_knowledge_and_truth_without_turning",
-    "theme": "gravity",
-    "modes": [
-      "classic"
-    ],
-    "prompt": "Who’s more likely to protect family, freedom, knowledge, and truth without turning them into slogans?",
-    "tags": [
-      {
-        "tag": "quiet_sacrifice",
-        "weight": 1.0
-      },
-      {
-        "tag": "being_needed_grip",
-        "weight": 0.5
-      },
-      {
-        "tag": "faithful_reliability",
-        "weight": 0.4
-      }
-    ]
-  },
-  {
-    "id": "gravity_carry_responsibility_for_harmony_perhaps_too_privately",
-    "theme": "gravity",
-    "modes": [
-      "classic"
-    ],
-    "prompt": "Who’s more likely to carry responsibility for harmony, perhaps too privately?",
-    "tags": [
-      {
-        "tag": "responsibility_load",
-        "weight": 1.0
-      },
-      {
-        "tag": "hidden_burden",
-        "weight": 0.5
-      },
-      {
-        "tag": "quiet_sacrifice",
-        "weight": 0.4
-      }
-    ]
-  },
-  {
-    "id": "gravity_carry_the_cost_of_being_sensitive_in_a",
-    "theme": "gravity",
-    "modes": [
-      "classic"
-    ],
-    "prompt": "Who’s more likely to carry the cost of being sensitive in a loud room?",
-    "tags": [
-      {
-        "tag": "responsibility_load",
-        "weight": 1.0
-      },
-      {
-        "tag": "hidden_burden",
-        "weight": 0.5
-      },
-      {
-        "tag": "quiet_sacrifice",
-        "weight": 0.4
-      }
-    ]
-  },
-  {
-    "id": "trust_trust_the_tone_before_the_content",
-    "theme": "trust",
-    "modes": [
-      "classic"
-    ],
-    "prompt": "Who’s more likely to trust the tone before the content?",
-    "tags": [
-      {
-        "tag": "loyalty",
-        "weight": 1.0
-      },
-      {
-        "tag": "precedent_memory",
-        "weight": 0.5
-      },
-      {
-        "tag": "faithful_reliability",
-        "weight": 0.4
-      }
-    ]
-  },
-  {
-    "id": "trust_trust_the_quiet_person_who_actually_heard_what",
-    "theme": "trust",
-    "modes": [
-      "classic"
-    ],
-    "prompt": "Who’s more likely to trust the quiet person who actually heard what happened?",
-    "tags": [
-      {
-        "tag": "loyalty",
-        "weight": 1.0
-      },
-      {
-        "tag": "precedent_memory",
-        "weight": 0.5
-      },
-      {
-        "tag": "faithful_reliability",
-        "weight": 0.4
-      }
-    ]
-  },
-  {
-    "id": "trust_trust_truth_when_it_is_tuned_not_shouted",
-    "theme": "trust",
-    "modes": [
-      "classic"
-    ],
-    "prompt": "Who’s more likely to trust truth when it is tuned, not shouted?",
-    "tags": [
-      {
-        "tag": "loyalty",
-        "weight": 1.0
-      },
-      {
-        "tag": "precedent_memory",
-        "weight": 0.5
-      },
-      {
-        "tag": "faithful_reliability",
-        "weight": 0.4
-      }
-    ]
-  },
-  {
-    "id": "trust_trust_the_person_whose_care_has_consistency_not",
-    "theme": "trust",
-    "modes": [
-      "classic"
-    ],
-    "prompt": "Who’s more likely to trust the person whose care has consistency, not volume?",
-    "tags": [
-      {
-        "tag": "loyalty",
-        "weight": 1.0
-      },
-      {
-        "tag": "precedent_memory",
-        "weight": 0.5
-      },
-      {
-        "tag": "faithful_reliability",
-        "weight": 0.4
-      }
-    ]
-  },
-  {
-    "id": "trust_trust_the_subtle_signal_beneath_the_obvious_performance",
-    "theme": "trust",
-    "modes": [
-      "classic"
-    ],
-    "prompt": "Who’s more likely to trust the subtle signal beneath the obvious performance?",
-    "tags": [
-      {
-        "tag": "loyalty",
-        "weight": 1.0
-      },
-      {
-        "tag": "precedent_memory",
-        "weight": 0.5
-      },
-      {
-        "tag": "faithful_reliability",
-        "weight": 0.4
-      }
-    ]
-  },
-  {
-    "id": "fire_become_quietly_unmovable_when_something_sacred_is_being",
-    "theme": "fire",
-    "modes": [
-      "classic"
-    ],
-    "prompt": "Who’s more likely to become quietly unmovable when something sacred is being mistreated?",
-    "tags": [
-      {
-        "tag": "calm_containment",
-        "weight": 1.0
-      },
-      {
-        "tag": "protective_care",
-        "weight": 0.5
-      },
-      {
-        "tag": "steadiness",
-        "weight": 0.4
-      }
-    ]
-  },
-  {
-    "id": "fire_protect_the_vulnerable_thing_without_attracting_a_crowd",
-    "theme": "fire",
-    "modes": [
-      "classic"
-    ],
-    "prompt": "Who’s more likely to protect the vulnerable thing without attracting a crowd?",
-    "tags": [
-      {
-        "tag": "protective_care",
-        "weight": 1.0
-      },
-      {
-        "tag": "cost_bearing",
-        "weight": 0.5
-      },
-      {
-        "tag": "crisis_action",
-        "weight": 0.4
-      }
-    ]
-  },
-  {
-    "id": "fire_hold_the_line_softly_enough_that_people_misjudge",
-    "theme": "fire",
-    "modes": [
-      "classic"
-    ],
-    "prompt": "Who’s more likely to hold the line softly enough that people misjudge it, briefly?",
-    "tags": [
-      {
-        "tag": "calm_containment",
-        "weight": 1.0
-      },
-      {
-        "tag": "protective_care",
-        "weight": 0.5
-      },
-      {
-        "tag": "steadiness",
-        "weight": 0.4
-      }
-    ]
-  },
-  {
-    "id": "fire_respond_to_pressure_by_getting_precise_not_loud",
-    "theme": "fire",
-    "modes": [
-      "classic"
-    ],
-    "prompt": "Who’s more likely to respond to pressure by getting precise, not loud?",
-    "tags": [
-      {
-        "tag": "calm_containment",
-        "weight": 1.0
-      },
-      {
-        "tag": "protective_care",
-        "weight": 0.5
-      },
-      {
-        "tag": "steadiness",
-        "weight": 0.4
-      }
-    ]
-  },
-  {
-    "id": "fire_defend_harmony_by_refusing_the_false_note",
-    "theme": "fire",
-    "modes": [
-      "classic"
-    ],
-    "prompt": "Who’s more likely to defend harmony by refusing the false note?",
-    "tags": [
-      {
-        "tag": "calm_containment",
-        "weight": 1.0
-      },
-      {
-        "tag": "protective_care",
-        "weight": 0.5
-      },
-      {
-        "tag": "steadiness",
-        "weight": 0.4
-      }
-    ]
-  },
-  {
-    "id": "path_return_to_purpose_by_finding_the_right_key",
+    "id": "path_make_something_to_carry_the_feeling",
     "theme": "path",
     "modes": [
       "classic"
     ],
-    "prompt": "Who’s more likely to return to purpose by finding the right key again?",
-    "tags": [
-      {
-        "tag": "aim_governance",
-        "weight": 1.0
-      },
-      {
-        "tag": "steadiness",
-        "weight": 0.5
-      },
-      {
-        "tag": "long_arc_thinking",
-        "weight": 0.4
-      }
-    ]
-  },
-  {
-    "id": "path_move_forward_when_care_no_longer_requires_invisibility",
-    "theme": "path",
-    "modes": [
-      "classic"
-    ],
-    "prompt": "Who’s more likely to move forward when care no longer requires invisibility?",
+    "prompt": "Who's more likely to return to purpose by making something real enough to carry the feeling for them?",
     "tags": [
       {
         "tag": "meaning_making",
         "weight": 1.0
       },
       {
-        "tag": "relational_repair",
+        "tag": "aim_governance",
+        "weight": 0.5
+      },
+      {
+        "tag": "high_openness",
+        "weight": 0.4
+      }
+    ]
+  },
+  {
+    "id": "path_work_love_values_share_calendar",
+    "theme": "path",
+    "modes": [
+      "classic"
+    ],
+    "prompt": "Who's more likely to move forward once the work, the love, and the values finally agree to share a calendar?",
+    "tags": [
+      {
+        "tag": "aim_governance",
+        "weight": 1.0
+      },
+      {
+        "tag": "meaning_making",
+        "weight": 0.5
+      },
+      {
+        "tag": "conviction",
+        "weight": 0.4
+      }
+    ]
+  },
+  {
+    "id": "path_restore_order_explain_meaning_later",
+    "theme": "path",
+    "modes": [
+      "classic"
+    ],
+    "prompt": "Who's more likely to rebuild the path by restoring order first and explaining the emotional meaning later?",
+    "tags": [
+      {
+        "tag": "practical_order",
+        "weight": 1.0
+      },
+      {
+        "tag": "aim_governance",
+        "weight": 0.5
+      },
+      {
+        "tag": "meaning_making",
+        "weight": 0.4
+      }
+    ]
+  },
+  {
+    "id": "path_road_protects_family_freedom_afternoon",
+    "theme": "path",
+    "modes": [
+      "classic"
+    ],
+    "prompt": "Who's more likely to keep walking when the road protects family, freedom, and the right to be left alone for one blessed afternoon?",
+    "tags": [
+      {
+        "tag": "aim_governance",
+        "weight": 1.0
+      },
+      {
+        "tag": "freedom_grip",
         "weight": 0.5
       },
       {
@@ -18414,67 +18458,23 @@
     ]
   },
   {
-    "id": "path_let_the_quiet_gift_become_audible_enough_to",
+    "id": "path_let_people_in_before_verdict",
     "theme": "path",
     "modes": [
       "classic"
     ],
-    "prompt": "Who’s more likely to let the quiet gift become audible enough to be received?",
+    "prompt": "Who's more likely to grow by letting people in before the verdict is finished, which is irritating because it is probably good advice?",
     "tags": [
       {
-        "tag": "steadiness",
+        "tag": "relational_repair",
         "weight": 1.0
       },
       {
-        "tag": "faithful_reliability",
+        "tag": "meaning_making",
         "weight": 0.5
       },
       {
-        "tag": "aim_governance",
-        "weight": 0.4
-      }
-    ]
-  },
-  {
-    "id": "path_keep_walking_with_family_freedom_knowledge_and_truth",
-    "theme": "path",
-    "modes": [
-      "classic"
-    ],
-    "prompt": "Who’s more likely to keep walking with family, freedom, knowledge, and truth in tune?",
-    "tags": [
-      {
-        "tag": "aim_governance",
-        "weight": 1.0
-      },
-      {
-        "tag": "steadiness",
-        "weight": 0.5
-      },
-      {
-        "tag": "long_arc_thinking",
-        "weight": 0.4
-      }
-    ]
-  },
-  {
-    "id": "path_choose_a_path_where_sensitivity_is_not_mistaken",
-    "theme": "path",
-    "modes": [
-      "classic"
-    ],
-    "prompt": "Who’s more likely to choose a path where sensitivity is not mistaken for fragility?",
-    "tags": [
-      {
-        "tag": "aim_governance",
-        "weight": 1.0
-      },
-      {
-        "tag": "steadiness",
-        "weight": 0.5
-      },
-      {
-        "tag": "long_arc_thinking",
+        "tag": "high_openness",
         "weight": 0.4
       }
     ]
