@@ -743,6 +743,17 @@ check("selection-avoids-blowout-when-tense-alternative-exists", () => {
   // softly: no round in the cohort-real generated game has a 1.0-vs-0
   // exact-blowout gap (i.e. score >= 1.0 with runnerUp.score === 0)
   // when the card library has alternatives for that theme.
+  //
+  // CC-ROOMREAD-EVEN-DISTRIBUTION — selection now computes the engine
+  // pick against the eligible (under-served) sub-pool, not the full
+  // player pool. In late rounds the sub-pool can legitimately shrink
+  // to a single player (e.g. 5p/8r cap=2, last round's under-served
+  // tier is the lone player still below cap). When the sub-pool has
+  // only one player, `getEnginePick` returns no runner-up by
+  // construction — that's not a one-sided card "blowout" in the
+  // CC-175.1 sense, it's the quota's natural floor. Skip rounds with
+  // a missing runner-up so the assertion catches genuine blowouts
+  // (multi-player sub-pool, top >= 1.0, runner-up = 0).
   const game = generateRoomReadGame({
     players: COHORT_PLAYERS,
     roundCount: 8,
@@ -750,14 +761,235 @@ check("selection-avoids-blowout-when-tense-alternative-exists", () => {
   });
   const blowouts: string[] = [];
   for (const r of game.rounds) {
+    if (r.enginePick.runnerUp === undefined) continue;
     const top = r.enginePick.score;
-    const ru = r.enginePick.runnerUp?.score ?? 0;
+    const ru = r.enginePick.runnerUp.score;
     if (top >= 1.0 && ru === 0) blowouts.push(`${r.theme}:${r.card.id}`);
   }
   return blowouts.length === 0
     ? null
     : `blowout rounds (1.0-vs-0) detected: ${blowouts.join(", ")}`;
 });
+
+// ─────────────────────────────────────────────────────────────────────
+// CC-ROOMREAD-EVEN-DISTRIBUTION · hard quota (replaces CC-175.1 nudge)
+// ─────────────────────────────────────────────────────────────────────
+//
+// The acceptance is "engine-pick targets divide as evenly as possible":
+// with P players and R rounds, each player is targeted floor(R/P) or
+// ceil(R/P) times — never "one player twice while another is zero."
+// The tests cover four shape cases (4p/4r balanced + dominant-synth,
+// 8r/4p, 5r/4p, 4r/6p) plus a fallback-events sanity check.
+
+/** Tally helper — engine-pick playerId → count. */
+function countByPlayer(
+  game: ReturnType<typeof generateRoomReadGame>
+): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const r of game.rounds) {
+    m.set(r.enginePick.playerId, (m.get(r.enginePick.playerId) ?? 0) + 1);
+  }
+  return m;
+}
+
+/** Build a synthetic "dominant" player whose signal vector overpowers
+ *  every card. Used to prove the quota is HARD (not a tunable nudge):
+ *  even when one player would out-score everyone on every theme, the
+ *  cap of `ceil(R/P)` still holds. */
+function dominantSynthPlayer(playerId: string): PlayerGameSignals {
+  const signals: Record<string, number> = {};
+  for (const card of CARDS) {
+    for (const t of card.tags) {
+      signals[t.tag] = 1.0;
+    }
+  }
+  return { playerId, displayName: playerId, signals };
+}
+
+check("even-distribution-4p-4r-balanced-exactly-one-each", () => {
+  // 4 players × 4 rounds → cap = 1 per player. With the cohort-real
+  // anchors as players, the quota gives every player exactly 1.
+  const players = COHORT_PLAYERS.slice(0, 4);
+  const game = generateRoomReadGame({
+    players,
+    roundCount: 4,
+    mode: "classic",
+  });
+  const counts = countByPlayer(game);
+  const tally = players
+    .map((p) => `${p.playerId}=${counts.get(p.playerId) ?? 0}`)
+    .join(", ");
+  for (const p of players) {
+    if ((counts.get(p.playerId) ?? 0) !== 1) {
+      return `expected every player exactly 1; got ${tally}`;
+    }
+  }
+  return null;
+});
+
+check("even-distribution-4p-4r-with-dominant-synth-still-exactly-one-each", () => {
+  // The hard-quota proof: replace one cohort player with a synthetic
+  // "all signals = 1.0" player who would win every quality rank. The
+  // quota must still pin them to exactly 1 — otherwise we're back to
+  // the soft-penalty nudge a dominant profile could out-score.
+  const dom = dominantSynthPlayer("dom-synth");
+  const players: PlayerGameSignals[] = [
+    dom,
+    ...COHORT_PLAYERS.slice(0, 3),
+  ];
+  const game = generateRoomReadGame({
+    players,
+    roundCount: 4,
+    mode: "classic",
+  });
+  const counts = countByPlayer(game);
+  const tally = players
+    .map((p) => `${p.playerId}=${counts.get(p.playerId) ?? 0}`)
+    .join(", ");
+  if ((counts.get("dom-synth") ?? 0) !== 1) {
+    return `dominant synth got ${counts.get("dom-synth") ?? 0} picks (expected 1, proving quota is hard): ${tally}`;
+  }
+  for (const p of players) {
+    if ((counts.get(p.playerId) ?? 0) !== 1) {
+      return `expected every player exactly 1; got ${tally}`;
+    }
+  }
+  return null;
+});
+
+check("even-distribution-8r-4p-exactly-two-each", () => {
+  // 8 rounds × 4 players → cap = 2. Each player exactly twice.
+  const players = COHORT_PLAYERS.slice(0, 4);
+  const game = generateRoomReadGame({
+    players,
+    roundCount: 8,
+    mode: "classic",
+  });
+  const counts = countByPlayer(game);
+  const tally = players
+    .map((p) => `${p.playerId}=${counts.get(p.playerId) ?? 0}`)
+    .join(", ");
+  for (const p of players) {
+    if ((counts.get(p.playerId) ?? 0) !== 2) {
+      return `expected every player exactly 2; got ${tally}`;
+    }
+  }
+  return null;
+});
+
+check("even-distribution-5r-4p-one-player-two-rest-one", () => {
+  // 5 rounds × 4 players → cap = 2, floor = 1. Sorted counts must
+  // be {2,1,1,1} — never {3,1,1,0} or {2,2,1,0}.
+  const players = COHORT_PLAYERS.slice(0, 4);
+  const game = generateRoomReadGame({
+    players,
+    roundCount: 5,
+    mode: "classic",
+  });
+  const counts = countByPlayer(game);
+  const sorted = players
+    .map((p) => counts.get(p.playerId) ?? 0)
+    .sort((a, b) => b - a);
+  const expected = [2, 1, 1, 1];
+  for (let i = 0; i < expected.length; i++) {
+    if (sorted[i] !== expected[i]) {
+      return `expected sorted counts [${expected.join(",")}]; got [${sorted.join(",")}]`;
+    }
+  }
+  return null;
+});
+
+check("even-distribution-4r-6p-four-distinct-no-player-twice", () => {
+  // 4 rounds × 6 players → cap = ceil(4/6) = 1, floor = 0. Best
+  // possible: 4 distinct players each once, 2 players at zero.
+  // The acceptance is the negative side: NO player gets 2.
+  if (COHORT_PLAYERS.length < 5) {
+    return `cohort fixture pool too small (${COHORT_PLAYERS.length}) — need ≥5 to top up to 6 players`;
+  }
+  const synth = dominantSynthPlayer("synth-6th");
+  const players: PlayerGameSignals[] = [...COHORT_PLAYERS, synth];
+  const game = generateRoomReadGame({
+    players,
+    roundCount: 4,
+    mode: "classic",
+  });
+  const counts = countByPlayer(game);
+  const distinct = new Set(game.rounds.map((r) => r.enginePick.playerId));
+  const tally = players
+    .map((p) => `${p.playerId}=${counts.get(p.playerId) ?? 0}`)
+    .join(", ");
+  if (distinct.size !== 4) {
+    return `expected 4 distinct targets; got ${distinct.size} — ${tally}`;
+  }
+  for (const p of players) {
+    if ((counts.get(p.playerId) ?? 0) > 1) {
+      return `player ${p.playerId} got ${counts.get(p.playerId)} picks; cap should hold at 1 when P>R — ${tally}`;
+    }
+  }
+  return null;
+});
+
+check("even-distribution-fallback-events-absent-on-cohort-steady-state", () => {
+  // The card library has ~5 cards per theme; the fallback shouldn't
+  // fire on the standard cohort + standard round counts. If it does,
+  // it's a signal to broaden the library — record so the test fails
+  // loudly when a future card edit narrows variety.
+  const game = generateRoomReadGame({
+    players: COHORT_PLAYERS,
+    roundCount: 8,
+    mode: "classic",
+  });
+  if (game.fallbackEvents && game.fallbackEvents.length > 0) {
+    const events = game.fallbackEvents
+      .map((e) => `R${e.roundNumber}:${e.theme}→${e.targetPlayerId}`)
+      .join(", ");
+    return `fallback fired unexpectedly on 5p/8r cohort: ${events} (broaden card library for the affected themes)`;
+  }
+  return null;
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// CC-ROOMREAD-EVEN-DISTRIBUTION · report tallies (4p/4r balanced
+// vs one-dominant-synth — proof the quota holds in both cases)
+// ─────────────────────────────────────────────────────────────────────
+
+{
+  console.log("\nCC-ROOMREAD-EVEN-DISTRIBUTION 4p/4r target tallies:");
+  for (const label of ["balanced", "one-dominant-synth"] as const) {
+    const players: PlayerGameSignals[] =
+      label === "balanced"
+        ? COHORT_PLAYERS.slice(0, 4)
+        : [dominantSynthPlayer("dom-synth"), ...COHORT_PLAYERS.slice(0, 3)];
+    try {
+      const game = generateRoomReadGame({
+        players,
+        roundCount: 4,
+        mode: "classic",
+      });
+      const counts = countByPlayer(game);
+      const tally = players
+        .map((p) => `${p.playerId}=${counts.get(p.playerId) ?? 0}`)
+        .join(" / ");
+      console.log(`  ${label.padEnd(20)} → ${tally}`);
+      for (const r of game.rounds) {
+        console.log(
+          `    R${r.roundNumber} ${r.theme.padEnd(8)} ${r.card.id.padEnd(30)} → ${r.enginePick.playerId}`
+        );
+      }
+      if (game.fallbackEvents && game.fallbackEvents.length > 0) {
+        console.log(
+          `    fallbacks: ${game.fallbackEvents
+            .map((e) => `R${e.roundNumber}:${e.theme}→${e.targetPlayerId}`)
+            .join(", ")}`
+        );
+      }
+    } catch (e) {
+      console.log(
+        `  ${label} → failed: ${e instanceof Error ? e.message : String(e)}`
+      );
+    }
+  }
+}
 
 // ─────────────────────────────────────────────────────────────────────
 // Demo-cohort selection report (per CC-175.1 report-back)

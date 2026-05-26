@@ -274,6 +274,25 @@ export async function createRoomReadSession(
 // Read — public (token-as-auth)
 // ─────────────────────────────────────────────────────────────────────
 
+/**
+ * CC-ROOMREAD-ROUND-STATUS — per-round submission status. Surfaces ONLY
+ * who has voted (presence), never WHAT they voted. The engine pick + the
+ * actual choice strings stay hidden until reveal — see leak-guard
+ * comments in `getRoomReadByToken`.
+ */
+export interface RoomReadVoteStatus {
+  /** Players in the game (count of the roster). */
+  total: number;
+  /** How many of the roster have submitted a vote for this round. */
+  submittedCount: number;
+  /** Players whose vote is in. Names only — no vote choice exposed. */
+  submitted: { playerId: string; displayName: string }[];
+  /** Players whose vote isn't in yet. */
+  waitingOn: { playerId: string; displayName: string }[];
+  /** Convenience: submittedCount === total. The page polls on this. */
+  allIn: boolean;
+}
+
 export interface RoomReadStateForToken {
   sessionId: string;
   status: string;
@@ -289,6 +308,13 @@ export interface RoomReadStateForToken {
      *  the engine pick is OMITTED — never leaks to the public route. */
     enginePick?: EnginePick;
     revealedAt?: string;
+    /**
+     * CC-ROOMREAD-ROUND-STATUS — populated ONLY when the round status
+     * is "open". Once a round is revealed the waiting roster is no
+     * longer meaningful (all reveals show the room's actual votes
+     * via the reveal payload), so we omit it.
+     */
+    voteStatus?: RoomReadVoteStatus;
   } | null;
   scoreboard: { playerId: string; displayName: string; total: number }[];
 }
@@ -348,6 +374,29 @@ export async function getRoomReadByToken(
     // payload must never include the engine answer.
     if (currentRoundRow.status === "revealed") {
       currentRound.enginePick = engineRowToEnginePick(currentRoundRow, players);
+    }
+    // CC-ROOMREAD-ROUND-STATUS — voteStatus roster, open-round only.
+    // We select ONLY voter_player_id (presence) — the guessed choice
+    // and engine pick remain off-payload until reveal. Drizzle's
+    // narrowed select makes this guarantee explicit; even if the
+    // schema later grew an exploitable field, this code path can't
+    // surface it.
+    if (currentRoundRow.status === "open") {
+      const guessRows = await db
+        .select({ voter_player_id: roomReadGuesses.voter_player_id })
+        .from(roomReadGuesses)
+        .where(eq(roomReadGuesses.round_id, currentRoundRow.id));
+      const submittedIds = new Set(guessRows.map((g) => g.voter_player_id));
+      const submitted = players.filter((p) => submittedIds.has(p.playerId));
+      const waitingOn = players.filter((p) => !submittedIds.has(p.playerId));
+      currentRound.voteStatus = {
+        total: players.length,
+        submittedCount: submitted.length,
+        submitted,
+        waitingOn,
+        allIn:
+          players.length > 0 && submitted.length === players.length,
+      };
     }
   }
 

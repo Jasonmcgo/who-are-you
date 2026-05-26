@@ -98,6 +98,19 @@ export type RoomReadGame = {
   mode: RoomReadMode;
   players: PlayerGameSignals[];
   rounds: RoomReadRound[];
+  // CC-ROOMREAD-EVEN-DISTRIBUTION — diagnostic record of rounds where
+  // the even-distribution quota had to fall back because no candidate
+  // card in the round's theme could target an under-served player
+  // (every available card pointed at someone already at the cap).
+  // Empty when the card library has enough per-theme variety to keep
+  // distribution clean — which is the expected steady state. A
+  // non-empty list signals a card-library variety gap to investigate.
+  fallbackEvents?: ReadonlyArray<{
+    roundNumber: number;
+    theme: BodyCardTheme;
+    targetPlayerId: string;
+    reason: "all-eligible-targets-at-cap";
+  }>;
 };
 
 /** Sentinel returned by `getRoomWinner` when the room's plurality is

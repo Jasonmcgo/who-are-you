@@ -1,21 +1,43 @@
-// CC-175 — Room Read game generation.
+// CC-175 + CC-ROOMREAD-EVEN-DISTRIBUTION — Room Read game generation.
 //
 // Constructs an N-round game by walking the Body Card Journey in
 // `BODY_CARD_ORDER`. For each round, candidate cards are filtered to
-// the round's theme + mode + not-already-used, then ranked by
-//   confidenceBoost + enginePick.score − diversityPenalty
-// where the diversity penalty kicks in when the engine pick repeats
-// a previously-targeted player (the read should distribute across the
-// room when the data supports it).
+// the round's theme + mode + not-already-used, then selected by a
+// two-stage rule:
+//
+//   1. EVEN-DISTRIBUTION QUOTA (CC-ROOMREAD-EVEN-DISTRIBUTION).
+//      With P players and R rounds, the per-player engine-pick cap is
+//      `ceil(R/P)`. Each round prefers candidate cards whose engine
+//      pick targets a player in the current minimum-feature-count
+//      tier (the under-served players). Players at the cap are
+//      INELIGIBLE. The remainder (`R mod P` extra slots) falls out
+//      naturally to whoever wins the quality rank in the later rounds.
+//      This replaces CC-175.1's soft additive penalty
+//      (`COVERAGE_PENALTY_PER_REPEAT = 0.5`), which a dominant profile
+//      could out-score — the new rule is a HARD QUOTA, not a nudge.
+//
+//   2. QUALITY RANK (CC-175.1, retained intact).
+//      Within the eligible (under-served) set, the existing rank wins:
+//        confidenceBoost + enginePick.score + RUNNER_UP_TENSION_BONUS × tension(gap)
+//      This keeps the "best debatable card" picker; CC-ROOMREAD only
+//      constrains WHO it can target.
+//
+// Fallback: if no candidate card in the round's theme can target an
+// under-served player (the card library lacks variety for that theme),
+// the round picks the least-repeated eligible target and records the
+// event in `RoomReadGame.fallbackEvents` for follow-up analysis. The
+// fallback never throws; with ~5 cards/theme there's usually enough
+// variety.
 //
 // 4–10 players, 4–10 rounds. With 8 themes, rounds 9–10 reuse themes
 // (MVP behavior — flagged in the prompt). No duplicate CARD per
-// session. Throws if a theme has no eligible card.
+// session. Throws if a theme has no eligible card AT ALL.
 
 import { CARDS } from "./cards";
 import { getEnginePick } from "./engine";
 import { BODY_CARD_ORDER } from "./rounds";
 import type {
+  BodyCardTheme,
   PlayerGameSignals,
   RoomReadCard,
   RoomReadGame,
@@ -28,27 +50,20 @@ const MAX_PLAYERS = 10;
 const MIN_ROUNDS = 4;
 const MAX_ROUNDS = 10;
 
-// CC-175.1 — candidate-ranking weights.
+// CC-175.1 — candidate-ranking weights. The quality rank (used WITHIN
+// the eligible quota tier — see CC-ROOMREAD-EVEN-DISTRIBUTION) is:
 //
-// The per-candidate rank is:
-//
-//   confidenceBoost
-//   + enginePick.score
-//   + RUNNER_UP_TENSION_BONUS  × tension(gap)
-//   + COVERAGE_BONUS_PER_REPEAT × repeatsAlready  (NEGATIVE — escalating)
+//   confidenceBoost + enginePick.score + RUNNER_UP_TENSION_BONUS × tension(gap)
 //
 // where `tension(gap)` is a tent function centered on the "debatable"
 // band: it peaks at 1.0 in the 0.04..0.10 gap range, falls to 0 at
 // gap=0 (now routed to split cards instead) and at gap≥0.20 (a clear
-// blowout — not a debate). `repeatsAlready` is how many times the
-// candidate's engine pick has already featured in earlier rounds; the
-// penalty escalates linearly so a 3rd-time target only wins if its
-// engine score is much stronger than a fresh-target alternative.
+// blowout — not a debate).
 //
-// All three terms are bounded so they cannot dominate `enginePick.
-// score` — a strongly-justified card always beats a weak card with
-// great tension or fresh coverage.
-//
+// Both terms are bounded so they cannot dominate `enginePick.score` —
+// a strongly-justified card always beats a weak card with great
+// tension, WITHIN the same quota tier.
+
 /** Maximum tension bonus added to a candidate's rank. Tuned so a
  *  perfectly-debatable card (gap in 0.04..0.10) tips ~one ranking
  *  position against an otherwise-equal card with a 0.0 gap or a
@@ -63,18 +78,6 @@ const TENSION_BAND_HI = 0.10;
  *  ramps down. Below the inner edge the gap is a near-tie (split-card
  *  territory anyway); above the outer edge the gap is a clear blowout. */
 const TENSION_FAR = 0.20;
-
-/** Escalating coverage penalty. The Nth-time repeat of a player as
- *  engine pick incurs N × this value. A first repeat (N=1) costs
- *  0.30; a second repeat (N=2) costs 0.60, so a card whose engine
- *  score beats a fresh-target alternative by < 0.30 will lose to the
- *  fresh target on the first repeat, < 0.60 on the second. Tuned
- *  against the cohort-real fixtures (which carry players whose
- *  per-theme scores vary by 0.2-0.5) to spread targets across 5–8
- *  player rooms while still letting a strongly-justified repeat win
- *  (e.g. a 0.7-gap card beats the coverage penalty on the first
- *  repeat). NOT a rigid permutation — see the test cases. */
-const COVERAGE_PENALTY_PER_REPEAT = 0.5;
 
 export interface GenerateRoomReadGameArgs {
   players: PlayerGameSignals[];
@@ -101,6 +104,18 @@ export function generateRoomReadGame(
   const usedCardIds = new Set<string>();
   const featureCountByPlayer = new Map<string, number>();
   const rounds: RoomReadRound[] = [];
+  // CC-ROOMREAD-EVEN-DISTRIBUTION — per-player cap. With P players
+  // and R rounds, each player is targeted at most `ceil(R/P)` times,
+  // and the natural floor is `floor(R/P)` — never "one player twice
+  // while another is zero." This is a HARD quota, not a tunable
+  // penalty.
+  const cap = Math.ceil(roundCount / players.length);
+  const fallbackEvents: Array<{
+    roundNumber: number;
+    theme: BodyCardTheme;
+    targetPlayerId: string;
+    reason: "all-eligible-targets-at-cap";
+  }> = [];
 
   for (let i = 0; i < roundCount; i++) {
     const theme = BODY_CARD_ORDER[i % BODY_CARD_ORDER.length];
@@ -116,31 +131,84 @@ export function generateRoomReadGame(
       );
     }
 
-    // Score every candidate with the CC-175.1 tuned rank: base engine
-    // score + author confidence + runner-up tension + soft coverage.
+    // CC-ROOMREAD-EVEN-DISTRIBUTION — two-stage target selection.
+    //
+    // Stage 1 — eligible pool: players still BELOW the cap. A player
+    // who has hit `ceil(R/P)` is ineligible until the game ends.
+    // Stage 2 — under-served sub-pool: within the eligible pool, only
+    // players in the current MIN feature-count tier. This is the
+    // quota: every round prefers the under-served players, so picks
+    // distribute floor(R/P)..ceil(R/P) without one player sweeping.
+    //
+    // The engine pick is then computed AGAINST THE SUB-POOL via
+    // `getEnginePick(card, subPool)`. This is the load-bearing piece:
+    // without restricting the player list, a dominant profile (one
+    // player with high signals on every theme) would win every card's
+    // pick regardless of count — making the soft-penalty equivalent
+    // of CC-175.1 unavoidable. By recomputing the pick against the
+    // sub-pool, we keep "best debatable card within the eligible
+    // set" as the per-round quality rule.
+    //
+    // The eligible pool is guaranteed non-empty during round
+    // selection: total cap capacity = P × ceil(R/P) ≥ R, so we never
+    // run out of eligible players before the last round. The
+    // fallback below is a belt-and-suspenders for defensive
+    // edge-cases (e.g. a future change that makes engine picks
+    // unstable mid-round); it records to `fallbackEvents` and never
+    // throws.
+    const targetCount = (id: string) => featureCountByPlayer.get(id) ?? 0;
+    const eligiblePool = players.filter((p) => targetCount(p.playerId) < cap);
+    let subPool: PlayerGameSignals[];
+    let usedFallback = false;
+    if (eligiblePool.length > 0) {
+      const minCount = Math.min(
+        ...eligiblePool.map((p) => targetCount(p.playerId))
+      );
+      subPool = eligiblePool.filter(
+        (p) => targetCount(p.playerId) === minCount
+      );
+    } else {
+      // Defensive: should never fire (see invariant above). Falls back
+      // to the full player pool + records the event so a future
+      // regression surfaces loudly.
+      subPool = players;
+      usedFallback = true;
+    }
+
+    // CC-175.1 quality rank — base engine score + author confidence +
+    // runner-up tension. Score is computed against the SUB-POOL so the
+    // engine pick (and its runner-up, gap, tension) reflect the
+    // eligible set. NO coverage penalty here; CC-ROOMREAD's hard
+    // quota controls distribution via the sub-pool filter above.
     const scoredCandidates = candidates.map((card) => {
-      const enginePick = getEnginePick(card, players);
+      const enginePick = getEnginePick(card, subPool);
       const gap = enginePick.runnerUp
         ? enginePick.score - enginePick.runnerUp.score
         : enginePick.score;
       const tensionBonus = RUNNER_UP_TENSION_BONUS * tensionWeight(gap);
-      const repeats = featureCountByPlayer.get(enginePick.playerId) ?? 0;
-      const coveragePenalty = repeats * COVERAGE_PENALTY_PER_REPEAT;
-      const rank =
+      const qualityRank =
         (card.confidenceBoost ?? 0) +
         enginePick.score +
-        tensionBonus -
-        coveragePenalty;
-      return { card, enginePick, rank };
+        tensionBonus;
+      return { card, enginePick, qualityRank };
     });
+
     scoredCandidates.sort((a, b) => {
-      if (b.rank !== a.rank) return b.rank - a.rank;
+      if (b.qualityRank !== a.qualityRank) return b.qualityRank - a.qualityRank;
       // Deterministic tiebreak on card id so identical ranks pick
       // the same card every run.
       return a.card.id.localeCompare(b.card.id);
     });
 
     const chosen = scoredCandidates[0];
+    if (usedFallback) {
+      fallbackEvents.push({
+        roundNumber: i + 1,
+        theme,
+        targetPlayerId: chosen.enginePick.playerId,
+        reason: "all-eligible-targets-at-cap",
+      });
+    }
     usedCardIds.add(chosen.card.id);
     featureCountByPlayer.set(
       chosen.enginePick.playerId,
@@ -154,7 +222,14 @@ export function generateRoomReadGame(
     });
   }
 
-  return { mode, players, rounds };
+  return {
+    mode,
+    players,
+    rounds,
+    // Only attach when non-empty — keeps the field absent on the
+    // expected steady state (no library-variety gaps).
+    fallbackEvents: fallbackEvents.length > 0 ? fallbackEvents : undefined,
+  };
 }
 
 /** Tent function: 1.0 inside the debatable band (`[TENSION_BAND_LO,

@@ -45,6 +45,15 @@ interface EnginePickPayload {
   runnerUp?: { playerId: string; displayName: string; score: number };
 }
 
+// CC-ROOMREAD-ROUND-STATUS — per-round submission roster (open-round only).
+interface VoteStatusPayload {
+  total: number;
+  submittedCount: number;
+  submitted: { playerId: string; displayName: string }[];
+  waitingOn: { playerId: string; displayName: string }[];
+  allIn: boolean;
+}
+
 interface RoomReadStatePayload {
   sessionId: string;
   status: string;
@@ -58,6 +67,8 @@ interface RoomReadStatePayload {
     card: { id: string; prompt: string };
     enginePick?: EnginePickPayload;
     revealedAt?: string;
+    /** CC-ROOMREAD-ROUND-STATUS — present only on open rounds. */
+    voteStatus?: VoteStatusPayload;
   } | null;
   scoreboard: { playerId: string; displayName: string; total: number }[];
 }
@@ -287,6 +298,26 @@ export default function RoomReadGamePage({
     if (round.status !== "revealed") return;
     if (reveal.kind === "loaded" && reveal.payload.roundId === round.roundId) return;
     if (reveal.kind === "revealing") return;
+    void loadOrFireReveal(round.roundId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [load]);
+
+  // CC-ROOMREAD-ROUND-STATUS — auto-reveal when all reads are in.
+  // The poll loop refreshes voteStatus every 2.5s; once it sees
+  // allIn=true, ANY client can fire the reveal POST. The endpoint is
+  // idempotent so multiple clients racing to it doesn't matter — the
+  // first writes "revealed", the rest receive an "already revealed"
+  // and synthesize the reveal from the GET state. No silent jump:
+  // we leave the "All reads in — revealing…" beat visible while the
+  // reveal POST is in flight.
+  useEffect(() => {
+    if (load.kind !== "ready") return;
+    const round = load.data.currentRound;
+    if (!round) return;
+    if (round.status !== "open") return;
+    if (!round.voteStatus?.allIn) return;
+    if (reveal.kind === "revealing") return;
+    if (reveal.kind === "loaded" && reveal.payload.roundId === round.roundId) return;
     void loadOrFireReveal(round.roundId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load]);
@@ -824,6 +855,17 @@ function VotingScreen({
         </p>
       </section>
 
+      {/* CC-ROOMREAD-ROUND-STATUS — vote roster. Renders the
+          submitted/waiting-on split (names, not just N/M), the
+          viewer's own state, and a clear reveal-unlock condition. */}
+      {round.voteStatus ? (
+        <VoteRoster
+          voteStatus={round.voteStatus}
+          identity={identity}
+          revealing={revealState.kind === "revealing"}
+        />
+      ) : null}
+
       <section className="flex flex-col" style={{ gap: 8 }}>
         <p
           className="font-mono uppercase"
@@ -926,6 +968,118 @@ function VotingScreen({
 
       <Scoreboard scoreboard={state.scoreboard} />
     </PageShell>
+  );
+}
+
+// CC-ROOMREAD-ROUND-STATUS — vote roster + reveal-unlock copy. Renders
+// during the open round only. Names are presence-only — no vote choice
+// or engine pick is exposed here.
+function VoteRoster({
+  voteStatus,
+  identity,
+  revealing,
+}: {
+  voteStatus: VoteStatusPayload;
+  identity: string;
+  revealing: boolean;
+}) {
+  const { submitted, waitingOn, submittedCount, total, allIn } = voteStatus;
+  // Did the viewer's own read land yet? Useful so each player gets
+  // confirmation independent of how many of their teammates have voted.
+  const viewerSubmitted = submitted.some((p) => p.playerId === identity);
+
+  // When `allIn` flips we surface a brief "All reads in — revealing…"
+  // beat. The auto-reveal hook above fires `loadOrFireReveal`; that
+  // sets `revealing` to true on the page, and the round-status flip
+  // (open → revealed) brings up the RevealScreen on the next poll.
+  // Either signal renders the bridge copy here, so the round-end isn't
+  // a silent jump.
+  const showRevealingBeat = allIn || revealing;
+
+  return (
+    <section
+      className="flex flex-col"
+      style={{
+        gap: 8,
+        background: showRevealingBeat ? "var(--umber-wash)" : "var(--paper)",
+        border: showRevealingBeat
+          ? "1px solid var(--umber)"
+          : "1px solid var(--rule)",
+        padding: "14px 16px",
+        borderRadius: 8,
+      }}
+      aria-live="polite"
+    >
+      <div
+        className="flex flex-row items-baseline justify-between"
+        style={{ gap: 12, flexWrap: "wrap" }}
+      >
+        <p
+          className="font-mono uppercase"
+          style={{
+            fontSize: 10,
+            letterSpacing: "0.12em",
+            color: showRevealingBeat ? "var(--umber)" : "var(--ink-mute)",
+            margin: 0,
+          }}
+        >
+          {showRevealingBeat
+            ? "All reads in — revealing…"
+            : `Reads in: ${submittedCount} of ${total}`}
+        </p>
+        <p
+          className="font-serif italic"
+          style={{
+            fontSize: 12,
+            color: "var(--ink-soft)",
+            margin: 0,
+          }}
+        >
+          {viewerSubmitted ? "✓ Your read is in" : "Your read isn't in yet"}
+        </p>
+      </div>
+      {!showRevealingBeat ? (
+        <div className="flex flex-col" style={{ gap: 2 }}>
+          {submitted.length > 0 ? (
+            <p
+              className="font-serif"
+              style={{
+                fontSize: 13,
+                color: "var(--ink)",
+                margin: 0,
+                lineHeight: 1.5,
+              }}
+            >
+              <span style={{ color: "var(--umber)" }}>✓ Submitted:</span>{" "}
+              {submitted.map((p) => p.displayName).join(", ")}
+            </p>
+          ) : null}
+          {waitingOn.length > 0 ? (
+            <p
+              className="font-serif italic"
+              style={{
+                fontSize: 13,
+                color: "var(--ink-soft)",
+                margin: 0,
+                lineHeight: 1.5,
+              }}
+            >
+              Waiting on: {waitingOn.map((p) => p.displayName).join(", ")}
+            </p>
+          ) : null}
+          <p
+            className="font-mono"
+            style={{
+              fontSize: 11,
+              color: "var(--ink-mute)",
+              margin: "4px 0 0",
+            }}
+          >
+            Reveal unlocks when all {total} have read.
+          </p>
+        </div>
+      ) : null}
+    </section>
   );
 }
 
