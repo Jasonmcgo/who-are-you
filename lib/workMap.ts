@@ -406,16 +406,55 @@ const generativeCreative: Predicate = (inp) => {
     lensInstrumentIs(inp.lensStack, ["ne", "fi"])
       ? 1
       : 0;
+  // CC-183 — overall Openness composite (raw subdomain T-score). Kept
+  // as the base oFit so existing high-O sessions still benefit.
   const oFit = inp.oceanOutput ? ramp(inp.oceanOutput.distribution.O, 22, 38) : 0;
+  // CC-183 — aesthetic subdimension + Q-O1#1 aesthetic-pick.
+  //
+  // The Openness facet most directly load-bearing for creative/artistic
+  // register is the aesthetic subdim (`opennessSubdimensions.aesthetic`
+  // — Q-O1 + Compass mercy/compassion/peace/enjoying signals). The
+  // pre-CC predicate read only the composite `distribution.O`, so an
+  // aesthetic-leading shape with mid composite (Nat: O=32, aesthetic=70)
+  // scored *under* caring/Direct-Service even when Ne+Fi lit up.
+  //
+  // Two changes:
+  //   1. `opennessComponent` = max(composite ramp, aesthetic-subdim
+  //      ramp) + a small bonus for aesthetic-at-Q-O1-rank-1. So a high
+  //      aesthetic subdim can lift the register even when other
+  //      Openness facets are mid; the bonus then nudges the
+  //      explicitly-aesthetic-leading shape further.
+  //   2. The `energyFit` gate (originally only learning/enjoying
+  //      energy priorities) now ALSO accepts aesthetic-at-Q-O1-rank-1
+  //      — aesthetic IS the energy direction for aesthetic-led creatives.
+  //      Without this, an aesthetic-led shape whose Q-E1 ranking doesn't
+  //      lean learning/enjoying drops the 0.25-weight energy term and
+  //      can't catch a strong-caring competitor that scores ~0.80.
+  //
+  // The aesthetic signal is therefore counted in TWO weighted slots
+  // (opennessComponent + energyFit), the same way Fi shows up twice in
+  // caringService (driver + agreeableness). Not suppressing
+  // caring_service — just letting aesthetic compete.
+  const aestheticFit = inp.oceanOutput
+    ? ramp(
+        inp.oceanOutput.dispositionSignalMix.opennessSubdimensions.aesthetic,
+        22,
+        38
+      )
+    : 0;
+  const aestheticTop1 =
+    topRankSignals(inp.signals, 1).includes("openness_aesthetic") ? 1 : 0;
+  const opennessComponent = Math.max(oFit, aestheticFit) + 0.15 * aestheticTop1;
   const energyFit =
     hasSignal(inp.signals, "learning_energy_priority") ||
-    hasSignal(inp.signals, "enjoying_energy_priority")
+    hasSignal(inp.signals, "enjoying_energy_priority") ||
+    aestheticTop1 === 1
       ? 1
       : 0;
   // Drive is intentionally weak here — generative work can be cost- or
   // coverage-leaning. Don't gate on a single bucket.
   const driveFit = inp.driveOutput ? 0.5 : 0;
-  return driverFit * 0.35 + oFit * 0.3 + energyFit * 0.25 + driveFit * 0.1;
+  return driverFit * 0.35 + opennessComponent * 0.3 + energyFit * 0.25 + driveFit * 0.1;
 };
 
 const operationalStewardship: Predicate = (inp) => {

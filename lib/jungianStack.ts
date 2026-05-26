@@ -667,11 +667,53 @@ export function aggregateLensStackBinary(signals: Signal[]): LensStack {
 
   const confidence: "high" | "low" = reasons.length > 0 ? "low" : "high";
 
+  // CC-183 — honor the user's four picked functions in the stack tail.
+  //
+  // STACK_TABLE returns the canonical MBTI 4-tuple for the dom|aux
+  // pair. For canonical types (the user's picks match MBTI canon),
+  // this matches the picks-derived tail exactly — see the proof
+  // sketches in the CC-183 prompt's Part A.
+  //
+  // For non-canonical sessions (a Fi-Se shape who picked Ne+Ti instead
+  // of canonical Ni+Te), STACK_TABLE introduces functions the user
+  // never picked. Override the tail with the non-leader picks: the
+  // perceiving pick that wasn't the leader + the judging pick that
+  // wasn't the leader, slotted into tertiary/inferior by the same
+  // axis-role mapping STACK_TABLE uses (tertiary = same axis as aux,
+  // inferior = same axis as dom). Only fires when ALL FOUR binary
+  // picks + both leaders are present; otherwise we keep STACK_TABLE's
+  // canonical tail (safe fallback for thin-signal sessions).
+  let resolvedTertiary: CognitiveFunctionId = stackTuple[2];
+  let resolvedInferior: CognitiveFunctionId = stackTuple[3];
+  if (
+    nePick &&
+    sePick &&
+    tePick &&
+    fePick &&
+    perceivingLeader &&
+    judgingLeader
+  ) {
+    const nonLeaderPerc = perceivingLeader === sePick ? nePick : sePick;
+    const nonLeaderJudg = judgingLeader === fePick ? tePick : fePick;
+    const auxIsPerceiving =
+      auxiliary === "ni" ||
+      auxiliary === "ne" ||
+      auxiliary === "si" ||
+      auxiliary === "se";
+    if (auxIsPerceiving) {
+      resolvedTertiary = nonLeaderPerc;
+      resolvedInferior = nonLeaderJudg;
+    } else {
+      resolvedTertiary = nonLeaderJudg;
+      resolvedInferior = nonLeaderPerc;
+    }
+  }
+
   return {
     dominant: stackTuple[0],
     auxiliary: stackTuple[1],
-    tertiary: stackTuple[2],
-    inferior: stackTuple[3],
+    tertiary: resolvedTertiary,
+    inferior: resolvedInferior,
     mbtiCode,
     confidence,
     confidenceLowReasons: reasons.length > 0 ? reasons : undefined,

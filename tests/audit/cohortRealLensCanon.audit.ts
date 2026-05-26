@@ -89,10 +89,14 @@ const LOCKS: AnchorLock[] = [
   {
     fixture: "nat-real.json",
     canonName: "Nat",
-    expectedDominant: "si",
-    expectedAuxFamily: "feeler",
+    expectedDominant: "fi",
+    // `expectedAuxFamily` intentionally omitted: Nat's aux is Se (a
+    // perceiving function), and the schema's expectedAuxFamily only
+    // encodes judging families (feeler/thinker). When extended to
+    // assert a perceiving aux this entry can grow that field;
+    // dropping it leaves the dom check authoritative for the lock.
     rationale:
-      "Nat = CC-SENSING-TYPING binary-same-attitude-leaders recovery anchor. Owner-confirmed: perfect-pitch musician, deep introvert (Extraversion=43). Binary picks: Q-TB-SI-SE=si, Q-TB-NI-NE=ne, Q-TB-TI-TE=ti, Q-TB-FI-FE=fi, PERC-ORDER=si (Si leads), JUDG-ORDER=fi (Fi leads), Q-O1#1=aesthetic (beauty/music/design). Pre-CC-SENSING-TYPING she fell to the architect-halo default (Ni/Te) at lib/jungianStack.ts:584-602 because BOTH her leaders share attitude (Si+Fi both introverted), triggering the binary-attitude-violation fallback. CC-SENSING-TYPING Part B recovers her into the closest canonical stack honoring her perceiving + judging family picks: Si-Fe-Ti-Ne = ISFJ. Perceiving correctly Si; judging correctly a Feeler (Fe aux). This anchor doubles as the calibration case for the `binary-same-attitude-leaders-resolved` ConfidenceLowReason — the only fixture in the cohort that exercises that branch.",
+      "Nat = Fi-Se artist canon (CC-183, 2026-05-26). Owner-confirmed: painter/musician/graphic designer; she picks Fi-Se-Ne-Ti, a non-MBTI stack. Binary picks: Q-TB-SI-SE=se, Q-TB-NI-NE=ne, Q-TB-TI-TE=ti, Q-TB-FI-FE=fi, PERC-ORDER=se (Se leads), JUDG-ORDER=fi (Fi leads), Q-O1#1=aesthetic (beauty/music/design). Pre-CC-SENSING-TYPING the engine pushed her to Ni/Te architect-halo (binary-attitude-violation); CC-SENSING-TYPING resolved her into Si-Fe-Ti-Ne (the stale ISFJ anchor this CC supersedes). CC-183: leaders Fi (judg) + Se (perc) resolve cleanly via the opposite-attitude path (no same-attitude violation), and Part A's tail-from-picks override keeps her remaining picks Ne + Ti as tertiary/inferior → fi › se › ne › ti. This anchor doubles as the canonical case for the Part A 'tail-honors-picks' override (the only fixture in the cohort whose tail would be MBTI-incorrect without it).",
   },
 ];
 

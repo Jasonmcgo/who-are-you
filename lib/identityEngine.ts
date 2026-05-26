@@ -6403,12 +6403,27 @@ export function synthesizeTopRisks(
   // an earlier card's label, fall back to TOP_RISK_CARD_FALLBACK[cardKey] —
   // an editorial per-card line, never the debug-style "{Card}-card risk
   // under pressure" placeholder.
+  //
+  // CC-183 — three-tier dedup. The card-fallback for `compass` is
+  // `"Integrity becoming rigidity."`, which is byte-equal to the
+  // editorial label for the Integrity gift category. When a session
+  // has Lens-Integrity + Compass-Integrity (or any other lens/category
+  // pair where the second card's fallback happens to equal a
+  // previously-seen editorial label), the existing two-tier dedup
+  // resolved BOTH rows to the same string. The third tier walks the
+  // editorial label ladder for the next unused label so the rendered
+  // "Growth edge" column never shows the same line twice across rows.
+  const editorialLadder = Object.values(TOP_RISK_LABEL_FOR_CATEGORY);
   const usedLabels = new Set<string>();
   return sorted.slice(0, 3).map((c) => {
     const editorial = c.category ? TOP_RISK_LABEL_FOR_CATEGORY[c.category] : undefined;
     let label = editorial ?? TOP_RISK_CARD_FALLBACK[c.cardKey];
     if (usedLabels.has(label)) {
       label = TOP_RISK_CARD_FALLBACK[c.cardKey];
+    }
+    if (usedLabels.has(label)) {
+      label =
+        editorialLadder.find((l) => !usedLabels.has(l)) ?? label;
     }
     usedLabels.add(label);
     return { label, paragraph: c.text };

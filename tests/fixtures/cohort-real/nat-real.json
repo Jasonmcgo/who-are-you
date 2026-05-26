@@ -243,9 +243,9 @@
     {
       "type": "single_pick",
       "card_id": "temperament",
-      "picked_id": "si",
+      "picked_id": "se",
       "question_id": "Q-TB-SI-SE",
-      "picked_signal": "si",
+      "picked_signal": "se",
       "question_text": "Which of these is closer to how you take in what's actually here?"
     },
     {
@@ -267,9 +267,9 @@
     {
       "type": "single_pick",
       "card_id": "temperament",
-      "picked_id": "si",
+      "picked_id": "se",
       "question_id": "Q-TB-PERC-ORDER",
-      "picked_signal": "si",
+      "picked_signal": "se",
       "question_text": "Of your two perceiving picks, which one leads in how you actually take in the world?"
     },
     {
