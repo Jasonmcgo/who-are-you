@@ -211,7 +211,7 @@ function rankNames(card: RoomReadCard): { name: string; score: number }[] {
 }
 
 check("si-card-keeps-si-anchors-above-ni-anchors", () => {
-  const card = findCard("lens_history_quality_control");
+  const card = findCard("lens_spot_the_missing_old_thing_that_once_held");
   const ranked = rankNames(card);
   const positions = new Map<string, number>();
   ranked.forEach((r, i) => positions.set(r.name, i));
@@ -228,7 +228,7 @@ check("si-card-keeps-si-anchors-above-ni-anchors", () => {
 });
 
 check("ni-card-keeps-ni-anchors-above-si-anchors", () => {
-  const card = findCard("lens_problem_behind_problem");
+  const card = findCard("lens_spot_the_governance_problem_inside_the_loose_thread");
   const ranked = rankNames(card);
   const positions = new Map<string, number>();
   ranked.forEach((r, i) => positions.set(r.name, i));
@@ -251,9 +251,9 @@ check("score-card-sum-matches-manual-calculation", () => {
     displayName: "Test",
     signals: { pattern_reader: 0.8, deep_seeing: 0.6, long_arc_thinking: 0.5 },
   };
-  const card = findCard("lens_problem_behind_problem");
-  // weights: pattern_reader 1.0, deep_seeing 0.6, long_arc_thinking 0.4
-  const expected = 0.8 * 1.0 + 0.6 * 0.6 + 0.5 * 0.4;
+  const card = findCard("lens_spot_the_governance_problem_inside_the_loose_thread");
+  // weights: pattern_reader 1.0, long_arc_thinking 0.5, deep_seeing 0.4
+  const expected = 0.8 * 1.0 + 0.5 * 0.5 + 0.6 * 0.4;
   const actual = scoreCardForPlayer(card, fakePlayer);
   if (Math.abs(actual - expected) > 1e-9) {
     return `expected ${expected}, got ${actual}`;
@@ -550,7 +550,7 @@ check("split-fires-on-near-tie-card", () => {
   // Construct two players whose scores on a 1.0-weight tag are within
   // SPLIT_EPS. The card weights pattern_reader at 1.0, so signal=0.4
   // vs 0.42 (gap=0.02 < SPLIT_EPS=0.03) gives a near-tie.
-  const card = findCard("lens_problem_behind_problem");
+  const card = findCard("lens_spot_the_governance_problem_inside_the_loose_thread");
   const players: PlayerGameSignals[] = [
     { playerId: "alpha", displayName: "Alpha", signals: { pattern_reader: 0.42 } },
     { playerId: "beta", displayName: "Beta", signals: { pattern_reader: 0.4 } },
@@ -565,7 +565,7 @@ check("split-fires-on-near-tie-card", () => {
 });
 
 check("split-stays-false-on-clear-card", () => {
-  const card = findCard("lens_problem_behind_problem");
+  const card = findCard("lens_spot_the_governance_problem_inside_the_loose_thread");
   const players: PlayerGameSignals[] = [
     { playerId: "alpha", displayName: "Alpha", signals: { pattern_reader: 0.9 } },
     { playerId: "beta", displayName: "Beta", signals: { pattern_reader: 0.3 } },
@@ -584,7 +584,7 @@ check("split-fires-at-widened-threshold-035", () => {
   // pattern_reader weight = 1.0, so signal=0.45 vs 0.415 → gap=0.035.
   // Under the old SPLIT_EPS=0.03 this stayed a single pick; under 0.04
   // it surfaces as a split.
-  const card = findCard("lens_problem_behind_problem");
+  const card = findCard("lens_spot_the_governance_problem_inside_the_loose_thread");
   const players: PlayerGameSignals[] = [
     { playerId: "alpha", displayName: "Alpha", signals: { pattern_reader: 0.45 } },
     { playerId: "beta", displayName: "Beta", signals: { pattern_reader: 0.415 } },
@@ -604,7 +604,7 @@ check("split-fires-at-widened-threshold-035", () => {
 check("split-stays-false-in-debatable-band", () => {
   // pattern_reader weight = 1.0; signal=0.50 vs 0.43 → gap=0.07,
   // squarely inside TENSION_BAND_LO..TENSION_BAND_HI.
-  const card = findCard("lens_problem_behind_problem");
+  const card = findCard("lens_spot_the_governance_problem_inside_the_loose_thread");
   const players: PlayerGameSignals[] = [
     { playerId: "alpha", displayName: "Alpha", signals: { pattern_reader: 0.50 } },
     { playerId: "beta", displayName: "Beta", signals: { pattern_reader: 0.43 } },
@@ -1221,8 +1221,8 @@ function printRanks(label: string, cardId: string) {
 console.log("CC-175 ROOM-READ-ENGINE-CORE — unit tests");
 console.log("==========================================");
 console.log("\nCohort sanity check (5 cohort-real anchors):");
-printRanks("Si card: rank-by-precedent_memory", "lens_history_quality_control");
-printRanks("Ni card: rank-by-pattern_reader", "lens_problem_behind_problem");
+printRanks("Si card: rank-by-precedent_memory", "lens_spot_the_missing_old_thing_that_once_held");
+printRanks("Ni card: rank-by-pattern_reader", "lens_spot_the_governance_problem_inside_the_loose_thread");
 
 // ─────────────────────────────────────────────────────────────────────
 // Print pass / fail summary
