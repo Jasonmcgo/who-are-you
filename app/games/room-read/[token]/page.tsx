@@ -57,6 +57,21 @@ interface VoteStatusPayload {
   allIn: boolean;
 }
 
+// CC-180 — per-round recap entry. Surfaces ONLY when
+// status === "complete"; absent on every other state.
+interface RoomReadRecapEntryPayload {
+  roundNumber: number;
+  theme: BodyCardTheme;
+  cardPrompt: string;
+  enginePick: { displayName: string };
+  roomPick:
+    | { displayName: string }
+    | { special: "both" | "nobody" }
+    | null;
+  verdict: "obvious" | "human_override" | "identity_fog";
+  pointsByPlayer: { displayName: string; points: number }[];
+}
+
 interface RoomReadStatePayload {
   sessionId: string;
   status: string;
@@ -74,6 +89,8 @@ interface RoomReadStatePayload {
     voteStatus?: VoteStatusPayload;
   } | null;
   scoreboard: { playerId: string; displayName: string; total: number }[];
+  /** CC-180 — present only when status === "complete". */
+  recap?: RoomReadRecapEntryPayload[];
 }
 
 interface RoundScoreBreakdownPayload {
@@ -82,6 +99,19 @@ interface RoundScoreBreakdownPayload {
   perfectRead: boolean;
   splitRead: boolean;
   points: number;
+}
+
+// CC-178 — per-voter vote choice on the reveal payload. Surfaces ONLY
+// post-reveal; the open-round GET payload omits these entirely (leak
+// guard). Mirrors `RevealVote`/`RevealVoteChoice` in persistence.ts.
+type RevealVoteChoicePayload =
+  | { kind: "player"; playerId: string; displayName: string }
+  | { kind: "special"; value: "both" | "nobody" };
+
+interface RevealVotePayload {
+  voterPlayerId: string;
+  voterName: string;
+  choice: RevealVoteChoicePayload;
 }
 
 interface RevealedRoundPayload {
@@ -99,6 +129,8 @@ interface RevealedRoundPayload {
     points: number;
     breakdown: RoundScoreBreakdownPayload;
   }[];
+  /** CC-178 — every voter's choice for this round. */
+  votes: RevealVotePayload[];
 }
 
 // Persistence sentinels — mirrored from `lib/games/roomRead/types.ts`.
@@ -135,28 +167,33 @@ function verdictCopy(
   verdict: RevealedRoundPayload["verdict"],
   enginePick: EnginePickPayload
 ): { kicker: string; body: string } {
+  const name = enginePick.displayName;
   if (verdict === "obvious") {
+    // CC-178 — name the subject. The agreement copy was vague ("agree
+    // on what?" complaint). Now reads "agree: this is {name}."
     return {
       kicker: "Obvious",
-      body: "The room and the engine agree. The accused may now stop pretending.",
+      body: `The room and the engine agree: this is ${name}. The accused may now stop pretending.`,
     };
   }
   if (verdict === "identity_fog") {
     return {
       kicker: "Identity Fog",
-      body: "No clean consensus. Either the prompt is brilliant, or everyone needs snacks.",
+      body: `No clean consensus. The engine's quiet pick was ${name}, but the room didn't converge. Either the prompt is brilliant, or everyone needs snacks.`,
     };
   }
   // human_override — split into two variants by engine confidence.
+  // CC-178 — both variants now name the engine's pick so "the room saw
+  // the surface" reads against a specific accused.
   if (enginePick.confidence === "high" && !enginePick.isSplit) {
     return {
       kicker: "Engine Dissent",
-      body: "The room saw the surface. The engine suspects deeper wiring.",
+      body: `The room saw the surface. The engine suspects deeper wiring — its pick was ${name}.`,
     };
   }
   return {
     kicker: "Human Override",
-    body: "The engine made a principled accusation. The room brought different receipts.",
+    body: `The engine made a principled accusation (${name}). The room brought different receipts.`,
   };
 }
 
@@ -330,6 +367,13 @@ export default function RoomReadGamePage({
   // only appears after all-in) both call with `force=false`; the
   // secondary "Reveal now — someone's away" affordance passes
   // `force=true` to bypass the server's all-submitted gate.
+  //
+  // CC-178 — the reveal endpoint is now idempotent: an already-revealed
+  // round returns the FULL recomputed payload (distribution, votes,
+  // scores) with 200, not 409. Every client that POSTs sees the same
+  // real data — no more synthetic placeholder for the multi-tab race
+  // losers. The old "build a stub payload from the GET state" branch
+  // is gone for the same reason.
   async function loadOrFireReveal(roundId: string, force: boolean = false) {
     setReveal({ kind: "revealing" });
     try {
@@ -343,21 +387,6 @@ export default function RoomReadGamePage({
       );
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
-        // "already revealed" is fine — the server returns the round
-        // in the GET payload. We just need the reveal payload to
-        // render. CC-176's reveal route returns the full reveal
-        // payload on success; if the round is already revealed we
-        // fall back to a synthetic payload built from the GET state.
-        if (body.error?.includes("already revealed") && load.kind === "ready") {
-          const round = load.data.currentRound;
-          if (round?.enginePick) {
-            setReveal({
-              kind: "loaded",
-              payload: synthesizeRevealFromState(round),
-            });
-            return;
-          }
-        }
         setReveal({
           kind: "error",
           message: body.error ?? `request failed (${res.status})`,
@@ -375,30 +404,6 @@ export default function RoomReadGamePage({
         message: e instanceof Error ? e.message : "reveal failed",
       });
     }
-  }
-
-  // Build a minimal reveal payload from the GET state. Used when the
-  // user navigates back to an already-revealed round (POST reveal
-  // returns 409 → we still want to show the engine pick + verdict).
-  // Vote distribution and scores aren't on the GET payload — we
-  // surface placeholders rather than re-fetch.
-  function synthesizeRevealFromState(
-    round: NonNullable<RoomReadStatePayload["currentRound"]>
-  ): RevealedRoundPayload {
-    if (!round.enginePick) {
-      throw new Error("synthesizeReveal: round has no enginePick");
-    }
-    return {
-      roundId: round.roundId,
-      roundNumber: round.roundNumber,
-      theme: round.theme,
-      card: round.card,
-      enginePick: round.enginePick,
-      roomWinnerPlayerId: undefined,
-      roomVoteDistribution: {},
-      verdict: "obvious", // best-effort fallback; the real verdict was logged at reveal time
-    scores: [],
-    };
   }
 
   async function handleSubmitVote() {
@@ -524,7 +529,7 @@ export default function RoomReadGamePage({
 
   const state = load.data;
   const isComplete = state.status === "complete" && state.currentRound === null;
-  if (isComplete) return <FinalScoreboard state={state} />;
+  if (isComplete) return <RecapScreen state={state} />;
 
   // Join screen — identity not yet picked.
   if (!identity) {
@@ -1326,48 +1331,96 @@ function RevealScreen({
         >
           The Room Says
         </p>
-        {Object.keys(reveal.roomVoteDistribution).length === 0 ? (
+        {/* CC-178 — distribution always real now (reveal endpoint is
+            idempotent — every client sees real data, no placeholder
+            fallback). */}
+        <ul
+          className="flex flex-col"
+          style={{ gap: 4, margin: 0, padding: 0, listStyle: "none" }}
+        >
+          {Object.entries(reveal.roomVoteDistribution)
+            .sort((a, b) => b[1] - a[1])
+            .map(([key, count]) => {
+              const label =
+                key === ROOM_WINNER_BOTH_SENTINEL
+                  ? "Both / Multiple"
+                  : key === ROOM_WINNER_NOBODY_SENTINEL
+                  ? "Nobody, thankfully"
+                  : playerById.get(key) ?? key;
+              return (
+                <li
+                  key={key}
+                  className="font-serif"
+                  style={{
+                    fontSize: 14,
+                    color: "var(--ink)",
+                    margin: 0,
+                  }}
+                >
+                  <span style={{ color: "var(--umber)", fontWeight: 600 }}>
+                    {count}
+                  </span>
+                  {" · "}
+                  {label}
+                </li>
+              );
+            })}
+        </ul>
+      </section>
+
+      {/* CC-178 — Who voted for whom. Per-voter list, names not just
+          counts. Reveal-only — the open-round GET never surfaces vote
+          choices (leak guard). */}
+      {reveal.votes.length > 0 ? (
+        <section
+          className="flex flex-col"
+          style={{
+            gap: 6,
+            background: "var(--paper-warm)",
+            border: "1px solid var(--rule)",
+            borderRadius: 8,
+            padding: "16px 18px",
+          }}
+        >
           <p
-            className="font-serif italic"
-            style={{ fontSize: 14, color: "var(--ink-soft)", margin: 0 }}
+            className="font-mono uppercase"
+            style={{
+              fontSize: 10,
+              letterSpacing: "0.12em",
+              color: "var(--ink-mute)",
+              margin: 0,
+            }}
           >
-            (no vote distribution — previously-revealed round)
+            Who voted for whom
           </p>
-        ) : (
           <ul
             className="flex flex-col"
-            style={{ gap: 4, margin: 0, padding: 0, listStyle: "none" }}
+            style={{ gap: 2, margin: 0, padding: 0, listStyle: "none" }}
           >
-            {Object.entries(reveal.roomVoteDistribution)
-              .sort((a, b) => b[1] - a[1])
-              .map(([key, count]) => {
-                const label =
-                  key === ROOM_WINNER_BOTH_SENTINEL
+            {reveal.votes.map((v) => {
+              const choiceLabel =
+                v.choice.kind === "special"
+                  ? v.choice.value === "both"
                     ? "Both / Multiple"
-                    : key === ROOM_WINNER_NOBODY_SENTINEL
-                    ? "Nobody, thankfully"
-                    : playerById.get(key) ?? key;
-                return (
-                  <li
-                    key={key}
-                    className="font-serif"
-                    style={{
-                      fontSize: 14,
-                      color: "var(--ink)",
-                      margin: 0,
-                    }}
-                  >
-                    <span style={{ color: "var(--umber)", fontWeight: 600 }}>
-                      {count}
-                    </span>
-                    {" · "}
-                    {label}
-                  </li>
-                );
-              })}
+                    : "Nobody, thankfully"
+                  : v.choice.displayName;
+              return (
+                <li
+                  key={v.voterPlayerId}
+                  className="font-serif"
+                  style={{ fontSize: 14, color: "var(--ink)", margin: 0 }}
+                >
+                  <span style={{ color: "var(--umber)", fontWeight: 600 }}>
+                    {v.voterName}
+                  </span>
+                  {" → "}
+                  {choiceLabel}
+                </li>
+              );
+            })}
           </ul>
-        )}
-      </section>
+        </section>
+      ) : null}
 
       <section
         className="flex flex-col"
@@ -1821,12 +1874,19 @@ function ConfirmTile({
   );
 }
 
-function FinalScoreboard({ state }: { state: RoomReadStatePayload }) {
+// CC-180 — final recap screen. Replaces the bare scoreboard with a
+// per-round summary (card + engine pick + room pick + verdict + round
+// points) followed by the winner headline + final standings. Reads
+// `state.recap` (only populated when `status === "complete"`); if a
+// `complete` session predates this CC and lacks recap data, the screen
+// degrades gracefully to the original winner + scoreboard.
+function RecapScreen({ state }: { state: RoomReadStatePayload }) {
   const sorted = useMemo(
     () => [...state.scoreboard].sort((a, b) => b.total - a.total),
     [state.scoreboard]
   );
   const winner = sorted[0];
+  const recap = state.recap ?? [];
   return (
     <PageShell>
       <header className="flex flex-col" style={{ gap: 8 }}>
@@ -1872,7 +1932,161 @@ function FinalScoreboard({ state }: { state: RoomReadStatePayload }) {
         ) : null}
       </header>
 
-      <Scoreboard scoreboard={state.scoreboard} />
+      {recap.length > 0 ? (
+        <section className="flex flex-col" style={{ gap: 12 }}>
+          <p
+            className="font-mono uppercase"
+            style={{
+              fontSize: 11,
+              letterSpacing: "0.16em",
+              color: "var(--ink-mute)",
+              margin: 0,
+            }}
+          >
+            Round-by-round
+          </p>
+          {recap.map((entry) => (
+            <RecapRoundCard key={entry.roundNumber} entry={entry} />
+          ))}
+        </section>
+      ) : null}
+
+      <section className="flex flex-col" style={{ gap: 6 }}>
+        <p
+          className="font-mono uppercase"
+          style={{
+            fontSize: 11,
+            letterSpacing: "0.16em",
+            color: "var(--ink-mute)",
+            margin: 0,
+          }}
+        >
+          Final standings
+        </p>
+        <Scoreboard scoreboard={state.scoreboard} />
+      </section>
     </PageShell>
+  );
+}
+
+// CC-180 — per-round card on the recap screen. One card per revealed
+// round; engine pick + room pick + verdict kicker + round points.
+function RecapRoundCard({
+  entry,
+}: {
+  entry: RoomReadRecapEntryPayload;
+}) {
+  const themeLabel = BODY_CARD_LABELS[entry.theme];
+  // Verdict-kicker copy reuses the same labels as the live reveal
+  // screen but stays terse here — the recap is a summary, not a
+  // re-read. We don't include the full sentence body to keep the list
+  // scannable.
+  const verdictKicker =
+    entry.verdict === "obvious"
+      ? "Obvious"
+      : entry.verdict === "identity_fog"
+      ? "Identity Fog"
+      : "Human Override";
+  const roomPickLabel =
+    entry.roomPick === null
+      ? "—"
+      : "special" in entry.roomPick
+      ? entry.roomPick.special === "both"
+        ? "Both / Multiple"
+        : "Nobody, thankfully"
+      : entry.roomPick.displayName;
+  // Sort points-by-player descending so the round's top scorers list
+  // first; zero-score rows trail. Order is stable inside ties.
+  const sortedPoints = [...entry.pointsByPlayer].sort(
+    (a, b) => b.points - a.points
+  );
+  return (
+    <article
+      className="flex flex-col"
+      style={{
+        gap: 8,
+        padding: "14px 16px",
+        background: "var(--paper-warm)",
+        border: "1px solid var(--rule)",
+        borderRadius: 8,
+      }}
+    >
+      <div
+        className="flex flex-row items-baseline justify-between"
+        style={{ gap: 12, flexWrap: "wrap" }}
+      >
+        <p
+          className="font-mono uppercase"
+          style={{
+            fontSize: 11,
+            letterSpacing: "0.12em",
+            color: "var(--ink-mute)",
+            margin: 0,
+          }}
+        >
+          Round {entry.roundNumber} · {themeLabel}
+        </p>
+        <p
+          className="font-mono uppercase"
+          style={{
+            fontSize: 11,
+            letterSpacing: "0.12em",
+            color: "var(--umber)",
+            margin: 0,
+          }}
+        >
+          {verdictKicker}
+        </p>
+      </div>
+      <p
+        className="font-serif italic"
+        style={{
+          fontSize: 14,
+          color: "var(--ink-soft)",
+          margin: 0,
+          lineHeight: 1.5,
+        }}
+      >
+        {entry.cardPrompt}
+      </p>
+      <div
+        className="flex flex-col"
+        style={{ gap: 2 }}
+      >
+        <p
+          className="font-serif"
+          style={{ fontSize: 13, color: "var(--ink)", margin: 0 }}
+        >
+          <span style={{ color: "var(--umber)" }}>Engine:</span>{" "}
+          {entry.enginePick.displayName}
+        </p>
+        <p
+          className="font-serif"
+          style={{ fontSize: 13, color: "var(--ink)", margin: 0 }}
+        >
+          <span style={{ color: "var(--umber)" }}>Room:</span> {roomPickLabel}
+        </p>
+      </div>
+      <div
+        className="flex flex-row"
+        style={{ gap: 12, flexWrap: "wrap" }}
+      >
+        {sortedPoints.map((p) => (
+          <span
+            key={p.displayName}
+            className="font-mono"
+            style={{
+              fontSize: 12,
+              color: p.points > 0 ? "var(--ink)" : "var(--ink-mute)",
+            }}
+          >
+            {p.displayName}{" "}
+            <span style={{ color: "var(--umber)", fontWeight: 600 }}>
+              {p.points}
+            </span>
+          </span>
+        ))}
+      </div>
+    </article>
   );
 }

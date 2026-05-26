@@ -293,6 +293,34 @@ export interface RoomReadVoteStatus {
   allIn: boolean;
 }
 
+/**
+ * CC-180 — per-round entry on the final recap payload. Only present
+ * on the GET when the session status is `"complete"`. Reads-only:
+ * built from persisted `roomReadCalibrationEvents` +
+ * `roomReadScores` + the stored round/card lookup. Nothing here is
+ * recomputed from raw guesses (the reveal pass already canonicalized
+ * the room winner + the verdict; we just play it back).
+ */
+export interface RoomReadRecapEntry {
+  roundNumber: number;
+  theme: string;
+  cardPrompt: string;
+  enginePick: { displayName: string };
+  /**
+   * `{ displayName }` when the room agreed on a real player; `{ special }`
+   * when the room's plurality was the "both" or "nobody" tile; `null`
+   * when no plurality formed (Identity Fog).
+   */
+  roomPick:
+    | { displayName: string }
+    | { special: "both" | "nobody" }
+    | null;
+  verdict: ReturnType<typeof getVerdict>;
+  /** Points awarded THIS round, per player. Players who scored zero
+   *  are included with `points: 0` so the recap row is uniform. */
+  pointsByPlayer: { displayName: string; points: number }[];
+}
+
 export interface RoomReadStateForToken {
   sessionId: string;
   status: string;
@@ -317,6 +345,13 @@ export interface RoomReadStateForToken {
     voteStatus?: RoomReadVoteStatus;
   } | null;
   scoreboard: { playerId: string; displayName: string; total: number }[];
+  /**
+   * CC-180 — per-round recap. Present ONLY when `status === "complete"`.
+   * Sorted by `roundNumber` ascending. Empty array if no rounds were
+   * revealed before completion (shouldn't happen under the regular
+   * flow; the field is still present for type narrowing).
+   */
+  recap?: RoomReadRecapEntry[];
 }
 
 /** Look up a Room Read session by `join_token`. Returns null when the
@@ -433,6 +468,22 @@ export async function getRoomReadByToken(
     total: totalByPlayer.get(p.playerId) ?? 0,
   }));
 
+  // CC-180 — per-round recap, gated to completed sessions only. Reads
+  // entirely from persisted state (calibration events + score rows +
+  // round/card lookup); no re-computation. Absent on every other
+  // session status to keep mid-game payloads unchanged.
+  let recap: RoomReadRecapEntry[] | undefined;
+  if (sess.status === "complete") {
+    recap = await buildRoomReadRecap({
+      db,
+      sessionId: sess.id,
+      allRounds,
+      game,
+      players,
+      scoreRows,
+    });
+  }
+
   return {
     sessionId: sess.id,
     status: sess.status,
@@ -440,7 +491,109 @@ export async function getRoomReadByToken(
     players,
     currentRound,
     scoreboard,
+    recap,
   };
+}
+
+// CC-180 — recap builder. Joins:
+//   - `room_read_calibration_events` (one row per revealed round) for
+//     engine pick, room winner, verdict.
+//   - `room_read_scores` (loaded by the caller for the scoreboard
+//     totals) for per-round / per-player points.
+//   - `roomReadRounds.card_id` + the stored `generated_game` for the
+//     card prompt.
+//
+// All three sources are persisted at reveal time and never re-derived,
+// so a player who reloads the recap page weeks later still sees the
+// same per-round summary the night of the game produced.
+async function buildRoomReadRecap(args: {
+  db: ReturnType<typeof getDb>;
+  sessionId: string;
+  allRounds: typeof roomReadRounds.$inferSelect[];
+  game: RoomReadGame;
+  players: { playerId: string; displayName: string }[];
+  scoreRows: typeof roomReadScores.$inferSelect[];
+}): Promise<RoomReadRecapEntry[]> {
+  const { db, sessionId, allRounds, game, players, scoreRows } = args;
+  const playerById = new Map(players.map((p) => [p.playerId, p.displayName]));
+  const cardPromptById = new Map<string, string>();
+  for (const r of game.rounds) cardPromptById.set(r.card.id, r.card.prompt);
+
+  // One calibration event per revealed round. Index by round_id so the
+  // recap entries align with the round rows.
+  const calRows = await db
+    .select()
+    .from(roomReadCalibrationEvents)
+    .where(eq(roomReadCalibrationEvents.session_id, sessionId));
+  const calByRoundId = new Map<string, typeof calRows[number]>();
+  for (const c of calRows) calByRoundId.set(c.round_id, c);
+
+  // Per-round score rows, indexed by round_id → playerId.
+  const scoresByRoundId = new Map<string, Map<string, number>>();
+  for (const s of scoreRows) {
+    let inner = scoresByRoundId.get(s.round_id);
+    if (!inner) {
+      inner = new Map();
+      scoresByRoundId.set(s.round_id, inner);
+    }
+    inner.set(s.player_id, s.points);
+  }
+
+  const revealedRounds = allRounds
+    .filter((r) => r.status === "revealed")
+    .sort((a, b) => a.round_number - b.round_number);
+
+  return revealedRounds.map((round) => {
+    const cal = calByRoundId.get(round.id);
+    const enginePickPlayerId =
+      cal?.engine_pick_player_id ?? round.engine_pick_player_id;
+    const enginePickName =
+      playerById.get(enginePickPlayerId) ?? "Player";
+
+    // Room pick resolution: real player id → name; "__both__" / "__nobody__"
+    // → special; null → no plurality (Identity Fog).
+    const roomWinnerRaw = cal?.room_winner_player_id ?? null;
+    let roomPick: RoomReadRecapEntry["roomPick"];
+    if (roomWinnerRaw === null) {
+      roomPick = null;
+    } else if (roomWinnerRaw === ROOM_WINNER_BOTH_SENTINEL) {
+      roomPick = { special: "both" };
+    } else if (roomWinnerRaw === "__nobody__") {
+      roomPick = { special: "nobody" };
+    } else {
+      roomPick = {
+        displayName: playerById.get(roomWinnerRaw) ?? "Player",
+      };
+    }
+
+    // Verdict — prefer the canonical stored value; recompute as a
+    // belt-and-suspenders fallback if the event row is somehow missing.
+    const verdict: ReturnType<typeof getVerdict> =
+      (cal?.verdict as ReturnType<typeof getVerdict> | undefined) ??
+      getVerdict({
+        roomWinnerPlayerId: roomWinnerRaw ?? undefined,
+        enginePickPlayerId,
+      });
+
+    // Per-player points for THIS round. Players who scored zero are
+    // included so the recap line has uniform shape.
+    const roundScores = scoresByRoundId.get(round.id) ?? new Map<string, number>();
+    const pointsByPlayer = players.map((p) => ({
+      displayName: p.displayName,
+      points: roundScores.get(p.playerId) ?? 0,
+    }));
+
+    return {
+      roundNumber: round.round_number,
+      theme: round.theme,
+      cardPrompt:
+        cardPromptById.get(round.card_id) ?? "(card prompt not found)",
+      enginePick: { displayName: enginePickName },
+      roomPick,
+      verdict,
+      pointsByPlayer,
+    };
+  });
 }
 
 function engineRowToEnginePick(
@@ -562,6 +715,21 @@ export async function submitGuess(args: SubmitGuessArgs): Promise<GuessAck> {
 // Reveal — compute room winner + scores + calibration event
 // ─────────────────────────────────────────────────────────────────────
 
+/**
+ * CC-178 — per-voter votes for the reveal payload. Names + choices
+ * surface only post-reveal; pre-reveal voteStatus exposes presence
+ * only (see `RoomReadVoteStatus`).
+ */
+export type RevealVoteChoice =
+  | { kind: "player"; playerId: string; displayName: string }
+  | { kind: "special"; value: "both" | "nobody" };
+
+export interface RevealVote {
+  voterPlayerId: string;
+  voterName: string;
+  choice: RevealVoteChoice;
+}
+
 export interface RevealedRoundPayload {
   roundId: string;
   roundNumber: number;
@@ -577,6 +745,14 @@ export interface RevealedRoundPayload {
     points: number;
     breakdown: RoundScoreBreakdown;
   }[];
+  /**
+   * CC-178 — full per-voter vote list. Built from `roomReadGuesses`
+   * (already loaded on the reveal path) and the player roster. Same
+   * data on a first-reveal POST and on every subsequent re-fetch of
+   * the same round (the route is idempotent — see `revealRound`).
+   * NEVER appears on the open-round GET payload (leak guard).
+   */
+  votes: RevealVote[];
 }
 
 export async function revealRound(args: {
@@ -617,9 +793,6 @@ export async function revealRound(args: {
     .limit(1);
   if (roundRows.length === 0) throw new Error("Room Read: round not found");
   const round = roundRows[0];
-  if (round.status === "revealed") {
-    throw new Error("Room Read: round is already revealed");
-  }
 
   const game = sess.generated_game as unknown as RoomReadGame;
   const playerById = new Map(
@@ -635,14 +808,34 @@ export async function revealRound(args: {
     .from(roomReadGuesses)
     .where(eq(roomReadGuesses.round_id, args.roundId));
 
+  // CC-178 — idempotent reveal. When the round is already revealed,
+  // skip the all-submitted gate + the persist work and return the
+  // FULL recomputed payload (distribution, per-voter votes, scores
+  // loaded from `room_read_scores`). This is what every "second
+  // client" of a multi-tab game hits: each client polls and POSTs
+  // /reveal once the round flips, but only the race winner does the
+  // first-reveal work — the rest now get real data on return instead
+  // of the empty synthetic payload the old throw-then-409 path forced
+  // the client to fabricate.
+  if (round.status === "revealed") {
+    return buildRevealPayloadForAlreadyRevealedRound({
+      db,
+      sessionId: sess.id,
+      round,
+      game,
+      playerById,
+      cardPrompt: cardForRound?.prompt ?? "(card prompt not found)",
+      guessRows,
+    });
+  }
+
   // CC-ROOMREAD-CADENCE — all-submitted gate. The guess set is what
   // the voteStatus payload sums (see ~L399); duplicate that check
   // here so the server is the source of truth, not the client. The
   // gate runs AFTER the load (we needed guessRows anyway) but
   // BEFORE the score/persist work, so a rejected reveal never
   // touches `room_read_scores` or the calibration log. `force`
-  // bypasses the gate but still goes through the rest of the flow
-  // (idempotent reveal, single calibration event, etc.).
+  // bypasses the gate but still goes through the rest of the flow.
   if (!args.force) {
     const submittedIds = new Set(guessRows.map((g) => g.voter_player_id));
     const submittedCount = game.players.filter((p) =>
@@ -769,6 +962,11 @@ export async function revealRound(args: {
       .where(eq(roomReadSessions.id, sess.id));
   });
 
+  // CC-178 — per-voter vote list. Built from guessRows (already in
+  // memory) + the player roster. Same shape on the idempotent
+  // already-revealed path so the payload reads the same on every fetch.
+  const votes = buildRevealVotes(guessRows, playerById);
+
   return {
     roundId: args.roundId,
     roundNumber: round.round_number,
@@ -782,6 +980,158 @@ export async function revealRound(args: {
     roomVoteDistribution: distribution,
     verdict,
     scores: scoreRows,
+    votes,
+  };
+}
+
+// CC-178 — shared per-voter vote builder. Used by both the first-reveal
+// path and the idempotent already-revealed path so the payload is
+// byte-equal between them. Order is stable on `voter_player_id` so a
+// re-fetch never reshuffles the list.
+function buildRevealVotes(
+  guessRows: typeof roomReadGuesses.$inferSelect[] | Array<{
+    voter_player_id: string;
+    guessed_player_id: string | null;
+    guessed_special: string | null;
+  }>,
+  playerById: Map<string, string>
+): RevealVote[] {
+  const sorted = [...guessRows].sort((a, b) =>
+    a.voter_player_id.localeCompare(b.voter_player_id)
+  );
+  return sorted.map((g) => {
+    const voterName = playerById.get(g.voter_player_id) ?? "Player";
+    let choice: RevealVoteChoice;
+    if (g.guessed_special === "both" || g.guessed_special === "nobody") {
+      choice = { kind: "special", value: g.guessed_special };
+    } else if (g.guessed_player_id) {
+      choice = {
+        kind: "player",
+        playerId: g.guessed_player_id,
+        displayName: playerById.get(g.guessed_player_id) ?? "Player",
+      };
+    } else {
+      // Defensive: a guess row with neither a player id nor a recognized
+      // special value shouldn't exist (submitGuess validates), but if it
+      // did we fall back to the "nobody" semantic — that's the only
+      // option that means "no specific player chosen."
+      choice = { kind: "special", value: "nobody" };
+    }
+    return {
+      voterPlayerId: g.voter_player_id,
+      voterName,
+      choice,
+    };
+  });
+}
+
+// CC-178 — idempotent reveal builder. Recomputes the FULL reveal
+// payload deterministically from stored data for a round whose status
+// is already "revealed":
+//   - guessRows → roomVoteDistribution + per-voter votes
+//   - room_read_scores → per-voter score rows
+//   - round row → enginePick (same fields the first-reveal path uses)
+//   - room_winner_player_id from the calibration event (the
+//     authoritative room-winner the original reveal computed; we don't
+//     re-tally to avoid drift if a future schema change shifts how
+//     guesses are interpreted)
+//
+// Returns the same RevealedRoundPayload shape; the route returns it
+// with 200 (no more 409 on the already-revealed branch).
+async function buildRevealPayloadForAlreadyRevealedRound(input: {
+  db: ReturnType<typeof getDb>;
+  sessionId: string;
+  round: typeof roomReadRounds.$inferSelect;
+  game: RoomReadGame;
+  playerById: Map<string, string>;
+  cardPrompt: string;
+  guessRows: typeof roomReadGuesses.$inferSelect[];
+}): Promise<RevealedRoundPayload> {
+  const { db, sessionId, round, playerById, cardPrompt, guessRows } = input;
+
+  // Distribution recomputed from guess rows (canonical source of truth
+  // for the room vote — same code path as the first-reveal branch).
+  const distribution: Record<string, number> = {};
+  for (const g of guessRows) {
+    let key: string;
+    if (g.guessed_special === "both") {
+      key = ROOM_WINNER_BOTH_SENTINEL;
+    } else if (g.guessed_special === "nobody") {
+      key = "__nobody__";
+    } else {
+      key = g.guessed_player_id ?? "__unknown__";
+    }
+    distribution[key] = (distribution[key] ?? 0) + 1;
+  }
+
+  // Engine pick rehydrated from the stored round row (no re-derivation;
+  // same as the first-reveal branch).
+  const enginePick: EnginePick = {
+    playerId: round.engine_pick_player_id,
+    displayName: playerById.get(round.engine_pick_player_id) ?? "Player",
+    score: 0,
+    confidence: round.engine_confidence as EnginePick["confidence"],
+    isSplit: round.engine_is_split,
+    matchedTags: round.engine_matched_tags as EnginePick["matchedTags"],
+    reason: round.engine_reason,
+    runnerUp: round.engine_runner_up_player_id
+      ? {
+          playerId: round.engine_runner_up_player_id,
+          displayName:
+            playerById.get(round.engine_runner_up_player_id) ?? "Player",
+          score: 0,
+        }
+      : undefined,
+  };
+
+  // Score rows from `room_read_scores` (persisted at first reveal).
+  const storedScores = await db
+    .select()
+    .from(roomReadScores)
+    .where(
+      and(
+        eq(roomReadScores.session_id, sessionId),
+        eq(roomReadScores.round_id, round.id)
+      )
+    );
+  const scores = storedScores.map((s) => ({
+    playerId: s.player_id,
+    displayName: playerById.get(s.player_id) ?? "Player",
+    points: s.points,
+    breakdown: s.breakdown as unknown as RoundScoreBreakdown,
+  }));
+
+  // Room winner from the calibration event (the authoritative record
+  // of what the first-reveal pass computed — never re-tallied here).
+  const calRows = await db
+    .select()
+    .from(roomReadCalibrationEvents)
+    .where(
+      and(
+        eq(roomReadCalibrationEvents.session_id, sessionId),
+        eq(roomReadCalibrationEvents.round_id, round.id)
+      )
+    )
+    .limit(1);
+  const roomWinner = calRows[0]?.room_winner_player_id ?? undefined;
+  const verdict = getVerdict({
+    roomWinnerPlayerId: roomWinner ?? undefined,
+    enginePickPlayerId: enginePick.playerId,
+  });
+
+  const votes = buildRevealVotes(guessRows, playerById);
+
+  return {
+    roundId: round.id,
+    roundNumber: round.round_number,
+    theme: round.theme,
+    card: { id: round.card_id, prompt: cardPrompt },
+    enginePick,
+    roomWinnerPlayerId: roomWinner ?? undefined,
+    roomVoteDistribution: distribution,
+    verdict,
+    scores,
+    votes,
   };
 }
 

@@ -34,6 +34,12 @@ export async function POST(
   }
 
   try {
+    // CC-178 — `revealRound` is now idempotent: the already-revealed
+    // branch returns the FULL recomputed payload (distribution, votes,
+    // scores) instead of throwing. The "already revealed" 409 mapping
+    // below is therefore dead code, but kept defensively in case a
+    // future refactor reintroduces the throw — better a clean 409 than
+    // a 500 if it does.
     const payload = await revealRound({
       joinToken: token,
       roundId,
