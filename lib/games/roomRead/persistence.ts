@@ -342,17 +342,32 @@ export async function getRoomReadByToken(
     displayName: p.displayName,
   }));
 
-  // Current round — first row whose status is "open" (or the last
-  // "revealed" round when the session is `complete`).
+  // Current round resolution.
+  //   1. A session marked `complete` has NO current round — the client
+  //      renders the final recap. Returning a revealed round here is the
+  //      bug that made the game appear to "loop back to Round 1": with no
+  //      open round, the old fallback grabbed the FIRST revealed round.
+  //   2. Otherwise an open round (voting in progress) is the current round.
+  //   3. With no open round and the session still active (the beat between
+  //      a reveal and the host advancing), show the MOST RECENTLY revealed
+  //      round — the highest round_number among revealed rounds — so the
+  //      reveal screen reflects the round just played, not the first one.
   const allRounds = await db
     .select()
     .from(roomReadRounds)
     .where(eq(roomReadRounds.session_id, sess.id));
   allRounds.sort((a, b) => a.round_number - b.round_number);
+  const revealedRounds = allRounds.filter((r) => r.status === "revealed");
+  // allRounds is sorted ascending by round_number, so the last revealed
+  // entry is the most recently revealed round.
+  const latestRevealedRow =
+    revealedRounds.length > 0
+      ? revealedRounds[revealedRounds.length - 1]
+      : null;
   const currentRoundRow =
-    allRounds.find((r) => r.status === "open") ??
-    allRounds.find((r) => r.status === "revealed") ??
-    null;
+    sess.status === "complete"
+      ? null
+      : allRounds.find((r) => r.status === "open") ?? latestRevealedRow;
 
   let currentRound: RoomReadStateForToken["currentRound"] = null;
   if (currentRoundRow) {

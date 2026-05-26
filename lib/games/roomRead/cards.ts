@@ -22,7 +22,7 @@ export const CARDS: RoomReadCard[] = [
     theme: "lens",
     modes: ["classic"],
     prompt:
-      "When the team ships, this person is checking it against every previous version of itself.",
+      "When something new goes out the door, this person is checking it against every previous version of itself.",
     tags: [
       { tag: "precedent_memory", weight: 1.0 },
       { tag: "discernment", weight: 0.5 },
