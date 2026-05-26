@@ -25,7 +25,10 @@
 
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 
-import { BODY_CARD_LABELS } from "../../../../lib/games/roomRead/rounds";
+import {
+  BODY_CARD_ASSET,
+  BODY_CARD_LABELS,
+} from "../../../../lib/games/roomRead/rounds";
 import type { BodyCardTheme } from "../../../../lib/games/roomRead/types";
 
 // ─────────────────────────────────────────────────────────────────────
@@ -322,12 +325,21 @@ export default function RoomReadGamePage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load]);
 
-  async function loadOrFireReveal(roundId: string) {
+  // CC-ROOMREAD-CADENCE — `force=true` is the abandoned-player escape
+  // hatch. The auto-reveal path (and the manual reveal button that
+  // only appears after all-in) both call with `force=false`; the
+  // secondary "Reveal now — someone's away" affordance passes
+  // `force=true` to bypass the server's all-submitted gate.
+  async function loadOrFireReveal(roundId: string, force: boolean = false) {
     setReveal({ kind: "revealing" });
     try {
       const res = await fetch(
         `/api/games/room-read/${token}/rounds/${roundId}/reveal`,
-        { method: "POST" }
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ force }),
+        }
       );
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
@@ -434,7 +446,27 @@ export default function RoomReadGamePage({
     await loadOrFireReveal(round.roundId);
   }
 
+  // CC-ROOMREAD-CADENCE — secondary "Reveal now — someone's away"
+  // affordance. Calls the same reveal endpoint with `force: true`,
+  // bypassing the server's all-submitted gate so a stuck game can
+  // still proceed when a player has abandoned mid-round.
+  async function handleForceReveal() {
+    if (load.kind !== "ready") return;
+    const round = load.data.currentRound;
+    if (!round) return;
+    await loadOrFireReveal(round.roundId, true);
+  }
+
+  // CC-ROOMREAD-CADENCE — client-side re-entry guard on the
+  // "Next Body Card" button. The server already no-ops a second
+  // advance via the open-round guard (CC aa5d167), but a double-
+  // click should still not double-submit from the client. Tracked
+  // as state so the button can render disabled while in flight.
+  const [advancing, setAdvancing] = useState(false);
+
   async function handleNextRound() {
+    if (advancing) return;
+    setAdvancing(true);
     try {
       await fetch(`/api/games/room-read/${token}/next-round`, {
         method: "POST",
@@ -445,6 +477,8 @@ export default function RoomReadGamePage({
       void refetch();
     } catch {
       // Soft-fail; GET refresh will surface any new state.
+    } finally {
+      setAdvancing(false);
     }
   }
 
@@ -526,6 +560,7 @@ export default function RoomReadGamePage({
         }
         onConfirmSubmit={handleSelfConfirmSubmit}
         onNextRound={handleNextRound}
+        advancing={advancing}
       />
     );
   }
@@ -540,6 +575,7 @@ export default function RoomReadGamePage({
       onSubmitVote={handleSubmitVote}
       voteSubmit={voteSubmit}
       onReveal={handleReveal}
+      onForceReveal={handleForceReveal}
       revealState={reveal}
     />
   );
@@ -758,6 +794,7 @@ function VotingScreen({
   onSubmitVote,
   voteSubmit,
   onReveal,
+  onForceReveal,
   revealState,
 }: {
   state: RoomReadStatePayload;
@@ -767,6 +804,9 @@ function VotingScreen({
   onSubmitVote: () => void;
   voteSubmit: VoteSubmitState;
   onReveal: () => void;
+  // CC-ROOMREAD-CADENCE — secondary "Reveal now — someone's away"
+  // affordance, always available so a stuck game can still proceed.
+  onForceReveal: () => void;
   revealState: RevealState;
 }) {
   const round = state.currentRound;
@@ -833,6 +873,30 @@ function VotingScreen({
           {intro}
         </p>
       </header>
+
+      {/* CC-ROOMREAD-CARD-GRAPHIC — body-card art for this round's theme.
+          Centered above the prompt so the round reads as a CARD, not a
+          bare text box. Asset is referenced from public/cards/ via the
+          BODY_CARD_ASSET map; theme label drives the alt text.
+          Using <img> instead of next/image per CC's "keep it simple,
+          reference the public asset" guidance — the assets are tiny
+          static SVG/PNG, no optimization layer needed. */}
+      <figure
+        style={{
+          margin: 0,
+          display: "flex",
+          justifyContent: "center",
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={BODY_CARD_ASSET[round.theme]}
+          alt={themeLabel}
+          width={180}
+          height={180}
+          style={{ display: "block", maxWidth: "100%", height: "auto" }}
+        />
+      </figure>
 
       <section
         style={{
@@ -942,28 +1006,71 @@ function VotingScreen({
           round is revealed.
         </p>
 
-        <button
-          type="button"
-          onClick={onReveal}
-          disabled={revealState.kind === "revealing"}
-          data-focus-ring
-          className="font-mono uppercase"
-          style={{
-            marginTop: 18,
-            fontSize: 11,
-            letterSpacing: "0.12em",
-            background: "transparent",
-            color: "var(--umber)",
-            border: "1px solid var(--umber)",
-            padding: "10px 16px",
-            cursor: "pointer",
-            alignSelf: "flex-start",
-          }}
-        >
-          {revealState.kind === "revealing"
-            ? "revealing…"
-            : "Reveal the Room Read"}
-        </button>
+        {/* CC-ROOMREAD-CADENCE — primary reveal button is hidden until
+            all players have voted (`voteStatus.allIn === true`). Auto-
+            reveal handles the all-in case on its own; this button is
+            the manual fallback for the same all-in moment if a player
+            wants to drive the reveal themselves. Pre-CC the button was
+            always visible and let any player flash a reveal before
+            everyone had voted. */}
+        {round.voteStatus?.allIn ? (
+          <button
+            type="button"
+            onClick={onReveal}
+            disabled={revealState.kind === "revealing"}
+            data-focus-ring
+            className="font-mono uppercase"
+            style={{
+              marginTop: 18,
+              fontSize: 11,
+              letterSpacing: "0.12em",
+              background: "transparent",
+              color: "var(--umber)",
+              border: "1px solid var(--umber)",
+              padding: "10px 16px",
+              cursor: "pointer",
+              alignSelf: "flex-start",
+            }}
+          >
+            {revealState.kind === "revealing"
+              ? "revealing…"
+              : "Reveal the Room Read"}
+          </button>
+        ) : null}
+
+        {/* CC-ROOMREAD-CADENCE — secondary force-reveal affordance.
+            Always visible while the round is open so a stuck game
+            (someone abandoned mid-round) can still proceed. Styled
+            clearly weaker than the primary button — muted italic
+            text-button, no border — so the cadence reads "wait for
+            everyone, then reveal" with this as an explicit escape
+            hatch, not a peer to the primary path. Sends `force: true`
+            to bypass the server's all-submitted gate. */}
+        {!round.voteStatus?.allIn ? (
+          <button
+            type="button"
+            onClick={onForceReveal}
+            disabled={revealState.kind === "revealing"}
+            data-focus-ring
+            className="font-serif italic"
+            style={{
+              marginTop: 18,
+              fontSize: 12,
+              background: "transparent",
+              color: "var(--ink-mute)",
+              border: "none",
+              padding: "4px 0",
+              cursor: "pointer",
+              alignSelf: "flex-start",
+              textDecoration: "underline",
+              textUnderlineOffset: 3,
+            }}
+          >
+            {revealState.kind === "revealing"
+              ? "revealing…"
+              : "Reveal now — someone's away"}
+          </button>
+        ) : null}
       </div>
 
       <Scoreboard scoreboard={state.scoreboard} />
@@ -1128,6 +1235,7 @@ function RevealScreen({
   onConfirmNoteChange,
   onConfirmSubmit,
   onNextRound,
+  advancing,
 }: {
   state: RoomReadStatePayload;
   reveal: RevealedRoundPayload;
@@ -1138,6 +1246,12 @@ function RevealScreen({
   onConfirmNoteChange: (note: string) => void;
   onConfirmSubmit: (response: "yes" | "no" | "both", note: string) => void;
   onNextRound: () => void;
+  // CC-ROOMREAD-CADENCE — true while the next-round POST is in
+  // flight, so the button can render disabled + the click handler
+  // can no-op a double submit. The server already short-circuits a
+  // second advance via its open-round guard, but this closes the
+  // client side of the loop.
+  advancing: boolean;
 }) {
   const themeLabel = BODY_CARD_LABELS[reveal.theme];
   const copy = verdictCopy(reveal.verdict, reveal.enginePick);
@@ -1158,6 +1272,26 @@ function RevealScreen({
         >
           Round {reveal.roundNumber} · {themeLabel} · Revealed
         </p>
+        {/* CC-ROOMREAD-CARD-GRAPHIC — same body-card art the voting
+            screen showed for this round's theme, so the reveal carries
+            the card identity through the round completion. <img> over
+            next/image per the CC's simplicity guidance. */}
+        <figure
+          style={{
+            margin: "4px 0 0 0",
+            display: "flex",
+            justifyContent: "center",
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={BODY_CARD_ASSET[reveal.theme]}
+            alt={themeLabel}
+            width={160}
+            height={160}
+            style={{ display: "block", maxWidth: "100%", height: "auto" }}
+          />
+        </figure>
         <p
           className="font-serif"
           style={{
@@ -1372,9 +1506,16 @@ function RevealScreen({
         />
       ) : null}
 
+      {/* CC-ROOMREAD-CADENCE — re-entry guard. `disabled` while
+          `advancing` so a double-click can't double-submit; the
+          `aria-disabled` mirror keeps assistive tech in sync with the
+          visual state. The cursor + opacity shift makes the disabled
+          state legible without changing the button's footprint. */}
       <button
         type="button"
         onClick={onNextRound}
+        disabled={advancing}
+        aria-disabled={advancing}
         data-focus-ring
         className="font-mono uppercase"
         style={{
@@ -1384,12 +1525,13 @@ function RevealScreen({
           color: "var(--paper, #fff)",
           border: "1px solid var(--umber)",
           padding: "12px 18px",
-          cursor: "pointer",
+          cursor: advancing ? "default" : "pointer",
+          opacity: advancing ? 0.6 : 1,
           alignSelf: "flex-start",
           marginTop: 16,
         }}
       >
-        Next Body Card →
+        {advancing ? "Advancing…" : "Next Body Card →"}
       </button>
     </PageShell>
   );

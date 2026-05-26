@@ -582,6 +582,19 @@ export interface RevealedRoundPayload {
 export async function revealRound(args: {
   joinToken: string;
   roundId: string;
+  // CC-ROOMREAD-CADENCE — server-enforced all-submitted gate. The
+  // primary path is auto-reveal-on-all-in: the page polls voteStatus
+  // every 2.5s and once `submittedCount === total` fires the reveal.
+  // A reveal attempt before all players have voted is REJECTED here
+  // unless the caller explicitly passes `force: true` (the
+  // abandoned-player escape hatch, surfaced on the client as a
+  // clearly-secondary "Reveal now — someone's away" affordance).
+  //
+  // Owner policy (MVP): `force` is callable by any player in the
+  // session. If a future CC restricts it to the session host, that
+  // requires host identity on the session — flagged as a follow-up,
+  // not blocking this CC.
+  force?: boolean;
 }): Promise<RevealedRoundPayload> {
   const db = getDb();
   const sessRows = await db
@@ -621,6 +634,27 @@ export async function revealRound(args: {
     .select()
     .from(roomReadGuesses)
     .where(eq(roomReadGuesses.round_id, args.roundId));
+
+  // CC-ROOMREAD-CADENCE — all-submitted gate. The guess set is what
+  // the voteStatus payload sums (see ~L399); duplicate that check
+  // here so the server is the source of truth, not the client. The
+  // gate runs AFTER the load (we needed guessRows anyway) but
+  // BEFORE the score/persist work, so a rejected reveal never
+  // touches `room_read_scores` or the calibration log. `force`
+  // bypasses the gate but still goes through the rest of the flow
+  // (idempotent reveal, single calibration event, etc.).
+  if (!args.force) {
+    const submittedIds = new Set(guessRows.map((g) => g.voter_player_id));
+    const submittedCount = game.players.filter((p) =>
+      submittedIds.has(p.playerId)
+    ).length;
+    const total = game.players.length;
+    if (submittedCount < total) {
+      throw new Error(
+        `Room Read: reveal blocked — ${submittedCount}/${total} players have submitted; pass force:true to override`
+      );
+    }
+  }
   const guesses: RoomGuess[] = guessRows.map((g) =>
     g.guessed_special === "both" || g.guessed_special === "nobody"
       ? { kind: "special" as const, value: g.guessed_special }
@@ -872,9 +906,27 @@ export async function advanceToNextRound(args: {
     .where(eq(roomReadRounds.session_id, sess.id));
   allRounds.sort((a, b) => a.round_number - b.round_number);
 
+  // OPEN-ROUND GUARD. A round that is still `open` means the game is in
+  // progress — it must be revealed before the game can advance or end.
+  // Completing here was the "8 selected, ended after 7" bug: a second
+  // advance call (e.g. a double-click on "Next Body Card", or a stray
+  // re-fire) found no `pending` round left and marked the session
+  // `complete` WHILE the final round was still open — stranding it
+  // unplayed. Treat an open round as the current round and no-op: the
+  // client refetches and shows that round's voting screen.
+  const openRound = allRounds.find((r) => r.status === "open");
+  if (openRound) {
+    return {
+      sessionStatus: "active",
+      openedRoundId: openRound.id,
+      openedRoundNumber: openRound.round_number,
+    };
+  }
+
   const nextPending = allRounds.find((r) => r.status === "pending");
   if (!nextPending) {
-    // All revealed → mark game complete.
+    // No open round AND no pending round → every round is revealed →
+    // the game is genuinely complete.
     await db
       .update(roomReadSessions)
       .set({ status: "complete", updated_at: sql`now()` })

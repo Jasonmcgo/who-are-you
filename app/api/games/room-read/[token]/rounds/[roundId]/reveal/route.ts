@@ -20,14 +20,35 @@ export async function POST(
 ) {
   const { token, roundId } = await params;
 
+  // CC-ROOMREAD-CADENCE — optional `force: true` flag bypasses the
+  // server's all-submitted gate. Body is optional (auto-reveal still
+  // POSTs an empty body); a malformed JSON or missing body is fine.
+  let force = false;
   try {
-    const payload = await revealRound({ joinToken: token, roundId });
+    const body = (await req.json()) as { force?: unknown };
+    if (body && typeof body === "object" && body.force === true) {
+      force = true;
+    }
+  } catch {
+    // No body / not JSON → no force. The auto-reveal path.
+  }
+
+  try {
+    const payload = await revealRound({
+      joinToken: token,
+      roundId,
+      force,
+    });
     return NextResponse.json(payload);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     let status = 500;
     if (message.includes("already revealed")) status = 409;
     else if (message.includes("not found")) status = 404;
+    // CC-ROOMREAD-CADENCE — "reveal blocked" is a client gate, not a
+    // server fault. 409 (Conflict) is the closest HTTP semantic for
+    // "the round state isn't ready for this action."
+    else if (message.includes("reveal blocked")) status = 409;
     console.error("[api/games/room-read/[token]/rounds/.../reveal] failed", {
       token,
       roundId,
