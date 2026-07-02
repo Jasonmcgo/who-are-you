@@ -19,13 +19,23 @@ import {
   createRoomReadSession,
   ROOM_READ_LIMITS,
 } from "../../../../../../lib/games/roomRead/persistence";
-import type { RoomReadMode } from "../../../../../../lib/games/roomRead/types";
+import { resolveAllowedPacks } from "../../../../../../lib/games/roomRead/entitlements";
+import { isKnownPack } from "../../../../../../lib/games/roomRead/packs";
+import type {
+  PackId,
+  RoomReadMode,
+} from "../../../../../../lib/games/roomRead/types";
 
 interface PostBody {
   playerSessionIds?: unknown;
   roundCount?: unknown;
   mode?: unknown;
   createdByAdmin?: unknown;
+  // CC-187 — admin override: an explicit pack list (validated against
+  // `KNOWN_PACKS`). Omitted → packs are resolved through the
+  // entitlement seam. NEVER trusts raw entries — any id not in
+  // `KNOWN_PACKS` is dropped (entitlement is then also enforced).
+  allowedPacks?: unknown;
 }
 
 export async function POST(req: NextRequest) {
@@ -63,12 +73,41 @@ export async function POST(req: NextRequest) {
   const createdByAdmin =
     typeof body.createdByAdmin === "string" ? body.createdByAdmin : undefined;
 
+  // CC-187 — resolve the allowed packs. The entitlement seam decides
+  // what the purchaser/admin holds; an explicit admin-side override
+  // (POST body `allowedPacks`) is validated against `KNOWN_PACKS`
+  // AND intersected with the entitlement-resolved set so a client
+  // can never trick the seam by sending a raw pack id.
+  const entitlementContext = { createdByAdmin };
+  const entitled = new Set(resolveAllowedPacks(entitlementContext));
+  let allowedPacks: PackId[] | undefined;
+  if (Array.isArray(body.allowedPacks)) {
+    const overrideIds = body.allowedPacks.filter(
+      (x): x is string => typeof x === "string" && isKnownPack(x)
+    );
+    // Intersect with entitlement — never trust a raw client list.
+    allowedPacks = overrideIds.filter((id) => entitled.has(id));
+    if (allowedPacks.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            "allowedPacks override is empty after entitlement check — every requested pack is either unknown or not entitled for this admin",
+        },
+        { status: 403 }
+      );
+    }
+  } else {
+    // No override → use the full entitled set.
+    allowedPacks = [...entitled];
+  }
+
   try {
     const created = await createRoomReadSession({
       playerSessionIds,
       roundCount,
       mode,
       createdByAdmin,
+      allowedPacks,
     });
     const baseUrl = new URL(req.url).origin;
     const joinUrl = `${baseUrl}/games/room-read/${created.joinToken}`;
@@ -87,7 +126,11 @@ export async function POST(req: NextRequest) {
     const isValidation =
       message.includes("out of range") ||
       message.includes("duplicates") ||
-      message.includes("not found");
+      message.includes("not found") ||
+      // CC-187 — coverage-fail error from generate.ts's all-8-themes
+      // pre-check. Surface as 400 (admin/operator can fix by widening
+      // allowedPacks) rather than 500.
+      message.includes("don't cover theme");
     const status = isValidation ? 400 : 500;
     console.error("[api/admin/games/room-read/sessions] create failed", {
       playerSessionIds,

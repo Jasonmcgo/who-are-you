@@ -38,11 +38,13 @@ import type {
   MetaSignal,
 } from "../../types";
 import { generateRoomReadGame, ROOM_READ_LIMITS } from "./generate";
+import { DEFAULT_PACK_ID } from "./packs";
 import { calculateCardScores, getRoomWinner, type RoomGuess } from "./scoring";
 import { buildPlayerGameSignals } from "./signals";
 import {
   ROOM_WINNER_BOTH_SENTINEL,
   type EnginePick,
+  type PackId,
   type PlayerGameSignals,
   type RoomReadCard,
   type RoomReadGame,
@@ -168,6 +170,15 @@ export interface CreateRoomReadSessionArgs {
   roundCount: number;
   mode?: RoomReadMode;
   createdByAdmin?: string;
+  // CC-187 — packs the game may draw from. The admin route is
+  // responsible for resolving this via `resolveAllowedPacks`
+  // (entitlements.ts) BEFORE passing it in — this function does NOT
+  // re-validate entitlement here; it trusts the caller. The
+  // generator's all-8-themes pre-check still fires on insufficient
+  // coverage, so an entitlement bug can't produce a half-generated
+  // game. Omitted/empty → defaults to `[DEFAULT_PACK_ID]` for
+  // back-compat with pre-CC-187 callers.
+  allowedPacks?: PackId[];
 }
 
 export interface CreatedRoomReadSession {
@@ -210,6 +221,14 @@ export async function createRoomReadSession(
     throw new Error("Room Read: playerSessionIds contains duplicates");
   }
 
+  // CC-187 — resolve allowed packs. Empty / undefined → default to
+  // `[DEFAULT_PACK_ID]` so an old caller that didn't know about packs
+  // still gets the academic pool.
+  const allowedPacks: PackId[] =
+    args.allowedPacks && args.allowedPacks.length > 0
+      ? args.allowedPacks
+      : [DEFAULT_PACK_ID];
+
   const db = getDb();
   const loaded: LoadedPlayer[] = [];
   for (const sid of playerSessionIds) {
@@ -219,6 +238,7 @@ export async function createRoomReadSession(
     players: loaded.map((p) => p.signals),
     roundCount,
     mode,
+    allowedPacks,
   });
 
   // Persist the session + its rounds inside one transaction so a half-
@@ -237,6 +257,10 @@ export async function createRoomReadSession(
         status: "active",
         engine_shape_version: ENGINE_SHAPE_VERSION,
         generated_game: game as unknown as Record<string, unknown>,
+        // CC-187 — persist the entitlement-resolved pack list. Old
+        // rows (pre-CC-187) keep loading because the column is
+        // nullable + readers treat null as `[DEFAULT_PACK_ID]`.
+        allowed_packs: allowedPacks,
       })
       .returning({ id: roomReadSessions.id });
 

@@ -35,9 +35,11 @@
 
 import { CARDS } from "./cards";
 import { getEnginePick } from "./engine";
+import { DEFAULT_PACK_ID } from "./packs";
 import { BODY_CARD_ORDER } from "./rounds";
 import type {
   BodyCardTheme,
+  PackId,
   PlayerGameSignals,
   RoomReadCard,
   RoomReadGame,
@@ -104,12 +106,23 @@ export interface GenerateRoomReadGameArgs {
   players: PlayerGameSignals[];
   roundCount: number;
   mode: RoomReadMode;
+  // CC-187 — packs the game may draw cards from. Resolved through
+  // `resolveAllowedPacks` (entitlements.ts) BEFORE this function is
+  // called; never trusted from a raw client list. Defaults to
+  // `[DEFAULT_PACK_ID]` (i.e. `["academic"]`) for back-compat — a
+  // pre-CC-187 caller that didn't know about packs gets the same
+  // pool it did before.
+  allowedPacks?: PackId[];
 }
 
 export function generateRoomReadGame(
   args: GenerateRoomReadGameArgs
 ): RoomReadGame {
   const { players, roundCount, mode } = args;
+  const allowedPacks: PackId[] =
+    args.allowedPacks && args.allowedPacks.length > 0
+      ? args.allowedPacks
+      : [DEFAULT_PACK_ID];
 
   if (players.length < MIN_PLAYERS || players.length > MAX_PLAYERS) {
     throw new Error(
@@ -119,6 +132,29 @@ export function generateRoomReadGame(
   if (roundCount < MIN_ROUNDS || roundCount > MAX_ROUNDS) {
     throw new Error(
       `generateRoomReadGame: roundCount ${roundCount} out of range [${MIN_ROUNDS}, ${MAX_ROUNDS}]`
+    );
+  }
+
+  // CC-187 — all-8-themes pre-check. Before the round loop draws any
+  // cards, verify the allowed-pack pool collectively covers EVERY
+  // body-card theme. A pack with a theme hole (e.g. a holiday pack
+  // that has nothing for "trust") can't field a full game on its own,
+  // and the existing mid-loop `no eligible card for theme=…` throw
+  // would surface as a confusing late-round failure (and a 500 on
+  // the admin route). Fail at creation with a clear, named-theme
+  // error so the operator knows exactly which themes need a card
+  // and which packs were considered.
+  const themesCovered = new Set<BodyCardTheme>();
+  for (const c of CARDS) {
+    const cardPack: PackId = c.pack ?? DEFAULT_PACK_ID;
+    if (!c.modes.includes(mode)) continue;
+    if (!allowedPacks.includes(cardPack)) continue;
+    themesCovered.add(c.theme);
+  }
+  const missingThemes = BODY_CARD_ORDER.filter((t) => !themesCovered.has(t));
+  if (missingThemes.length > 0) {
+    throw new Error(
+      `Room Read: allowed packs [${allowedPacks.join(", ")}] don't cover theme(s) "${missingThemes.join('", "')}" — every game needs at least one card per Body Card theme`
     );
   }
 
@@ -144,6 +180,11 @@ export function generateRoomReadGame(
       (c) =>
         c.theme === theme &&
         c.modes.includes(mode) &&
+        // CC-187 — gate by allowedPacks. Cards loaded without an
+        // explicit `pack` are coerced to `DEFAULT_PACK_ID` by the
+        // loader (see cards.ts), so `c.pack ?? DEFAULT_PACK_ID`
+        // never matches outside the academic-default pool.
+        allowedPacks.includes(c.pack ?? DEFAULT_PACK_ID) &&
         !usedCardIds.has(c.id)
     );
     if (candidates.length === 0) {

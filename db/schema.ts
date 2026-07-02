@@ -353,6 +353,14 @@ export const roomReadSessions = pgTable("room_read_sessions", {
   // (already in `room_read_rounds`) AND so a stale-version inspect can
   // diff the stored artifact against a re-derivation.
   generated_game: jsonb("generated_game").notNull(),
+  // CC-187 — packs this game was generated from. Persisted so the
+  // reveal/replay paths see the exact pool that fed generation; the
+  // generator never re-derives from CARDS on reveal (it reads the
+  // snapshot in `generated_game`), but having the pack list at the
+  // session level keeps the contract explicit and lets future audits
+  // group revenue by pack. Nullable for back-compat with pre-CC-187
+  // rows; readers treat null as `["academic"]` (DEFAULT_PACK_ID).
+  allowed_packs: text("allowed_packs").array(),
   created_at: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

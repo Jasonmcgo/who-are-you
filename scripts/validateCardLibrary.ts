@@ -45,6 +45,15 @@ const VALID_THEMES = new Set<string>([
   "lens", "compass", "hands", "voice", "gravity", "trust", "fire", "path",
 ]);
 
+// CC-187 — known pack ids. Mirrors `KNOWN_PACKS` in
+// `lib/games/roomRead/packs.ts`; kept inline here so the validator
+// remains zero-import-of-engine (it parses JSON and reports — no
+// runtime engine import). Add a new pack to both lists together.
+const VALID_PACKS = new Set<string>([
+  "academic",
+  "holiday_family",
+]);
+
 interface TagW { tag: string; weight: number }
 interface Card {
   id?: unknown;
@@ -52,6 +61,7 @@ interface Card {
   modes?: unknown;
   prompt?: unknown;
   tags?: unknown;
+  pack?: unknown;
 }
 
 const errors: string[] = [];
@@ -95,6 +105,18 @@ function main(): void {
     // theme
     if (typeof c.theme !== "string" || !VALID_THEMES.has(c.theme)) {
       errors.push(`[${where}] invalid theme: ${JSON.stringify(c.theme)}`);
+    }
+
+    // CC-187 — pack. Errors on missing or unknown pack so the runtime
+    // loader's back-compat default (`cards.ts` → `DEFAULT_PACK_ID`)
+    // never has to silently absorb a typo. Per-pack distribution
+    // tallied below for the summary.
+    if (c.pack === undefined || c.pack === null || c.pack === "") {
+      errors.push(`[${where}] missing pack — every card must declare a pack id (see lib/games/roomRead/packs.ts)`);
+    } else if (typeof c.pack !== "string") {
+      errors.push(`[${where}] pack must be a string: ${JSON.stringify(c.pack)}`);
+    } else if (!VALID_PACKS.has(c.pack)) {
+      errors.push(`[${where}] unknown pack "${c.pack}" — add it to KNOWN_PACKS in lib/games/roomRead/packs.ts AND to VALID_PACKS at the top of this script before shipping cards`);
     }
 
     // modes
@@ -151,9 +173,46 @@ function main(): void {
     }
   });
 
+  // ── CC-187 — per-pack distribution + coverage check ──
+  //
+  // Counts cards per pack and warns when a pack doesn't span all 8
+  // themes. A pack with a theme hole can't field a full game on its
+  // own — `generate.ts` will hard-fail at creation time with a
+  // named-theme error rather than throwing mid-loop on round-N. This
+  // is just the build-time heads-up.
+  const cardsByPack = new Map<string, number>();
+  const themesByPack = new Map<string, Set<string>>();
+  cards.forEach((c) => {
+    if (typeof c.pack !== "string" || !c.pack) return;
+    cardsByPack.set(c.pack, (cardsByPack.get(c.pack) ?? 0) + 1);
+    if (typeof c.theme === "string" && VALID_THEMES.has(c.theme)) {
+      const set = themesByPack.get(c.pack) ?? new Set<string>();
+      set.add(c.theme);
+      themesByPack.set(c.pack, set);
+    }
+  });
+  for (const [packId, themes] of themesByPack.entries()) {
+    if (themes.size < VALID_THEMES.size) {
+      const missing = [...VALID_THEMES].filter((t) => !themes.has(t));
+      warnings.push(
+        `[pack:${packId}] covers ${themes.size}/${VALID_THEMES.size} themes — missing: ${missing.join(", ")} (this pack alone can't fill a full game; combine with another pack or extend it)`
+      );
+    }
+  }
+
   // ── report ──
   console.log(`\nCard library: ${cards.length} cards · ${seenIds.size} unique ids`);
   console.log(`Cards with a clean single dominant tag: ${dominantOk}/${cards.length}`);
+  // CC-187 — per-pack roll-up.
+  if (cardsByPack.size > 0) {
+    console.log(`\nPer-pack distribution:`);
+    [...cardsByPack.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .forEach(([packId, count]) => {
+        const themes = themesByPack.get(packId)?.size ?? 0;
+        console.log(`  ${packId}: ${count} cards · ${themes}/${VALID_THEMES.size} themes`);
+      });
+  }
   console.log(`\nERRORS: ${errors.length}   WARNINGS: ${warnings.length}\n`);
 
   const show = (label: string, arr: string[], cap: number): void => {

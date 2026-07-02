@@ -13,6 +13,13 @@
 import { useState } from "react";
 
 import type { RosterEntry } from "./CreateCoupleGameForm";
+import { KNOWN_PACKS } from "../../../lib/games/roomRead/packs";
+
+// Pack options for the picker, sourced from the single registry so a new
+// pack shows up here automatically. `academic` (free base) stays first.
+const PACK_OPTIONS = Object.values(KNOWN_PACKS).sort((a, b) =>
+  a.id === "academic" ? -1 : b.id === "academic" ? 1 : a.label.localeCompare(b.label)
+);
 
 type SubmitState =
   | { kind: "idle" }
@@ -31,6 +38,7 @@ export default function CreateRoomReadGameForm({
   const [open, setOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [roundCount, setRoundCount] = useState<number>(8);
+  const [pack, setPack] = useState<string>("academic");
   const [submit, setSubmit] = useState<SubmitState>({ kind: "idle" });
 
   function togglePlayer(id: string) {
@@ -61,6 +69,11 @@ export default function CreateRoomReadGameForm({
           playerSessionIds: [...selectedIds],
           roundCount,
           mode: "classic",
+          // The admin route resolves entitlement per `createdByAdmin`
+          // (owner comp) then intersects this override against it — so a
+          // pure single-pack game is honored only if the owner holds it.
+          allowedPacks: [pack],
+          createdByAdmin: "admin",
         }),
       });
       if (!res.ok) {
@@ -114,6 +127,7 @@ export default function CreateRoomReadGameForm({
   function handleReset() {
     setSelectedIds(new Set());
     setRoundCount(8);
+    setPack("academic");
     setSubmit({ kind: "idle" });
   }
 
@@ -299,6 +313,42 @@ export default function CreateRoomReadGameForm({
           {[4, 5, 6, 7, 8, 9, 10].map((n) => (
             <option key={n} value={n}>
               {n}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="flex flex-row" style={{ gap: 10, alignItems: "center" }}>
+        <label
+          className="font-mono uppercase"
+          style={{
+            fontSize: 10,
+            letterSpacing: "0.12em",
+            color: "var(--ink-mute)",
+          }}
+        >
+          Pack
+        </label>
+        <select
+          value={pack}
+          onChange={(e) => {
+            setPack(e.target.value);
+            setSubmit({ kind: "idle" });
+          }}
+          data-focus-ring
+          className="font-serif"
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--rule)",
+            padding: "6px 10px",
+            borderRadius: 4,
+            fontSize: 13,
+            color: "var(--ink)",
+          }}
+        >
+          {PACK_OPTIONS.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.label}
             </option>
           ))}
         </select>

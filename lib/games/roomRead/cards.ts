@@ -25,6 +25,16 @@
 // this swap.
 
 import cardData from "./cards.data.json";
+import { DEFAULT_PACK_ID } from "./packs";
 import type { RoomReadCard } from "./types";
 
-export const CARDS: RoomReadCard[] = cardData as unknown as RoomReadCard[];
+// CC-187 — coerce a missing `pack` to the default at load time. The
+// current library (840 cards, all `pack: "academic"`) never trips this
+// fallback, but a hand-edited new card with a typo / missing field
+// would silently fall out of every pool (every `allowedPacks` filter
+// rejects an undefined pack) without it. The validator separately
+// ERRORS on missing/unknown pack at build time, so the runtime default
+// is belt-and-suspenders only — not a substitute for the check.
+export const CARDS: RoomReadCard[] = (cardData as unknown as RoomReadCard[]).map(
+  (c) => (c.pack ? c : { ...c, pack: DEFAULT_PACK_ID })
+);

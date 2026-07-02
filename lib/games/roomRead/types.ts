@@ -26,6 +26,16 @@ export type RoomReadMode = "classic";
  * the runtime guard against typos. */
 export type TagId = string;
 
+/** CC-187 — a pack id. Free-form string by the same rationale as
+ * `TagId`: the pack space is negotiated between the card author and
+ * the `KNOWN_PACKS` registry (`lib/games/roomRead/packs.ts`), which is
+ * the runtime authority — the validator (`scripts/validateCardLibrary.ts`)
+ * errors when a card cites a pack not in `KNOWN_PACKS`. `"academic"`
+ * is the base/free pack; entitlement-required packs (`requiresEntitlement:
+ * true` in the registry) are gated via the `resolveAllowedPacks` seam in
+ * `lib/games/roomRead/entitlements.ts`. */
+export type PackId = string;
+
 /** A single card in the library. */
 export type RoomReadCard = {
   /** Stable id; used for de-dup in `generate.ts`. */
@@ -35,6 +45,16 @@ export type RoomReadCard = {
   theme: BodyCardTheme;
   /** Modes this card is eligible for. Empty / missing = unavailable. */
   modes: RoomReadMode[];
+  /** CC-187 — which pack this card belongs to. The library currently
+   *  ships a single pack (`"academic"`, all 840 cards). Future packs
+   *  (`"holiday_movies"`, `"fantasy_school"`, etc.) live alongside it;
+   *  generation filters the candidate pool by an `allowedPacks` list
+   *  resolved through `resolveAllowedPacks` before each round draws.
+   *  Optional in the type so the loader's back-compat default
+   *  (`cards.ts` coerces missing → `"academic"`) covers any hand-edited
+   *  card. The validator errors on absent or unknown packs at build
+   *  time so the runtime default is belt-and-suspenders only. */
+  pack?: PackId;
   /** The prompt copy the room sees. Wit is the product voice — kept
    *  verbatim from the card-library brief. */
   prompt: string;
