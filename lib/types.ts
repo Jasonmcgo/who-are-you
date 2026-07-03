@@ -330,6 +330,66 @@ export type MirrorAxisRead = {
   confidence: "high"; // confidence in the axis itself; high by construction
 };
 
+// ── CC-188 — hydrated function shape ────────────────────────────────
+// The user-facing primary output is the function *shape* (magnitudes +
+// axis range + within-axis differentiation), with MBTI demoted to a
+// secondary litmus label. All shape fields are optional so pre-CC-188
+// callers and saved sessions keep compiling / rendering.
+
+// Per-function allocated magnitude (0–100) AFTER anti-bleed
+// differentiation. Axis strength is a budget *allocated across* its
+// within-axis pair by the differentiating evidence — never a bonus
+// added to both — so a clean Ni-Te never smears into a false NiTeTiNe
+// soup or drifts to the Ne-Ti mirror.
+export type FunctionMagnitudes = Record<CognitiveFunctionId, number>;
+
+// Domain-family (axis) strength, 0–100. "Axis range" (high Intuition /
+// high Thinking) is a SEPARATE layer from within-axis differentiation
+// and from stack order. High axis range must never inflate the
+// subordinate same-axis function or promote it into the 4-tuple.
+export type AxisMagnitude = {
+  intuition: number;
+  sensing: number;
+  thinking: number;
+  feeling: number;
+};
+
+// Within-attitude breadth flags. `*Broad === true` means LOW
+// differentiation between the two attitudes inside a family (Ni≈Ne /
+// Te≈Ti) — genuine ambidexterity — NOT high axis strength. Jason is
+// axis-broad but function-clean, so his flags are false.
+export type WithinAxisBroadFlags = {
+  intuitionBroad: boolean;
+  sensingBroad: boolean;
+  thinkingBroad: boolean;
+  feelingBroad: boolean;
+};
+
+// Per-axis provenance so the prose layer can tell axis range from clean
+// differentiation and name which function actually won.
+export type AxisShapeEvidence = {
+  axisMagnitude: number;
+  differentiationGap: number; // |leader − partner| on the magnitude scale
+  broad: boolean;
+  leader: CognitiveFunctionId; // winning function in the axis
+  partner: CognitiveFunctionId; // subordinate same-axis function
+};
+
+export type ShapeEvidence = {
+  source: "cross-signal" | "qt-blend" | "hybrid";
+  intuition: AxisShapeEvidence;
+  sensing: AxisShapeEvidence;
+  thinking: AxisShapeEvidence;
+  feeling: AxisShapeEvidence;
+  // Same-axis partners that are attractive/usable *resonance*, not real
+  // within-axis breadth (e.g. Jason's live Ne/Ti). The prose layer must
+  // not read these as promotion.
+  resonanceFlags?: CognitiveFunctionId[];
+  // Contamination suspicions carried through so the hedge prose can name
+  // them (stress / role / model-aware self-authorship).
+  contaminationFlags?: ConfidenceLowReason[];
+};
+
 export type LensStack = {
   dominant: CognitiveFunctionId;
   auxiliary: CognitiveFunctionId;
@@ -404,6 +464,20 @@ export type LensStack = {
   // binary-attitude-violation reason fires on the *perceiving* pair
   // (Ni/Ne + Si/Se). Pair is `[picked_ni_or_ne, picked_si_or_se]`.
   binaryContestedPerceivingPair?: [CognitiveFunctionId, CognitiveFunctionId];
+  // CC-188 — hydrated function shape (additive; MBTI stays as the
+  // secondary litmus label in `mbtiCode`, the 4-tuple is untouched).
+  // The differentiated spine (dominant/auxiliary) plus these fields let
+  // a downstream renderer say "clear spine, rich edges" instead of a
+  // bare MBTI stereotype or an over-hydrated NT cloud.
+  functionMagnitudes?: FunctionMagnitudes;
+  axisMagnitude?: AxisMagnitude;
+  withinAxisBroad?: WithinAxisBroadFlags;
+  // Structured label, e.g. "Ni-Te · clean stack · wide N/T axis range".
+  // Distinct from `mbtiCode`. Order: (a) differentiated spine,
+  // (b) stack confidence, (c) axis range when meaningful,
+  // (d) within-axis breadth only when differentiation is genuinely low.
+  shapeLabel?: string;
+  shapeEvidence?: ShapeEvidence;
 };
 
 // CC-141 + CC-138 — reason flags for `LensStack.confidenceLowReasons`.
@@ -451,7 +525,26 @@ export type ConfidenceLowReason =
   // picks ARE structurally inconsistent at the canonical-stack
   // level; this reason marks the recovered case so the hedge
   // prose can distinguish it from a genuine attitude violation.
-  | "binary-same-attitude-leaders-resolved";
+  | "binary-same-attitude-leaders-resolved"
+  // CC-188 — hydration / attractor / satisficing reasons.
+  //   - "unresolved-shape": dominant/auxiliary could not be resolved
+  //     from real scored signal. The stack is an explicit low-confidence
+  //     placeholder and must NOT render a confident type or mbtiCode.
+  //     Replaces the old `dominant ?? "ni"` / hardcoded Ni-Te-Fi-Se
+  //     architect-halo defaults (CC-188 Part B.1).
+  //   - "low-discrimination": the respondent's Q-T picks are near-flat
+  //     (satisficing "just picked the top one" OR genuinely
+  //     undifferentiated). The shape is read off thin discrimination;
+  //     the hedge widens and no confident dominant is invented
+  //     (CC-188 Part D).
+  //   - "model-aware-resonance-suspect": broad high scores across a
+  //     theory-aware respondent's admired same-axis pair while clean
+  //     discriminators still favour one side. Routed to breadth /
+  //     resonance, never to promotion (CC-188 designer-contamination
+  //     canon).
+  | "unresolved-shape"
+  | "low-discrimination"
+  | "model-aware-resonance-suspect";
 
 export type GiftCategory =
   | "Pattern"

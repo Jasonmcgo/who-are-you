@@ -37,10 +37,15 @@ const JUNGIAN_BASE_UNIT = 15;
 // engine-relevant since their position weight is 0.
 
 import type {
+  AxisMagnitude,
+  AxisShapeEvidence,
   CognitiveFunctionId,
   ConfidenceLowReason,
+  FunctionMagnitudes,
   LensStack,
+  ShapeEvidence,
   Signal,
+  WithinAxisBroadFlags,
 } from "./types";
 
 export type CogFunction = CognitiveFunctionId;
@@ -196,23 +201,59 @@ export function topPickCountFor(
   return n;
 }
 
+// CC-188 Part D — full-distribution pool weighting. Rank-1 is weighted
+// heavily but rank-2 / rank-3 earn partial credit, so a single lazy
+// top-pick can't swing a pool the way a pure rank-1 count can. Gradient
+// overlay (per the gradient-calibration canon), not a new hard rule:
+// rank-1 count and averageRank stay deterministic tiebreaks, and the
+// weights are calibrated so no canonical cohort dominant moves.
+const POOL_BLEND_R1 = 3;
+const POOL_BLEND_R2 = 1.4;
+const POOL_BLEND_R3 = 0.6;
+// Flat-response guard: the dominant pool reads near-flat when its leader
+// ties the runner-up on rank-1 count AND barely leads on full-
+// distribution weight — a satisficing / undifferentiated fingerprint.
+const POOL_FLAT_BLENDED_MARGIN = 2.0;
+
+function poolBlendedWeightFor(
+  signals: Signal[],
+  fn: CognitiveFunctionId
+): number {
+  let w = 0;
+  for (const s of signals) {
+    if (s.signal_id !== fn) continue;
+    if (s.rank === 1) w += POOL_BLEND_R1;
+    else if (s.rank === 2) w += POOL_BLEND_R2;
+    else if (s.rank === 3) w += POOL_BLEND_R3;
+    // rank 4+ / undefined: no credit
+  }
+  return w;
+}
+
 /**
  * For a given function pool (perceiving or judging), build the per-
- * function top-pick counts sorted desc with a deterministic tiebreak
- * (averageRank asc, then fn name asc).
+ * function ranking. CC-188 Part D keeps rank-1 `topPicks` count as the
+ * PRIMARY order (so every non-tied cohort leader stays byte-identical —
+ * D.3: no dominant moves) and inserts the full-distribution `blended`
+ * weight as the FIRST tiebreak, ahead of averageRank. This is the
+ * "tie-robustness" the CC asks for: a pool whose rank-1 counts are TIED
+ * (the satisficing / lazy-pick fingerprint) now resolves by the whole
+ * rank-2/3 distribution instead of a single averageRank coin-flip.
  */
 function poolTopPickRanking(
   signals: Signal[],
   pool: CognitiveFunctionId[]
-): Array<{ fn: CognitiveFunctionId; topPicks: number; avg: number }> {
+): Array<{ fn: CognitiveFunctionId; topPicks: number; avg: number; blended: number }> {
   return pool
     .map((fn) => ({
       fn,
       topPicks: topPickCountFor(signals, fn),
       avg: averageRank(signals, fn),
+      blended: poolBlendedWeightFor(signals, fn),
     }))
     .sort((a, b) => {
       if (b.topPicks !== a.topPicks) return b.topPicks - a.topPicks;
+      if (b.blended !== a.blended) return b.blended - a.blended;
       if (a.avg !== b.avg) return a.avg - b.avg;
       return a.fn.localeCompare(b.fn);
     });
@@ -624,16 +665,62 @@ export function aggregateLensStackBinary(signals: Signal[]): LensStack {
     }
   }
 
-  // If we couldn't resolve dom/aux, fall back to a placeholder stack
-  // (low confidence). Don't throw — engine pipeline expects a value.
+  // CC-188 Part B.1 — no Ni-Te architect-halo default. If dom/aux
+  // couldn't be resolved, salvage a magnitude-led dominant from whatever
+  // the respondent actually picked (leader-first, then the raw axis
+  // picks) and pair it with its canonical aux. Only when there is
+  // genuinely nothing to key on do we emit an explicit `unresolved-shape`
+  // placeholder — confidence low, mbtiCode "UNRESOLVED", neutral tail —
+  // that downstream renders as uncertain rather than a confident INTJ.
+  // The fallback never privileges Ni or Te.
   if (!dominant || !auxiliary) {
+    const salvagedDom: CognitiveFunctionId | null =
+      dominant ??
+      perceivingLeader ??
+      judgingLeader ??
+      nePick ??
+      sePick ??
+      tePick ??
+      fePick ??
+      null;
+    if (salvagedDom) {
+      const validAuxes = VALID_AUX_BY_DOMINANT[salvagedDom] ?? [];
+      const salvagedAux: CognitiveFunctionId | undefined =
+        auxiliary && validAuxes.includes(auxiliary)
+          ? auxiliary
+          : validAuxes
+              .map((fn) => ({ fn, topPicks: topPickCountFor(signals, fn) }))
+              .sort(
+                (a, b) => b.topPicks - a.topPicks || a.fn.localeCompare(b.fn)
+              )[0]?.fn;
+      const salvagedKey = `${salvagedDom}|${salvagedAux}`;
+      const salvagedTuple = salvagedAux ? STACK_TABLE[salvagedKey] : undefined;
+      if (salvagedTuple) {
+        return {
+          dominant: salvagedTuple[0],
+          auxiliary: salvagedTuple[1],
+          tertiary: salvagedTuple[2],
+          inferior: salvagedTuple[3],
+          mbtiCode: MBTI_LOOKUP[salvagedKey],
+          confidence: "low",
+          confidenceLowReasons: reasons.length > 0 ? reasons : ["binary-thin"],
+          binaryContestedJudgingPair,
+          binaryContestedPerceivingPair,
+        };
+      }
+    }
+    // Genuinely no resolvable signal — explicit unresolved placeholder.
     return {
-      dominant: dominant ?? "ni",
-      auxiliary: auxiliary ?? "te",
-      tertiary: "fi",
-      inferior: "se",
+      dominant: "ne",
+      auxiliary: "fi",
+      tertiary: "te",
+      inferior: "si",
+      mbtiCode: "UNRESOLVED",
       confidence: "low",
-      confidenceLowReasons: reasons.length > 0 ? reasons : ["binary-thin"],
+      confidenceLowReasons: [
+        ...reasons.filter((r) => r !== "binary-thin"),
+        "unresolved-shape",
+      ],
       binaryContestedJudgingPair,
       binaryContestedPerceivingPair,
     };
@@ -763,12 +850,21 @@ export function aggregateLensStack(signals: Signal[]): LensStack {
     !isFinite(dominantPerceiving.avg) &&
     !isFinite(dominantJudging.avg)
   ) {
+    // CC-188 Part B.1 — no Ni-Te architect-halo default on empty signal.
+    // Pre-CC-188 this returned a confident-looking INTJ 4-tuple for a
+    // session with zero perceiving/judging data. Emit an explicit
+    // `unresolved-shape` placeholder instead: confidence low, mbtiCode
+    // "UNRESOLVED", and a neutral tail that does NOT privilege Ni or Te.
+    // Downstream reads `unresolved-shape` / mbtiCode to render the shape
+    // as explicitly uncertain rather than a stereotyped architect stack.
     return {
-      dominant: "ni",
-      auxiliary: "te",
-      tertiary: "fi",
-      inferior: "se",
+      dominant: "ne",
+      auxiliary: "fi",
+      tertiary: "te",
+      inferior: "si",
+      mbtiCode: "UNRESOLVED",
       confidence: "low",
+      confidenceLowReasons: ["unresolved-shape"],
     };
   }
 
@@ -916,6 +1012,18 @@ export function aggregateLensStack(signals: Signal[]): LensStack {
   if (dominantMirrorTooTight) reasons.push("dominant-mirror");
   if (nsValenceSuspect) reasons.push("ns-valence");
   if (judgingCoOccurrenceSuspect) reasons.push("judging-cooccurrence");
+
+  // CC-188 Part D — flat-response (satisficing) guard. When the dominant
+  // pool reads near-flat — the leader ties its runner-up on rank-1 count
+  // AND barely leads on the full-distribution weight — the shape is being
+  // read from noise ("just picked the top one"). Raise `low-discrimination`
+  // so the hedge widens; the published dominant is unchanged. Calibrated
+  // (tie + sub-margin blended lead) so no clean cohort member trips it.
+  const lowDiscrimination =
+    dominantRunnerUp !== undefined &&
+    dominant.topPicks === dominantRunnerUp.topPicks &&
+    dominant.blended - dominantRunnerUp.blended < POOL_FLAT_BLENDED_MARGIN;
+  if (lowDiscrimination) reasons.push("low-discrimination");
 
   const confidence: "high" | "low" = reasons.length > 0 ? "low" : "high";
 
@@ -1144,6 +1252,294 @@ export function applyPerceivingAxisCorrection(
     inferior: stackTuple[3],
     mbtiCode,
   };
+}
+
+// ── CC-188 Part B.2 — principled Fi-Se same-attitude correction ─────────
+//
+// The introversion attractor: `aggregateLensStackBinary`'s same-attitude
+// recovery (CC-SENSING-TYPING) unconditionally crowns the introverted
+// PERCEIVING leader as dominant when perceiving + judging leaders share
+// attitude. For a respondent whose judging pick was Fi and whose
+// perceiving pick was an introverted-perceiving function (Si/Ni), that
+// buries the explicit Fi into an extraverted-Feeler aux and publishes
+// Si-Fe (ISFJ) / Ni-Fe (INFJ) over a real Fi-Se / Fi-Ne (ISFP / INFP).
+//
+// This post-pass decontaminates introversion from perceiving credit. It
+// runs where cross-signal scores are available (identityEngine, alongside
+// `applyPerceivingAxisCorrection`) — the binary resolver's signals-only
+// signature can't see them, and the Se-vs-Si evidence that makes this a
+// PRINCIPLED discriminator (not a name hardcode) lives in cross-signal.
+//
+// It fires ONLY on the recovery marker + the exact ISFJ/INFJ shape it
+// produces, and only when cross-signal supports the extraverted
+// perceiving read AND corroborates the Fi signature. No cohort member
+// carries the marker today (Nat resolves Fi-Se via the clean opposite-
+// attitude path, not the recovery), so this moves nobody in the cohort —
+// it closes the latent attractor for future binary Si+Fi / Ni+Fi ISFPs.
+
+// "Not clearly above": how far the introverted-perceiving dominant may
+// lead its extraverted mirror in cross-signal and still be treated as
+// not-clearly-dominant (so the extraverted read is preferred).
+export const FI_SE_PERCEIVING_TOLERANCE = 15;
+// How far Fi may sit below Fe in cross-signal and still corroborate the
+// explicit Fi pick the recovery converted into an Fe aux.
+export const FI_SE_FEELING_TOLERANCE = 15;
+
+export function applyFiSeSameAttitudeCorrection(
+  lensStack: LensStack,
+  signals: Signal[],
+  crossSignalScores: Record<CognitiveFunctionId, number>
+): LensStack {
+  void signals; // reserved for future pick-level corroboration; unused today
+  const reasons = lensStack.confidenceLowReasons ?? [];
+  // Gate 1 — only the binary same-attitude recovery produces this shape.
+  if (!reasons.includes("binary-same-attitude-leaders-resolved")) {
+    return lensStack;
+  }
+  // Gate 2 — the recovery only crowns an introverted PERCEIVING dominant
+  // (si/ni) with an extraverted Feeler aux (fe); that fe encodes that the
+  // user's original judging pick was Fi. Anything else is not this case.
+  const dom = lensStack.dominant;
+  if (dom !== "si" && dom !== "ni") return lensStack;
+  if (lensStack.auxiliary !== "fe") return lensStack;
+
+  const extravertedMirror: CognitiveFunctionId = dom === "si" ? "se" : "ne";
+  const introScore = crossSignalScores[dom] ?? 0;
+  const mirrorScore = crossSignalScores[extravertedMirror] ?? 0;
+  const fiScore = crossSignalScores.fi ?? 0;
+  const feScore = crossSignalScores.fe ?? 0;
+
+  // Principled Fi-Se discriminator (pattern, NOT a name check):
+  //  (1) the introverted-perceiving dominant is NOT clearly above its
+  //      extraverted mirror in cross-signal (Se not dominated by Si);
+  //  (2) the Fi signature holds up in cross-signal (Fi not clearly below
+  //      Fe), corroborating the explicit Fi pick.
+  const extravertedPerceivingSupported =
+    mirrorScore >= introScore - FI_SE_PERCEIVING_TOLERANCE;
+  const fiSignatureHolds = fiScore >= feScore - FI_SE_FEELING_TOLERANCE;
+  if (!extravertedPerceivingSupported || !fiSignatureHolds) return lensStack;
+
+  const key = `fi|${extravertedMirror}`;
+  const stackTuple = STACK_TABLE[key];
+  const mbtiCode = MBTI_LOOKUP[key];
+  if (!stackTuple) return lensStack; // defensive — fi|se & fi|ne are canonical
+
+  // Correct the DIRECTION of the read to Fi-Se / Fi-Ne. Confidence stays
+  // low: the binary picks are structurally inconsistent at the canonical-
+  // stack level; only the inverted stack order is fixed. Reasons (incl.
+  // the recovery marker) are preserved so the hedge prose still fires.
+  return {
+    ...lensStack,
+    dominant: stackTuple[0],
+    auxiliary: stackTuple[1],
+    tertiary: stackTuple[2],
+    inferior: stackTuple[3],
+    mbtiCode,
+  };
+}
+
+// ── CC-188 Part A — hydrated function shape ──────────────────────────────
+//
+// Publishes the differentiated stack as function MAGNITUDES + AXIS RANGE
+// + within-axis BREADTH, so a downstream renderer can say "clear spine,
+// rich edges" instead of a bare MBTI stereotype or an over-hydrated NT
+// cloud. MBTI stays a secondary litmus label.
+//
+// Anti-bleed (load-bearing): per-function magnitudes come straight from
+// the cross-signal score sheet, which scores each function independently
+// — axis strength is therefore NEVER added as a bonus to both members of
+// a within-axis pair. A clean Ni-Te (Ni≫Ne, Te≫Ti in cross-signal) stays
+// clean; only genuinely even evidence sets a `*Broad` flag. `axisMagnitude`
+// is a SEPARATE, secondary layer (leader + a quarter of the partner) that
+// honours real axis range without diluting or inverting the stack.
+
+// Broad (low within-axis differentiation) requires BOTH a small
+// leader-vs-partner gap AND a genuinely present axis, so a low-magnitude
+// axis with a tiny gap (e.g. Jason's feeling) is never spuriously flagged.
+const SHAPE_BROAD_GAP_MAX = 15;
+const SHAPE_AXIS_PRESENT_FLOOR = 45;
+// An axis reads as "wide range" at/above this magnitude.
+const SHAPE_AXIS_HIGH = 60;
+// A same-axis partner is resonance (attractive, not the lead) at/above this.
+const SHAPE_RESONANCE_FLOOR = 35;
+// A differentiated spine reads "clean" when the dominant leads its axis
+// by at least this magnitude gap.
+const SHAPE_CLEAN_DOM_GAP = 20;
+
+const AXIS_MEMBERS: Record<
+  keyof AxisMagnitude,
+  [CognitiveFunctionId, CognitiveFunctionId]
+> = {
+  intuition: ["ni", "ne"],
+  sensing: ["si", "se"],
+  thinking: ["ti", "te"],
+  feeling: ["fi", "fe"],
+};
+
+const AXIS_LETTER: Record<keyof AxisMagnitude, string> = {
+  intuition: "N",
+  sensing: "S",
+  thinking: "T",
+  feeling: "F",
+};
+
+const CONTAMINATION_REASONS: ReadonlySet<ConfidenceLowReason> = new Set([
+  "thin-floor",
+  "ns-valence",
+  "judging-cooccurrence",
+  "dominant-mirror",
+  "low-discrimination",
+  "model-aware-resonance-suspect",
+  "unresolved-shape",
+]);
+
+function fnUpper(fn: CognitiveFunctionId): string {
+  return fn.charAt(0).toUpperCase() + fn.slice(1);
+}
+
+function combineAxis(a: number, b: number): number {
+  return Math.round(Math.min(100, Math.max(a, b) + 0.25 * Math.min(a, b)));
+}
+
+/**
+ * CC-188 — compute the hydrated function shape from the published stack
+ * and the cross-signal score sheet. Pure; both inputs are already in hand
+ * at the identityEngine cross-signal-attach site.
+ */
+export function computeFunctionShape(
+  lensStack: LensStack,
+  crossSignalScores: Record<CognitiveFunctionId, number>
+): {
+  functionMagnitudes: FunctionMagnitudes;
+  axisMagnitude: AxisMagnitude;
+  withinAxisBroad: WithinAxisBroadFlags;
+  shapeLabel: string;
+  shapeEvidence: ShapeEvidence;
+} {
+  const clamp = (n: number) => Math.round(Math.max(0, Math.min(100, n)));
+  const functionMagnitudes = ALL_FUNCTIONS.reduce((acc, fn) => {
+    acc[fn] = clamp(crossSignalScores[fn] ?? 0);
+    return acc;
+  }, {} as FunctionMagnitudes);
+
+  const axisMagnitude = {} as AxisMagnitude;
+  const broad = {} as WithinAxisBroadFlags;
+  const axisEvidence = {} as Record<keyof AxisMagnitude, AxisShapeEvidence>;
+  const resonanceFlags: CognitiveFunctionId[] = [];
+
+  (Object.keys(AXIS_MEMBERS) as Array<keyof AxisMagnitude>).forEach((axis) => {
+    const [x, y] = AXIS_MEMBERS[axis];
+    const mx = functionMagnitudes[x];
+    const my = functionMagnitudes[y];
+    const leader = mx >= my ? x : y;
+    const partner = mx >= my ? y : x;
+    const gap = Math.abs(mx - my);
+    const mag = combineAxis(mx, my);
+    axisMagnitude[axis] = mag;
+    const isBroad = gap <= SHAPE_BROAD_GAP_MAX && mag >= SHAPE_AXIS_PRESENT_FLOOR;
+    broad[`${axis}Broad` as keyof WithinAxisBroadFlags] = isBroad;
+    axisEvidence[axis] = {
+      axisMagnitude: mag,
+      differentiationGap: gap,
+      broad: isBroad,
+      leader,
+      partner,
+    };
+    // A well-differentiated, meaningfully-present partner is resonance
+    // (attractive edge), not real within-axis breadth.
+    if (
+      !isBroad &&
+      mag >= SHAPE_AXIS_PRESENT_FLOOR &&
+      functionMagnitudes[partner] >= SHAPE_RESONANCE_FLOOR
+    ) {
+      resonanceFlags.push(partner);
+    }
+  });
+
+  // Model-aware-resonance: high N AND high T axis range with live same-
+  // axis resonance while the spine stays cleanly differentiated — the
+  // "NT cloud" risk profile (pattern caution, not an identity check).
+  const contaminationFlags: ConfidenceLowReason[] = (
+    lensStack.confidenceLowReasons ?? []
+  ).filter((r) => CONTAMINATION_REASONS.has(r));
+  const ntCloudRisk =
+    axisMagnitude.intuition >= SHAPE_AXIS_HIGH &&
+    axisMagnitude.thinking >= SHAPE_AXIS_HIGH &&
+    !broad.intuitionBroad &&
+    !broad.thinkingBroad &&
+    resonanceFlags.length > 0;
+  if (ntCloudRisk && !contaminationFlags.includes("model-aware-resonance-suspect")) {
+    contaminationFlags.push("model-aware-resonance-suspect");
+  }
+
+  // ── shapeLabel: (a) spine, (b) confidence, (c) axis range, (d) breadth
+  const spine = `${fnUpper(lensStack.dominant)}-${fnUpper(lensStack.auxiliary)}`;
+
+  const reasons = lensStack.confidenceLowReasons ?? [];
+  const domAxis = (Object.keys(AXIS_MEMBERS) as Array<keyof AxisMagnitude>).find(
+    (a) => AXIS_MEMBERS[a].includes(lensStack.dominant)
+  )!;
+  const auxAxis = (Object.keys(AXIS_MEMBERS) as Array<keyof AxisMagnitude>).find(
+    (a) => AXIS_MEMBERS[a].includes(lensStack.auxiliary)
+  )!;
+  const domGap = axisEvidence[domAxis].differentiationGap;
+  const spineClean =
+    !axisEvidence[domAxis].broad &&
+    !axisEvidence[auxAxis].broad &&
+    domGap >= SHAPE_CLEAN_DOM_GAP;
+  let descriptor: string;
+  if (reasons.includes("unresolved-shape") || lensStack.mbtiCode === "UNRESOLVED") {
+    descriptor = "unresolved";
+  } else if (lensStack.crossSignalAgreement === "mirror-axis" || lensStack.mirrorAxis) {
+    descriptor = "mirror-axis";
+  } else if (lensStack.confidence === "high") {
+    descriptor = "clean stack";
+  } else if (reasons.every((r) => r === "aux-ambiguous") && spineClean) {
+    // Q-T aux count was tight but the shape itself is cleanly
+    // differentiated (Ni≫Ne, Te≫Ti) — honestly a clean spine.
+    descriptor = "clean stack";
+  } else {
+    descriptor = "low-confidence";
+  }
+
+  const highAxes = (Object.keys(AXIS_MEMBERS) as Array<keyof AxisMagnitude>)
+    .filter((a) => axisMagnitude[a] >= SHAPE_AXIS_HIGH)
+    .map((a) => AXIS_LETTER[a]);
+  const axisRange =
+    highAxes.length >= 2 ? `wide ${highAxes.join("/")} axis range` : null;
+
+  // Surface within-axis breadth in the LABEL only for prominent axes
+  // (the flag itself stays in `withinAxisBroad` as full metadata) — a
+  // minor axis reading Ni≈Ne is honest but clutters "clear spine, rich
+  // edges". Only breadth on a genuinely high axis earns a label slot.
+  const broadAxes = (Object.keys(AXIS_MEMBERS) as Array<keyof AxisMagnitude>)
+    .filter(
+      (a) =>
+        broad[`${a}Broad` as keyof WithinAxisBroadFlags] &&
+        axisMagnitude[a] >= SHAPE_AXIS_HIGH
+    )
+    .map((a) => {
+      const [x, y] = AXIS_MEMBERS[a];
+      return `${fnUpper(x)}≈${fnUpper(y)}`;
+    });
+  const breadth = broadAxes.length > 0 ? broadAxes.join(", ") : null;
+
+  const shapeLabel = [spine, descriptor, axisRange, breadth]
+    .filter((p): p is string => !!p)
+    .join(" · ");
+
+  // source: cross-signal today (magnitudes are the cross-signal sheet).
+  const shapeEvidence: ShapeEvidence = {
+    source: "cross-signal",
+    intuition: axisEvidence.intuition,
+    sensing: axisEvidence.sensing,
+    thinking: axisEvidence.thinking,
+    feeling: axisEvidence.feeling,
+    ...(resonanceFlags.length > 0 ? { resonanceFlags } : {}),
+    ...(contaminationFlags.length > 0 ? { contaminationFlags } : {}),
+  };
+
+  return { functionMagnitudes, axisMagnitude, withinAxisBroad: broad, shapeLabel, shapeEvidence };
 }
 
 // ── Re-exports for diagnostic-time inspection ───────────────────────────

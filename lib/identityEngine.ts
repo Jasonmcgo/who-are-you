@@ -2664,6 +2664,24 @@ function attachCrossSignalDriverInference(
     if (corrected !== constitution.lens_stack) {
       constitution.lens_stack = corrected;
     }
+    // CC-188 Part B.2 — decontaminate introversion from perceiving
+    // credit. Runs here (not in the binary resolver) because the Se-vs-Si
+    // cross-signal evidence that makes the Fi-Se call principled — rather
+    // than a Nat/JDrew name hardcode — is only available at this layer,
+    // exactly where `applyPerceivingAxisCorrection` already sits. Corrects
+    // a recovered Si-Fe / Ni-Fe (ISFJ / INFJ) into Fi-Se / Fi-Ne
+    // (ISFP / INFP) only when cross-signal supports the extraverted
+    // perceiving read AND corroborates the Fi signature. No cohort member
+    // carries the same-attitude-recovery marker, so this moves nobody in
+    // the cohort; it closes the latent attractor for future respondents.
+    const fiSeCorrected = applyFiSeSameAttitudeCorrection(
+      constitution.lens_stack,
+      constitution.signals,
+      cs.scores
+    );
+    if (fiSeCorrected !== constitution.lens_stack) {
+      constitution.lens_stack = fiSeCorrected;
+    }
     // CC-097B-CALIBRATION Phase 1 — agreement-lift rule.
     // Runs BEFORE the existing agree/disagree/mirror-axis branching so
     // that when Q-T direct and cross-signal converge strongly on the
@@ -2714,11 +2732,24 @@ function attachCrossSignalDriverInference(
       //   - `binary-dominance-ambiguous`: dominance ordering missing
       //     or doesn't match either parent pick. Dominant agreement
       //     can't reconcile an unresolved dominance call.
+      //   - `binary-same-attitude-leaders-resolved` (CC-188): both the
+      //     perceiving AND judging leaders shared attitude — an
+      //     impossible canonical stack that `aggregateLensStackBinary`
+      //     merely *recovers* into the nearest legal shape. It is
+      //     structurally inconsistent, so it is the LEAST liftable state
+      //     too. This became load-bearing when CC-188's
+      //     `applyFiSeSameAttitudeCorrection` re-routes such a recovery
+      //     to an Fi-dominant stack: the corrected dominant can now match
+      //     the cross-signal driver, which would otherwise satisfy the
+      //     lift's `inferredDriver === dominant` gate and harden a
+      //     structurally-inconsistent typing to `high` — contradicting
+      //     the correction's own "confidence stays low" invariant.
       // String literals match `aggregateLensStackBinary` emission
       // sites in lib/jungianStack.ts byte-for-byte (a typo here
       // silently no-ops the gate).
       "binary-attitude-violation",
       "binary-dominance-ambiguous",
+      "binary-same-attitude-leaders-resolved",
     ];
     const liftIsBlocked =
       (constitution.lens_stack.confidenceLowReasons ?? []).some((r) =>
@@ -2757,10 +2788,40 @@ function attachCrossSignalDriverInference(
       constitution.lens_stack.confidence = "low";
     }
     // agreement === "agree": existing confidence reading stands.
+
+    // CC-188 Part A — attach the hydrated function shape LAST, computed
+    // from the FINAL published stack (post perceiving + Fi-Se correction,
+    // post lift / classify) and the cross-signal score sheet, so the
+    // magnitudes + shapeLabel reflect exactly what the engine publishes.
+    const shape = computeFunctionShape(constitution.lens_stack, cs.scores);
+    constitution.lens_stack.functionMagnitudes = shape.functionMagnitudes;
+    constitution.lens_stack.axisMagnitude = shape.axisMagnitude;
+    constitution.lens_stack.withinAxisBroad = shape.withinAxisBroad;
+    constitution.lens_stack.shapeLabel = shape.shapeLabel;
+    constitution.lens_stack.shapeEvidence = shape.shapeEvidence;
   } catch {
     // Silent fallback — if cross-signal inference throws on a
-    // thin-signal session, leave the LensStack untouched. The
+    // thin-signal session, leave the LensStack corrections untouched. The
     // pre-CC-097B contract still holds.
+    //
+    // CC-188 — still attach a minimal shape (from a zeroed score sheet)
+    // so the hydration fields are present on EVERY constitution, even
+    // when cross-signal throws. Acceptance requires shape on every stack.
+    if (!constitution.lens_stack.functionMagnitudes) {
+      try {
+        const zero: Record<CognitiveFunctionId, number> = {
+          ni: 0, ne: 0, si: 0, se: 0, ti: 0, te: 0, fi: 0, fe: 0,
+        };
+        const shape = computeFunctionShape(constitution.lens_stack, zero);
+        constitution.lens_stack.functionMagnitudes = shape.functionMagnitudes;
+        constitution.lens_stack.axisMagnitude = shape.axisMagnitude;
+        constitution.lens_stack.withinAxisBroad = shape.withinAxisBroad;
+        constitution.lens_stack.shapeLabel = shape.shapeLabel;
+        constitution.lens_stack.shapeEvidence = shape.shapeEvidence;
+      } catch {
+        // Give up — leave shape undefined on a truly broken stack.
+      }
+    }
   }
 }
 
@@ -2791,6 +2852,22 @@ function attachHandsCard(constitution: InnerConstitution): void {
       constitution.lens_stack?.dominant
         ? constitution.lens_stack.dominant
         : "unknown";
+    // CC-186 — auxiliary + aesthetic signals for the maker route.
+    // Auxiliary completes the Fi-Se gate; the aesthetic signal is
+    // taken from either Q-O1's #1 ranked pick (canonical aesthetic
+    // tell) or the smoothed Openness `aesthetic` subdimension. Both
+    // are inputs the engine already computes elsewhere — pulled here
+    // inline rather than threaded across module boundaries.
+    const lensAux = constitution.lens_stack?.auxiliary ?? undefined;
+    const qO1TopPickIsAesthetic = (constitution.signals ?? []).some(
+      (s) =>
+        s.rank === 1 &&
+        s.signal_id === "openness_aesthetic" &&
+        (s.source_question_ids?.includes("Q-O1") ?? false)
+    );
+    const oceanOpennessAesthetic =
+      constitution.ocean?.dispositionSignalMix?.opennessSubdimensions
+        ?.aesthetic ?? 0;
     const surfaceById = (id: string, qid: string): string | null => {
       const hit = constitution.signals.find(
         (s) =>
@@ -2848,6 +2925,10 @@ function attachHandsCard(constitution: InnerConstitution): void {
       // the archetype router can fall back to `unmappedType` when the
       // driver function is uncertain.
       lensConfidence: constitution.lens_stack.confidence,
+      // CC-186 — auxiliary + aesthetic signals feed the maker route.
+      lensAux,
+      qO1TopPickIsAesthetic,
+      oceanOpennessAesthetic,
     });
   } catch {
     // Silent fallback — handsCard stays undefined.
@@ -3374,6 +3455,8 @@ export function toAnswer(
 import {
   aggregateLensStack,
   applyPerceivingAxisCorrection,
+  applyFiSeSameAttitudeCorrection,
+  computeFunctionShape,
 } from "./jungianStack";
 export { aggregateLensStack };
 

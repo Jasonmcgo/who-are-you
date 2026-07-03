@@ -77,6 +77,16 @@ export interface HandsCardInputs {
   // engine isn't sure about. Optional so pre-CC callers continue to
   // compile; absent => treated as "high" (preserves prior behavior).
   lensConfidence?: "high" | "low";
+  // CC-186 — auxiliary + aesthetic signals for the aesthetic-maker
+  // route. The route fires on `Fi-driver + Se-aux + aesthetic signal`,
+  // independent of archetype, INDEPENDENT of lensConfidence (the
+  // aesthetic signal is the high-confidence anchor — see Part B
+  // comment in resolveTemplateKey). All optional so callers added
+  // before CC-186 still compile; absent inputs simply leave the
+  // maker route un-fireable for that session.
+  lensAux?: string;
+  qO1TopPickIsAesthetic?: boolean;
+  oceanOpennessAesthetic?: number; // 0–100 subdimension intensity
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -95,7 +105,16 @@ type Template = {
   closing: string;
 };
 
-const TEMPLATES: Record<ProfileArchetype, Template> = {
+// CC-186 — TemplateKey extends ProfileArchetype with `"makerType"` for
+// the aesthetic-maker register. Pre-CC the TEMPLATES map was strictly
+// archetype-keyed and the routing resolver returned a ProfileArchetype;
+// the maker register doesn't belong to a profileArchetype (it cuts
+// across cindyType / unmappedType when Fi-Se + aesthetic signal
+// fires), so it needs its own key without polluting ProfileArchetype
+// (which has cross-module consumers).
+type TemplateKey = ProfileArchetype | "makerType";
+
+const TEMPLATES: Record<TemplateKey, Template> = {
   jasonType: {
     opening:
       "You tend to build structural frameworks that hold what you've seen — the long-arc systems that turn pattern into form.",
@@ -176,6 +195,33 @@ const TEMPLATES: Record<ProfileArchetype, Template> = {
     closing:
       "Hands is what your life makes real. Work Map is where that making may fit.",
   },
+  // CC-186 — the aesthetic-maker register. Fires for Fi-driver + Se-aux
+  // shapes whose aesthetic signal (Q-O1 #1 = openness_aesthetic or
+  // ocean subdimension `aesthetic` ≥ 60) is high — the artist whose
+  // hands make form (painting, song, designed object). The growth-edge
+  // language mirrors CC-185's executive-read pair-line ("values made
+  // visible only after the moment they were meant for has passed").
+  // The closing ties to "values made visible" — the same arc.
+  makerType: {
+    opening:
+      "You tend to build form. Your hands make the painting, the song, the designed object — the thing in front of you that wasn't there before — and the work is the value made visible.",
+    strength:
+      "Your hands make form. The painting, the song, the designed object — what you build is the value you carry rendered into something that can be looked at, listened to, picked up. The making isn't decoration; it's how your inner sense gets translated into a thing the world can register without you in the room to explain it.",
+    growthEdge:
+      "The maker's risk is values made visible only after the moment they were meant for has passed. The work waits — until it's ready, until it's safe to be seen, until the room feels like the right room — and the making lands later than what it was made for. When the perfecting becomes a shield, the form starts protecting you from being read at all.",
+    healthRegister:
+      "In health, you let the made thing leave your hands while the moment it was for is still alive. The form arrives when it's needed, not when you've finished defending it; the value made visible is allowed to be touched, used, even misread, before it is finished.",
+    pressureRegister:
+      "Under pressure, making to express becomes making to prove. The form gets refined past its addressee; the work waits for a viewer worthy of it; the making continues because stopping would mean letting the thing be seen before it's safe. The hands stay busy because if the form ever lands, it can be judged.",
+    integrationLine:
+      "The difference is whether what you're making is reaching toward what you want it to mean, or holding off the moment it would have to be received.",
+    practice:
+      "Pick one piece you're still finishing for the right viewer and release it to a wrong viewer — someone whose response won't change the work. Let the made thing meet the world without the perfect frame around it.",
+    movementNote:
+      "Hands sits on the Goal axis; for a maker shape, Soul-substance is what's being rendered into Goal-axis form. Grip drag here looks like the work-waiting-for-its-room; the corrective is letting the made thing arrive while the moment is still alive.",
+    closing:
+      "The work is to let what your values build leave your hands while the moment it was for is still there.",
+  },
 };
 
 // ─────────────────────────────────────────────────────────────────────
@@ -241,12 +287,67 @@ function compassSupportsArchetype(
   return topCompassSignalIds.some((s) => set.has(s));
 }
 
-function resolveTemplateArchetype(
+/**
+ * CC-186 — aesthetic-maker route predicate.
+ *
+ * Fires for `Fi driver + Se aux + aesthetic signal`. The aesthetic
+ * signal is satisfied by EITHER:
+ *   - the user ranked "beauty/music/design" first on Q-O1
+ *     (`qO1TopPickIsAesthetic`), OR
+ *   - their Openness aesthetic subdimension is high (≥ 60).
+ *
+ * Intentionally INDEPENDENT of `lensConfidence`: an aesthetic signal
+ * is its own high-confidence input — a person who ranks Q-O1 = beauty
+ * first or carries a high aesthetic subdim is telling the engine
+ * something the engine should believe even when the broader lens
+ * stack reads low-confidence. Pre-CC-186 the low-confidence gate at
+ * the top of `resolveTemplateKey` flattened these shapes to the
+ * generic `unmappedType` template; the maker route runs BEFORE that
+ * gate.
+ *
+ * Tight gate-shape on purpose: only Fi-Se (the ISFP artist pattern)
+ * fires. Fi-Ne is the Megan-pattern (possibility-tilted, CC-185 keeps
+ * it on the dom-only thesis fallback) — the auxiliary genuinely
+ * differentiates them and the maker template specifically describes
+ * the present-tense / form-making register Fi-Se carries.
+ */
+const MAKER_AESTHETIC_SUBDIM_FLOOR = 60;
+function isAestheticMaker(
+  lensDriver: string,
+  lensAux: string | undefined,
+  qO1TopPickIsAesthetic: boolean | undefined,
+  oceanOpennessAesthetic: number | undefined
+): boolean {
+  if (lensDriver.toLowerCase() !== "fi") return false;
+  if ((lensAux ?? "").toLowerCase() !== "se") return false;
+  const aestheticSignal =
+    qO1TopPickIsAesthetic === true ||
+    (oceanOpennessAesthetic ?? 0) >= MAKER_AESTHETIC_SUBDIM_FLOOR;
+  return aestheticSignal;
+}
+
+function resolveTemplateKey(
   archetype: ProfileArchetype,
   lensDriver: string,
+  lensAux: string | undefined,
   topCompassSignalIds: string[] | undefined,
-  lensConfidence: "high" | "low" | undefined
-): ProfileArchetype {
+  lensConfidence: "high" | "low" | undefined,
+  qO1TopPickIsAesthetic: boolean | undefined,
+  oceanOpennessAesthetic: number | undefined
+): TemplateKey {
+  // CC-186 — aesthetic-maker route fires FIRST, before the
+  // low-confidence fallback. See `isAestheticMaker` for why the
+  // aesthetic signal beats the lens-confidence gate.
+  if (
+    isAestheticMaker(
+      lensDriver,
+      lensAux,
+      qO1TopPickIsAesthetic,
+      oceanOpennessAesthetic
+    )
+  ) {
+    return "makerType";
+  }
   // CC-089-HEDGED-LOW-CONFIDENCE-LENS — low-confidence Lens means the
   // engine isn't sure about the driver function; routing the Hands
   // template by an uncertain driver compounds the miss. Fall back to
@@ -288,18 +389,21 @@ export function computeHandsCard(inputs: HandsCardInputs): HandsCardReading {
     qGS1TopReward,
     qV1TopMeaning,
   } = inputs;
-  const templateArchetype = resolveTemplateArchetype(
+  const templateKey = resolveTemplateKey(
     archetype,
     lensDriver,
+    inputs.lensAux,
     inputs.topCompassSignalIds,
-    inputs.lensConfidence
+    inputs.lensConfidence,
+    inputs.qO1TopPickIsAesthetic,
+    inputs.oceanOpennessAesthetic
   );
-  const t = TEMPLATES[templateArchetype] ?? TEMPLATES.unmappedType;
+  const t = TEMPLATES[templateKey] ?? TEMPLATES.unmappedType;
 
   // Diagnostic rationale — names the inputs that fired.
   const rationaleParts = [
     `archetype=${archetype}`,
-    `templateArchetype=${templateArchetype}`,
+    `templateKey=${templateKey}`,
     `gripPattern=${gripPatternBucket}`,
     `goalScore=${goalScore.toFixed(0)}`,
     `costStrength=${costStrength.toFixed(0)}`,

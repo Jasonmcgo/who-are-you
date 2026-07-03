@@ -44,3 +44,45 @@ use them as ground-truth anchors for their flagged dimension.
 
 Re-confirm each flagged cohort after the cohort re-derive that follows CC-134
 and CC-135.
+
+## CC-188 — Typing Hydration (unique shape over MBTI stereotype)
+
+Adds a first-class **function shape** to `lens_stack` (`functionMagnitudes`,
+`axisMagnitude`, `withinAxisBroad`, `shapeLabel`, `shapeEvidence`) so the
+user-facing output is the differentiated spine **plus** honest axis range and
+within-axis breadth — MBTI demoted to the `mbtiCode` litmus. Anti-bleed: axis
+strength is allocated per-function (never a bonus added to both same-axis
+functions), so a clean Ni-Te never smears into a false NiTeTiNe / Ne-Ti mush.
+
+- **Jason** reads `Ni-Te · clean stack · wide N/T axis range` (axisMagnitude
+  N=75, T=99; `intuitionBroad=false`, `thinkingBroad=false`; Ni 65 ≫ Ne 40,
+  Te 95 ≫ Ti 15). Still INTJ underneath. The high N/T axis range honours why
+  Ne/Ti feel familiar to him without promoting them.
+- **Ni-Te default killed** (Part B.1): the binary `dominant ?? "ni"` fallback
+  and the legacy degenerate `ni/te/fi/se` return now emit an explicit
+  `unresolved-shape` (mbtiCode `"UNRESOLVED"`) instead of a fake INTJ. Empty /
+  typing-signal-free fixtures no longer default to the architect halo.
+- **Nat** = **Fi-Se (ISFP)** already — corrected by CC-183; her real picks are
+  Ne+Se / Ti+Fi, so she takes the clean opposite-attitude path and the binary
+  same-attitude recovery no longer inverts her. No CC-188 change needed for her
+  dominant. The **principled Fi-Se discriminator**
+  (`applyFiSeSameAttitudeCorrection`, cross-signal-gated on Se-vs-Si + a
+  corroborated Fi signature) is shipped to close the *latent* attractor for
+  future binary Si+Fi / Ni+Fi respondents; it fires on no current cohort
+  member (verified) — no hardcode.
+- **JDrew** = published **Fe-Ni (ENFJ)**, low-confidence. Owner reads him as
+  Fi-Se ISFP, but his real answers do **not** support it: Q-T judging splits
+  Fi/Fe 2–2 (Fe slightly better avg), perceiving is a 4-way rank-1 tie, and
+  cross-signal is Fe 85 / Si 70 / Se 40 / Fi 35. A principled discriminator
+  cannot flip him without a name hardcode. **Owner decision (2026-07-03):**
+  surface the honest read — the Part D satisficing guard raises
+  `low-discrimination` on his flat data (he is the only cohort member that
+  trips it) and widens the hedge, rather than confidently mislabelling him.
+- **Connor** (published Ti-INTP, cross-signal infers Ne) and **Brian**
+  (published Ni-INTJ, cross-signal infers Te) remain **documented
+  dominant-selection debt** — the `dominant-selection-debt-connor-brian` audit
+  guards their current output against silent regression. Fix deferred to
+  **CC-189 — Dominant-Selection Rework**. Not retyped here.
+- **Part D** blends the full rank distribution into pool ranking as a
+  *tiebreak* (top-pick count stays primary, so no cohort dominant moves —
+  Harry stays Si-Fe) plus the `low-discrimination` flat-response guard.
